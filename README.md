@@ -1,20 +1,18 @@
 <div align="center">
 
-# OpenReel Video
+<img src="apps/desktop/build/icon.png" alt="Laamacut llama" width="128">
 
-### Your footage. Your timeline. Your final cut.
+# Laamacut
 
-An open source video editor for the browser and desktop.<br>
-Cut clips, add captions, mix audio, and finish your video without a watermark.
+### Edit fast. Export smooth.
 
-**[Open the editor](https://openreel.video)** &nbsp;·&nbsp; **[Download desktop](https://github.com/Augani/openreel-video/releases/latest)** &nbsp;·&nbsp; **[Get help](https://github.com/Augani/openreel-video/issues)**
+A simple, friendly video editor for Windows. Download, install, edit.<br>
+Cut clips, add captions, mix audio, and export up to 120fps with no watermark.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-6366F1?style=flat-square)](LICENSE)
-[![Desktop releases](https://img.shields.io/github/v/release/Augani/openreel-video?include_prereleases&label=Desktop&style=flat-square&color=6366F1)](https://github.com/Augani/openreel-video/releases/latest)
+**[⬇ Download for Windows](https://github.com/archnemasis/laamacut/releases/latest)** &nbsp;·&nbsp; **[Report a problem](https://github.com/archnemasis/laamacut/issues)**
 
-<a href="https://github.com/sponsors/Augani">
-  <img src="https://img.shields.io/badge/Sponsor_me-EA4AAA?style=for-the-badge&amp;logo=githubsponsors&amp;logoColor=white" alt="Sponsor me on GitHub" height="40">
-</a>
+[![License: MIT](https://img.shields.io/badge/License-MIT-9333EA?style=flat-square)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/archnemasis/laamacut?include_prereleases&label=Release&style=flat-square&color=9333EA)](https://github.com/archnemasis/laamacut/releases/latest)
 
 </div>
 
@@ -22,7 +20,7 @@ Cut clips, add captions, mix audio, and finish your video without a watermark.
 
 ## Make something worth watching
 
-From a quick social clip to a longer edit, OpenReel gives you a timeline, a live preview, and control over the details.
+From a quick clip to a longer edit, Laamacut gives you a timeline, a live preview, and control over the details.
 
 | What you want to do | What you can use |
 | :--- | :--- |
@@ -31,86 +29,68 @@ From a quick social clip to a longer edit, OpenReel gives you a timeline, a live
 | **Make every word readable** | Create and style captions, import SRT subtitles, and add animated titles. |
 | **Make it sound right** | Mix music and dialogue with waveforms, volume controls, fades, EQ, compression, and audio ducking. |
 | **Find your look** | Adjust color with wheels, curves, HSL controls, and LUTs. Add effects, masks, and chroma key. |
-| **Fit the platform** | Work in landscape, portrait, or square, then choose export resolution, frame rate, and bitrate. |
+| **Fit the platform** | Pick 16:9, 9:16, 1:1 and more right in the editor, with the apps each shape suits. |
 
-## Edit with an AI assistant
+## Start editing in seconds
 
-Connect your own OpenAI, Anthropic, or compatible endpoint to make reversible timeline edits. Model connections and session keys are configured in Settings → AI Editor. See the [AI editing guide](docs/ai-editing.md) for setup, supported tools, and edit-sharing behavior.
-
-## Start editing in minutes
-
-1. **[Open OpenReel](https://openreel.video)** and create a project.
+1. **Hit Create project.** No setup screens.
 2. **Import your media** and drag clips onto the timeline.
 3. **Shape your edit** with cuts, captions, music, color, and transitions.
-4. **Export your video** using a preset or your own settings.
+4. **Export.** Name your video and pick quality, frame rate, and bitrate on one simple page.
 
-The browser editor needs no installation. For a native app, download a **macOS, Windows, or Linux** build from [Releases](https://github.com/Augani/openreel-video/releases/latest). Desktop builds are currently in **alpha**.
+## Smooth exports, up to 120fps
 
-## Keep control of your footage
-
-**Core editing and rendering happen on your device.** You can import, cut, preview, and export local media without uploading it to a server.
-
-- **No export watermark.** Your finished video stays yours.
-- **Open source, MIT licensed.** Use it for personal or commercial work, inspect the code, or host your own copy.
-- **Save as you work.** Local autosave and undo/redo help you recover edits. Export project files for backups and moving between sessions.
-- **Choose when to connect.** Optional AI and connected services use network requests; their data handling depends on the provider and feature you choose.
-
-Browser storage can be cleared by your browser. Keep backups of your project files and original media for work you want to keep.
-
-## Export for the next step
-
-| Destination | Export options |
+| | |
 | :--- | :--- |
-| **Social posts, tutorials, and everyday sharing** | MP4 with H.264; landscape, portrait, and square presets. |
-| **Web playback** | WebM, with codec availability determined by your browser and device. |
-| **High-resolution delivery** | Resolution presets up to 4K, plus custom frame rate and bitrate controls. |
-| **Further editing and compositing** | Use desktop for ProRes and exports that need transparency. |
+| **Frame rate** | 24, 30, 60, or 120fps. |
+| **Quality** | Simple bitrate presets (Lower, Recommended, Higher), or set your own. |
+| **Codecs** | H.264 for everything, HEVC (H.265) for smaller files at the same quality. |
+| **Resolution** | Up to 4K. |
 
-Browser codec support, available memory, and hardware affect which settings you can use and how fast exports finish. OpenReel adjusts unsupported browser settings where needed; use desktop when you need native export capabilities.
+On PC, exports use your graphics card's hardware encoder when it can, so they finish fast.
 
-## A little help from AI, if you want it
+## Your footage stays yours
 
-Describe an edit in the **AI Editor** panel: trim a clip, add a title, adjust a transform, or build a sequence through chat. Connect your own OpenAI, Anthropic, or compatible endpoint.
+- **Everything happens on your device.** Nothing is uploaded to a server.
+- **No watermark.** Your finished video is yours.
+- **Auto-save.** Your projects save as you work and show up in Recent projects with a preview.
+- **Free and open source,** under the MIT licence.
 
-AI is optional and provider usage may cost money. See the [AI Editor setup guide](docs/AGENT-GUIDE.md#bring-your-own-key-web--desktop-chat) for configuration, data handling, and approval controls. Desktop also supports [MCP clients](docs/AGENT-GUIDE.md), so external assistants can work with your project.
+## Install
 
-## Choose your setup
+1. Go to [Releases](https://github.com/archnemasis/laamacut/releases/latest) and download **`Laamacut-…-x64.exe`**.
+2. Run it. Laamacut installs and opens straight away, and adds itself to the Start menu.
+3. If Windows SmartScreen warns you, choose **More info → Run anyway**. The installer isn't code-signed yet.
 
-| | Browser | Desktop |
-| :--- | :--- | :--- |
-| **Get started** | [Open the web editor](https://openreel.video) | [Download a release](https://github.com/Augani/openreel-video/releases/latest) |
-| **Install** | No installation | macOS, Windows, or Linux |
-| **Editing** | Timeline, captions, audio, color, effects, and keyframes | The editor with native desktop integrations |
-| **Export** | Browser-supported codecs and settings | Native FFmpeg export, including ProRes/alpha workflows |
-| **AI connection** | Bring your own provider or compatible endpoint | Provider connections plus external MCP clients |
+Needs Windows 10 or 11 (64-bit). Larger projects and 4K footage run best with plenty of memory and a decent graphics card. Laamacut is in **alpha**, so expect a few rough edges.
 
-Use an up-to-date browser. Chrome or Edge is a good starting point; codec and GPU support vary across browsers and operating systems. Larger projects and 4K footage benefit from more memory and a capable GPU.
+<sub>There's also an Android version (`Laamacut-….apk`) on the same Releases page.</sub>
 
 ---
 
-## Run it locally
+## Build it yourself
 
-Install [Node.js](https://nodejs.org/) and the pnpm version declared in [`package.json`](package.json), then:
+Install [Node.js](https://nodejs.org/) and the pnpm version declared in [`package.json`](package.json), clone the repo, and run `pnpm install`.
 
-```bash
-git clone https://github.com/Augani/openreel-video.git
-cd openreel-video
-pnpm install
-pnpm dev
-```
+<details>
+<summary><strong>Building the Windows and Android apps</strong></summary>
 
-Open the local URL printed by Vite, usually `http://localhost:5173`.
+<br>
+
+**Windows installer** (output in `apps/desktop/release`):
 
 ```bash
-# Build and preview the browser app
-pnpm build
-pnpm preview
-
-# Check your changes
-pnpm typecheck
-pnpm test
-pnpm lint
+cd apps/web && OPENREEL_DESKTOP=1 pnpm build
+cd ../desktop && pnpm run build:main && pnpm exec electron-builder --win nsis --x64
 ```
+
+**Android APK** needs JDK 21 and the Android SDK (platform 35). Put your signing key details in `apps/android/android/keystore.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`), then:
+
+```bash
+cd apps/android && pnpm run apk
+```
+
+</details>
 
 <details>
 <summary><strong>Inside the project</strong></summary>
@@ -119,31 +99,25 @@ pnpm lint
 
 | Path | Purpose |
 | :--- | :--- |
-| [`apps/web`](apps/web) | Browser editor and shared desktop interface |
-| [`apps/desktop`](apps/desktop) | Desktop app, native integrations, and packaging |
+| [`apps/web`](apps/web) | The editor interface that runs inside the app |
+| [`apps/desktop`](apps/desktop) | Windows app and installer |
+| [`apps/android`](apps/android) | Android app |
 | [`packages/core`](packages/core) | Timeline, media, audio, rendering, and export engines |
 | [`packages/ui`](packages/ui) | Shared interface components |
-| [`packages/agent`](packages/agent) | AI editing tools and routing |
 
-Built with React, TypeScript, Zustand, MediaBunny, WebCodecs, WebGPU, Web Audio, and Three.js.
-
-For desktop packaging, see the [distribution guide](apps/desktop/DISTRIBUTION.md).
+Built with React, TypeScript, Electron, Capacitor, MediaBunny, WebCodecs, WebGPU, and Web Audio.
 
 </details>
 
-## Help shape OpenReel
+## Found a bug?
 
-**Found a bug?** [Open an issue](https://github.com/Augani/openreel-video/issues/new) with what you tried, what happened, your browser or desktop version, and steps to reproduce it.
-
-**Want to contribute?** Start with the [contributing guide](CONTRIBUTING.md). Fixes, documentation, accessibility improvements, and reproducible test cases all help.
-
-**Want to support development?** [Sponsor Augustus on GitHub](https://github.com/sponsors/Augani) to support continued work on OpenReel.
+[Open an issue](https://github.com/archnemasis/laamacut/issues/new) with what you tried, what happened, and how to make it happen again.
 
 ---
 
 <div align="center">
 
-Made by [Augustus Otu](https://github.com/Augani) and [contributors](https://github.com/Augani/openreel-video/graphs/contributors).<br>
-[MIT License](LICENSE) &nbsp;·&nbsp; [Updates on X](https://x.com/python_xi) &nbsp;·&nbsp; [Sponsor](https://github.com/sponsors/Augani)
+Laamacut is built on [OpenReel Video](https://github.com/Augani/openreel-video) by [Augustus Otu](https://github.com/Augani) and contributors.<br>
+[MIT License](LICENSE)
 
 </div>
