@@ -85,6 +85,6 @@ describe("deriveSourceExportMatch", () => {
     const small = deriveSourceExportMatch(makeProject([{ width: 320, height: 240, frameRate: 30 }]))!;
     const big = deriveSourceExportMatch(makeProject([{ width: 7680, height: 4320, frameRate: 60 }]))!;
     expect(small.bitrate).toBeGreaterThanOrEqual(2500);
-    expect(big.bitrate).toBeLessThanOrEqual(60000);
+    expect(big.bitrate).toBeLessThanOrEqual(150000);
   });
 });

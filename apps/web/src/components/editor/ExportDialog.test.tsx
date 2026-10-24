@@ -40,9 +40,10 @@ describe("ExportDialog", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("radio", { name: "Presets" }));
     expect(screen.getByTestId("quick-export-card")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Custom Settings" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Advanced" }));
 
     expect(screen.queryByTestId("quick-export-card")).not.toBeInTheDocument();
     expect(
@@ -68,6 +69,7 @@ describe("ExportDialog", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("radio", { name: "Presets" }));
     fireEvent.click(screen.getByRole("button", { name: "Quick Export" }));
 
     expect(onExport).toHaveBeenCalledWith(
@@ -94,7 +96,7 @@ describe("ExportDialog", () => {
   it("updates custom output dimensions when switching to a different project", () => {
     const onExport = vi.fn();
     const { rerender } = render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={5} />);
-    fireEvent.click(screen.getByRole("radio", { name: "Custom Settings" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Advanced" }));
     rerender(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={5} projectWidth={1080} projectHeight={1920} frameRate={60} />);
     fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
     expect(onExport).toHaveBeenCalledWith(expect.objectContaining({ width: 1080, height: 1920, frameRate: 60 }), "download");
@@ -103,6 +105,8 @@ describe("ExportDialog", () => {
   it("prevents empty timeline exports through both normal and quick actions", () => {
     const onExport = vi.fn();
     render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={0} sourceMatch={SOURCE_MATCH} />);
+    expect(screen.getByRole("button", { name: "Export Video" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: "Presets" }));
     expect(screen.getByRole("button", { name: "Export Video" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Quick Export" })).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent("Add a clip");
@@ -115,6 +119,7 @@ describe("ExportDialog", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Marked In/Out" }));
     fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
     expect(onExport).toHaveBeenLastCalledWith(expect.objectContaining({ range: { startTime: 2, endTime: 4 } }), "download");
+    fireEvent.click(screen.getByRole("radio", { name: "Presets" }));
     fireEvent.click(screen.getByRole("button", { name: "Quick Export" }));
     expect(onExport).toHaveBeenLastCalledWith(expect.objectContaining({ range: { startTime: 2, endTime: 4 } }), "download");
     fireEvent.click(screen.getByRole("radio", { name: "Entire timeline" }));
@@ -146,8 +151,65 @@ describe("ExportDialog", () => {
 
   it("recommends a small source without upscaling or suggesting native-only codecs", () => {
     render(<ExportDialog isOpen onClose={vi.fn()} onExport={vi.fn()} duration={5} projectWidth={640} projectHeight={360} frameRate={24} />);
+    fireEvent.click(screen.getByRole("radio", { name: "Presets" }));
     expect(screen.getByRole("checkbox", { name: "Project settings" })).toBeChecked();
     expect(screen.queryByRole("checkbox", { name: "YouTube 4K" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "4K ProRes HQ" })).not.toBeInTheDocument();
+  });
+
+  describe("CapCut-style export panel", () => {
+    it("opens first and exports the project size at the recommended bitrate", () => {
+      const onExport = vi.fn();
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={5} projectWidth={1920} projectHeight={1080} frameRate={30} />);
+      expect(screen.getByRole("radio", { name: "Export" })).toBeChecked();
+      fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
+      expect(onExport).toHaveBeenCalledWith(expect.objectContaining({
+        format: "mp4", codec: "h264", width: 1920, height: 1080, frameRate: 30, bitrate: 7500, keyframeInterval: 60,
+      }), "download");
+    });
+
+    it("applies the chosen resolution, bitrate level, format and frame rate", () => {
+      const onExport = vi.fn();
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={5} projectWidth={1080} projectHeight={1920} frameRate={30} />);
+      fireEvent.change(screen.getByLabelText("Resolution"), { target: { value: "720" } });
+      fireEvent.change(screen.getByLabelText("Bitrate"), { target: { value: "higher" } });
+      fireEvent.change(screen.getByLabelText("Format"), { target: { value: "mov" } });
+      fireEvent.change(screen.getByLabelText("Frame rate"), { target: { value: "120" } });
+      fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
+      expect(onExport).toHaveBeenCalledWith(expect.objectContaining({
+        format: "mov", width: 720, height: 1280, frameRate: 120, bitrate: 26500, keyframeInterval: 240,
+      }), "download");
+    });
+
+    it("exports a custom bitrate", () => {
+      const onExport = vi.fn();
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={5} />);
+      fireEvent.change(screen.getByLabelText("Bitrate"), { target: { value: "custom" } });
+      fireEvent.change(screen.getByLabelText("Custom bitrate (kbps)"), { target: { value: "42000" } });
+      fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
+      expect(onExport).toHaveBeenCalledWith(expect.objectContaining({ bitrate: 42000 }), "download");
+    });
+
+    it("disables HEVC and keeps H.264 when the browser can't encode it", async () => {
+      vi.mocked(checkBrowserExportCapability).mockImplementation(async (settings) =>
+        settings.codec === "h265"
+          ? { supported: false, reason: "no HEVC" }
+          : { supported: true, reason: null });
+      const onExport = vi.fn();
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={5} />);
+      const hevc = await screen.findByRole("option", { name: "HEVC (not supported here)" });
+      expect(hevc).toBeDisabled();
+      expect(screen.getByLabelText("Codec")).toHaveValue("h264");
+    });
+
+    it("exports HEVC when the browser supports it", async () => {
+      vi.mocked(checkBrowserExportCapability).mockResolvedValue({ supported: true, reason: null });
+      const onExport = vi.fn();
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} duration={5} />);
+      fireEvent.change(screen.getByLabelText("Codec"), { target: { value: "h265" } });
+      await waitFor(() => expect(screen.getByRole("button", { name: "Export Video" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
+      expect(onExport).toHaveBeenCalledWith(expect.objectContaining({ codec: "h265" }), "download");
+    });
   });
 });

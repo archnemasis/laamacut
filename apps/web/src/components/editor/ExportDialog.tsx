@@ -73,6 +73,16 @@ import {
   type CodecRecommendation,
 } from "@openreel/core";
 import { EDITING_FRAME_RATE_OPTIONS } from "./editing-frame-rate";
+import {
+  QUICK_BITRATE_LEVELS,
+  MAX_QUICK_BITRATE_KBPS,
+  MIN_QUICK_BITRATE_KBPS,
+  defaultQuickResolution,
+  quickBitrateKbps,
+  quickExportSize,
+  quickResolutionOptions,
+  type QuickBitrateLevel,
+} from "./quick-export";
 import type { ExportDeliveryMode } from "../../services/export-runner";
 import { formatFrameTimecode } from "../../utils/frame-timecode";
 
@@ -132,6 +142,26 @@ function getAspectRatioLabel(aspectType: AspectRatioType): string {
 
 const getExportValidationError = getVideoExportValidationError;
 
+function QuickExportRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[12px] font-medium text-fg">{label}</p>
+        {hint && <p className="mt-0.5 text-[10px] text-fg-muted">{hint}</p>}
+      </div>
+      <div className="w-[230px] shrink-0">{children}</div>
+    </div>
+  );
+}
+
 type PlatformIcon = typeof Video;
 
 const PLATFORM_ICONS: Record<string, PlatformIcon> = {
@@ -179,8 +209,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [checkingCapability, setCheckingCapability] = useState(false);
   const [browserAudioCodec, setBrowserAudioCodec] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"presets" | "custom" | "reduce">(
-    "presets",
+  const [activeTab, setActiveTab] = useState<"quick" | "presets" | "custom" | "reduce">(
+    "quick",
   );
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(
     "recommended",
@@ -225,6 +255,53 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       frameRate,
     }));
   }, [projectWidth, projectHeight, frameRate]);
+
+  const [quickResolution, setQuickResolution] = useState(() =>
+    defaultQuickResolution(projectWidth, projectHeight),
+  );
+  const [quickBitrateLevel, setQuickBitrateLevel] =
+    useState<QuickBitrateLevel>("recommended");
+  const [quickCustomBitrate, setQuickCustomBitrate] = useState(15000);
+  const [quickCodec, setQuickCodec] = useState<"h264" | "h265">("h264");
+  const [quickFormat, setQuickFormat] = useState<"mp4" | "mov">("mp4");
+  const [quickFrameRate, setQuickFrameRate] = useState(frameRate);
+  const [hevcSupported, setHevcSupported] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setQuickResolution(defaultQuickResolution(projectWidth, projectHeight));
+    setQuickFrameRate(frameRate);
+  }, [projectWidth, projectHeight, frameRate]);
+
+  const quickSettings = useMemo<VideoExportSettings>(() => {
+    const { width, height } = quickExportSize(projectWidth, projectHeight, quickResolution);
+    const bitrate = quickBitrateLevel === "custom"
+      ? quickCustomBitrate
+      : quickBitrateKbps(width, height, quickFrameRate, quickBitrateLevel);
+    return {
+      ...customSettings,
+      format: quickFormat,
+      codec: quickCodec,
+      width,
+      height,
+      frameRate: quickFrameRate,
+      bitrate,
+      bitrateMode: "vbr",
+      keyframeInterval: Math.max(1, Math.round(quickFrameRate * 2)),
+      upscaling: customSettings.upscaling
+        ? { ...customSettings.upscaling, enabled: false }
+        : undefined,
+    };
+  }, [
+    customSettings,
+    projectWidth,
+    projectHeight,
+    quickResolution,
+    quickBitrateLevel,
+    quickCustomBitrate,
+    quickCodec,
+    quickFormat,
+    quickFrameRate,
+  ]);
 
   const projectPreset = useMemo<PlatformExportPreset>(() => ({
     id: "project-settings",
@@ -302,6 +379,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   }, [reduceSourceBytes, reduceEstimatedBytes]);
 
   const effectiveSettings = useMemo<VideoExportSettings>(() => {
+    if (activeTab === "quick") {
+      return quickSettings;
+    }
     if (activeTab === "presets" && selectedPreset) {
       return selectedPreset.settings as VideoExportSettings;
     }
@@ -309,7 +389,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       return compressionPlanToExportSettings(reducePlan);
     }
     return customSettings;
-  }, [activeTab, selectedPreset, reducePlan, customSettings]);
+  }, [activeTab, quickSettings, selectedPreset, reducePlan, customSettings]);
 
   const validationError = getExportValidationError(effectiveSettings, duration);
 
@@ -370,6 +450,26 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     });
     return () => { active = false; };
   }, [isOpen, isDesktop, validationError, effectiveSettings, duration, resolveBrowserSettings, hasAudio]);
+
+  // Like CapCut, offer HEVC only where this device can encode it; the desktop
+  // app encodes it natively.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isDesktop) {
+      setHevcSupported(true);
+      return;
+    }
+    let active = true;
+    const probe = resolveWebCodecsExportLimits({ ...quickSettings, codec: "h265" }, duration).settings;
+    checkBrowserExportCapability(probe, undefined, false).then((capability) => {
+      if (active) setHevcSupported(capability.supported);
+    });
+    return () => { active = false; };
+  }, [isOpen, isDesktop, quickSettings, duration]);
+
+  useEffect(() => {
+    if (hevcSupported === false && quickCodec === "h265") setQuickCodec("h264");
+  }, [hevcSupported, quickCodec]);
 
   useEffect(() => {
     if (isOpen) {
@@ -476,9 +576,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       return;
     }
     const chosen =
-      activeTab === "presets" && selectedPreset
-        ? (selectedPreset.settings as VideoExportSettings)
-        : customSettings;
+      activeTab === "quick"
+        ? quickSettings
+        : activeTab === "presets" && selectedPreset
+          ? (selectedPreset.settings as VideoExportSettings)
+          : customSettings;
     const settings: VideoExportSettings = {
       ...chosen,
       encodeMode: customSettings.encodeMode ?? "balanced",
@@ -487,6 +589,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     onClose();
   }, [
     activeTab,
+    quickSettings,
     selectedPreset,
     reducePlan,
     customSettings,
@@ -560,7 +663,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         header={
           <DialogHeader
             title="Export Video"
-            subtitle="Choose a ready-made preset or fine-tune every setting."
+            subtitle="Pick a resolution, bitrate and format, or fine-tune every setting."
             onOpenChange={(open) => !open && onClose()}
             startContent={
               <Download size={20} className="text-primary" aria-hidden />
@@ -588,15 +691,16 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   </span>
                 </div>
               </fieldset>
-              <ToolcraftSegmentedControl<"presets" | "custom" | "reduce">
+              <ToolcraftSegmentedControl<"quick" | "presets" | "custom" | "reduce">
                 ariaLabel="Export mode"
                 value={activeTab}
                 onChange={setActiveTab}
-                className="max-w-[440px] bg-bg-2"
+                className="max-w-[540px] bg-bg-2"
                 options={[
+                  { value: "quick", label: "Export" },
                   { value: "presets", label: "Presets" },
                   { value: "reduce", label: "Smaller File" },
-                  { value: "custom", label: "Custom Settings" },
+                  { value: "custom", label: "Advanced" },
                 ]}
               />
 
@@ -648,6 +752,127 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 </div>
               )}
             </div>
+
+            {activeTab === "quick" && (
+              <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                <section className="mx-auto max-w-[580px] rounded-[10px] border border-border bg-bg-1 px-4 py-2">
+                  <div className="divide-y divide-border">
+                    <QuickExportRow
+                      label="Resolution"
+                      hint={`${quickSettings.width}×${quickSettings.height}`}
+                    >
+                      <Selector
+                        label="Resolution"
+                        isLabelHidden
+                        value={String(quickResolution)}
+                        onChange={(value) => setQuickResolution(Number(value))}
+                        options={quickResolutionOptions(projectWidth, projectHeight).map((option) => ({
+                          value: String(option.value),
+                          label: option.label,
+                        }))}
+                        width="100%"
+                      />
+                    </QuickExportRow>
+
+                    <QuickExportRow
+                      label="Bitrate"
+                      hint={`${(quickSettings.bitrate / 1000).toFixed(1)} Mbps`}
+                    >
+                      <Selector
+                        label="Bitrate"
+                        isLabelHidden
+                        value={quickBitrateLevel}
+                        onChange={(value) => {
+                          if (value === "custom") setQuickCustomBitrate(quickSettings.bitrate);
+                          setQuickBitrateLevel(value as QuickBitrateLevel);
+                        }}
+                        options={QUICK_BITRATE_LEVELS}
+                        width="100%"
+                      />
+                    </QuickExportRow>
+
+                    {quickBitrateLevel === "custom" && (
+                      <QuickExportRow
+                        label="Custom bitrate"
+                        hint={`${MIN_QUICK_BITRATE_KBPS / 1000}–${MAX_QUICK_BITRATE_KBPS / 1000} Mbps`}
+                      >
+                        <ToolcraftNumberInputControl
+                          label="Custom bitrate (kbps)"
+                          value={quickCustomBitrate}
+                          onChange={(value) =>
+                            setQuickCustomBitrate(
+                              Math.min(
+                                MAX_QUICK_BITRATE_KBPS,
+                                Math.max(MIN_QUICK_BITRATE_KBPS, value || 0),
+                              ),
+                            )
+                          }
+                          min={MIN_QUICK_BITRATE_KBPS}
+                          max={MAX_QUICK_BITRATE_KBPS}
+                          step={500}
+                          width="100%"
+                        />
+                      </QuickExportRow>
+                    )}
+
+                    <QuickExportRow
+                      label="Codec"
+                      hint={
+                        quickCodec === "h265"
+                          ? "Smaller files; some older devices can't play HEVC"
+                          : "Plays everywhere"
+                      }
+                    >
+                      <Selector
+                        label="Codec"
+                        isLabelHidden
+                        value={quickCodec}
+                        onChange={(value) => setQuickCodec(value as "h264" | "h265")}
+                        options={[
+                          { value: "h264", label: "H.264" },
+                          {
+                            value: "h265",
+                            label: hevcSupported === false
+                              ? "HEVC (not supported here)"
+                              : "HEVC",
+                            disabled: hevcSupported === false,
+                          },
+                        ]}
+                        width="100%"
+                      />
+                    </QuickExportRow>
+
+                    <QuickExportRow label="Format">
+                      <Selector
+                        label="Format"
+                        isLabelHidden
+                        value={quickFormat}
+                        onChange={(value) => setQuickFormat(value as "mp4" | "mov")}
+                        options={[
+                          { value: "mp4", label: "MP4" },
+                          { value: "mov", label: "MOV" },
+                        ]}
+                        width="100%"
+                      />
+                    </QuickExportRow>
+
+                    <QuickExportRow label="Frame rate">
+                      <Selector
+                        label="Frame rate"
+                        isLabelHidden
+                        value={String(quickFrameRate)}
+                        onChange={(value) => setQuickFrameRate(Number(value))}
+                        options={EDITING_FRAME_RATE_OPTIONS.map((option) => ({
+                          value: String(option.value),
+                          label: option.label,
+                        }))}
+                        width="100%"
+                      />
+                    </QuickExportRow>
+                  </div>
+                </section>
+              </div>
+            )}
 
             {activeTab === "presets" && (
               <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -1644,17 +1869,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                       <HardDrive size={12} />~
                       {activeTab === "reduce" && reducePlan
                         ? formatBytes(reduceEstimatedBytes)
-                        : formatFileSize(
-                            activeTab === "presets" && selectedPreset
-                              ? (selectedPreset.settings as VideoExportSettings)
-                                  .bitrate || 8000
-                              : customSettings.bitrate,
-                            duration,
-                          )}
+                        : formatFileSize(effectiveSettings.bitrate || 8000, duration)}
                     </div>
                     {timeEstimate &&
                       deviceProfile?.encoding[
-                        customSettings.codec as keyof typeof deviceProfile.encoding
+                        effectiveSettings.codec as keyof typeof deviceProfile.encoding
                       ]?.hardware && (
                         <div className="flex items-center gap-1 text-green-500">
                           <Zap size={12} />

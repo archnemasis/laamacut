@@ -27,7 +27,7 @@ describe("EditorBootstrapGate", () => {
       </EditorBootstrapGate>,
     );
     expect(screen.getByText("Loading editor…")).toBeTruthy();
-    expect(container.querySelector("svg")).toBeTruthy();
+    expect(container.querySelector("img[alt=\"Laamacut\"]")).toBeTruthy();
     expect(screen.queryByTestId("editor-child")).toBeNull();
   });
 
