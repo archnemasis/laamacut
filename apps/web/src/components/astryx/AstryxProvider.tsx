@@ -12,7 +12,7 @@ export function AstryxProvider({
   children: JSX.Element;
 }): JSX.Element {
   const mode = useThemeStore((state) => state.mode);
-  const astryxMode = mode === "auto" ? "system" : mode;
+  const astryxMode = mode === "auto" ? "system" : mode === "amoled" ? "dark" : mode;
 
   return (
     <Theme theme={neutralTheme} mode={astryxMode}>

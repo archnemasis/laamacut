@@ -20,7 +20,7 @@ import {
 } from "@/icons/lucide-compat";
 import { useProjectStore } from "../../stores/project-store";
 import { useUIStore } from "../../stores/ui-store";
-import { useThemeStore } from "../../stores/theme-store";
+import { NEXT_MODE, THEME_LABELS, useThemeStore } from "../../stores/theme-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import { useRouter } from "../../hooks/use-router";
 import {
@@ -61,22 +61,18 @@ export const EditorActionRail: React.FC = () => {
   const { openSettings } = useSettingsStore();
   const { navigate } = useRouter();
 
-  const themeLabel =
-    themeMode === "auto"
-      ? "System"
-      : themeMode.charAt(0).toUpperCase() + themeMode.slice(1);
-  const nextThemeLabel =
-    themeMode === "light" ? "Dark" : themeMode === "dark" ? "System" : "Light";
+  const themeLabel = THEME_LABELS[themeMode];
+  const nextThemeLabel = THEME_LABELS[NEXT_MODE[themeMode]];
   const themeIcon =
     themeMode === "light" ? (
       <Sun size={16} aria-hidden />
-    ) : themeMode === "dark" ? (
+    ) : themeMode === "dark" || themeMode === "amoled" ? (
       <Moon size={16} aria-hidden />
     ) : (
       <SunMoon size={16} aria-hidden />
     );
   const themeActionLabel = `Theme: ${themeLabel}. Switch to ${nextThemeLabel}`;
-  // The desktop app is always dark, so it has no theme toggle.
+  // The desktop app sets its theme in Settings instead.
   const isDesktop =
     typeof window !== "undefined" && window.openreel?.platform === "desktop";
 

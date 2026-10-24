@@ -6,10 +6,11 @@
    Surfaces: charcoal-neutral (hue ~250, low chroma).
    Accent: purple (hue ~305).
    ============================================================ */
-/* DesktopApp also puts the class on <html> so dialogs and menus, which
+/* Dark mode only: in light mode the light tokens from index.css apply.
+   DesktopApp also puts the class on <html> so dialogs and menus, which
    render in portals outside the app container, get the same tokens. */
-:root.openreel-desktop,
-.openreel-desktop {
+:root.dark.openreel-desktop,
+:root.dark .openreel-desktop {
   color-scheme: dark;
 
   --bg: oklch(0.16 0.004 250);

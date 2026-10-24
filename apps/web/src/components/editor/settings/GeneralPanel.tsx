@@ -6,22 +6,11 @@ import { ToolcraftText as Text } from "@openreel/ui";
 import { useSettingsStore } from "../../../stores/settings-store";
 import { useProjectStore } from "../../../stores/project-store";
 import { useUIStore } from "../../../stores/ui-store";
+import { THEME_LABELS, useThemeStore, type ThemeMode } from "../../../stores/theme-store";
 import { keyboardShortcuts } from "../../../services/keyboard-shortcuts";
 import { EDITING_FRAME_RATE_OPTIONS } from "../editing-frame-rate";
 import type { PreviewQuality } from "../preview/preview-resolution";
-
-const BACKGROUND_SWATCHES = [
-  "#000000",
-  "#FFFFFF",
-  "#1E1E1E",
-  "#2563EB",
-  "#DC2626",
-  "#16A34A",
-  "#F59E0B",
-  "#9333EA",
-  "#DB2777",
-  "#0EA5E9",
-];
+import { BACKGROUND_SWATCHES } from "../canvas-presets";
 
 const PREVIEW_QUALITY_CHOICES: { value: PreviewQuality; label: string }[] = [
   { value: "auto", label: "Auto (matches the player size)" },
@@ -29,6 +18,50 @@ const PREVIEW_QUALITY_CHOICES: { value: PreviewQuality; label: string }[] = [
   { value: "half", label: "Half" },
   { value: "quarter", label: "Quarter" },
 ];
+
+// Swatch colours: window, panel, and accent of each theme.
+const THEME_CHOICES: { mode: ThemeMode; swatch: [string, string] }[] = [
+  { mode: "dark", swatch: ["#1b1c20", "#2a2b31"] },
+  { mode: "amoled", swatch: ["#000000", "#121214"] },
+  { mode: "light", swatch: ["#f4f4f6", "#ffffff"] },
+  { mode: "auto", swatch: ["#1b1c20", "#f4f4f6"] },
+];
+
+function ThemePicker() {
+  const mode = useThemeStore((s) => s.mode);
+  const setMode = useThemeStore((s) => s.setMode);
+  return (
+    <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-2 py-3 sm:grid-cols-4">
+      {THEME_CHOICES.map(({ mode: choice, swatch: [window, panel] }) => {
+        const selected = mode === choice;
+        return (
+          <button
+            key={choice}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => setMode(choice)}
+            className={`flex flex-col gap-2 rounded-lg border p-2 text-left text-xs transition-colors ${
+              selected ? "border-accent bg-accent-soft text-fg" : "border-border text-fg-2 hover:border-border-strong"
+            }`}
+          >
+            <span
+              aria-hidden
+              className="relative block h-12 w-full overflow-hidden rounded-md border border-border"
+              style={{ background: choice === "auto" ? `linear-gradient(135deg, ${window} 50%, ${panel} 50%)` : window }}
+            >
+              {choice !== "auto" && (
+                <span className="absolute inset-x-2 bottom-2 top-4 rounded" style={{ background: panel }} />
+              )}
+              <span className="absolute left-2 top-1.5 h-1.5 w-6 rounded-full bg-accent" />
+            </span>
+            <span className="font-medium">{THEME_LABELS[choice]}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -83,6 +116,10 @@ export const GeneralPanel: React.FC = () => {
 
   return (
     <div className="space-y-5 pb-4">
+      <Section title="Appearance">
+        <ThemePicker />
+      </Section>
+
       <Section title="Saving">
         <Row label="Auto-save" hint="Save your project automatically while you edit">
           <ToolcraftSwitchControl

@@ -17,7 +17,8 @@ import { useProjectStore } from "../../stores/project-store";
 import { useUIStore } from "../../stores/ui-store";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useEditorInitialization } from "../../hooks/useEditorInitialization";
-import { useCompactEditor } from "../../hooks/useCompactEditor";
+import { useCompactEditor, usePhoneEditor } from "../../hooks/useCompactEditor";
+import { PhoneEditor } from "./PhoneEditor";
 import "./editor-responsive.css";
 
 const ChatPanel = React.lazy(() =>
@@ -85,6 +86,7 @@ const useAutoSave = () => {
  */
 export const EditorInterface: React.FC = () => {
   const compact = useCompactEditor();
+  const phone = usePhoneEditor();
   const [compactPanel, setCompactPanel] = useState<"timeline" | "media" | "inspector" | "chat">("timeline");
   const [hasOpenedChat, setHasOpenedChat] = useState(false);
   const { initialized, initializing, initError, initStatus, retry } =
@@ -333,6 +335,14 @@ export const EditorInterface: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+    );
+  }
+
+  if (phone) {
+    return (
+      <div ref={rootRef} className="editor-shell w-full h-full overflow-hidden font-sans select-none relative z-20">
+        <PhoneEditor />
       </div>
     );
   }

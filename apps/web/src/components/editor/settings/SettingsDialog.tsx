@@ -19,7 +19,7 @@ export const SettingsDialog: React.FC = () => {
         header={
           <DialogHeader
             title="Settings"
-            subtitle="Saving, playback, timeline and keyboard preferences."
+            subtitle="Appearance, saving, playback, timeline and keyboard."
             onOpenChange={(open) => !open && closeSettings()}
             startContent={<Settings size={18} className="text-primary" aria-hidden />}
           />

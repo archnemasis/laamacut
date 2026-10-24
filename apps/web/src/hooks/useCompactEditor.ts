@@ -19,3 +19,24 @@ export function useCompactEditor(): boolean {
     () => false,
   );
 }
+
+export const PHONE_EDITOR_QUERY = "(max-width: 767px)";
+
+function subscribePhone(onChange: () => void): () => void {
+  const media = window.matchMedia(PHONE_EDITOR_QUERY);
+  media.addEventListener("change", onChange);
+  window.addEventListener("resize", onChange);
+  return () => {
+    media.removeEventListener("change", onChange);
+    window.removeEventListener("resize", onChange);
+  };
+}
+
+/** Phone-width screens get the CapCut-style PhoneEditor layout. */
+export function usePhoneEditor(): boolean {
+  return useSyncExternalStore(
+    subscribePhone,
+    () => window.innerWidth < 768,
+    () => false,
+  );
+}

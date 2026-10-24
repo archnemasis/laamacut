@@ -8,6 +8,7 @@ import { useProjectStore } from "../stores/project-store";
 import type { ProjectState } from "../stores/project-store";
 import { useUIStore } from "../stores/ui-store";
 import { useSettingsStore } from "../stores/settings-store";
+import { useThemeStore } from "../stores/theme-store";
 
 vi.mock("../stores/project-store", () => ({
   useProjectStore: vi.fn(),
@@ -66,13 +67,15 @@ describe("DesktopApp", () => {
     expect(container.querySelector(".openreel-desktop")).not.toBeNull();
   });
 
-  it("forces dark mode on <html> so portaled dialogs match", () => {
+  it("puts the saved theme on <html> so portaled dialogs match", () => {
+    useThemeStore.getState().setMode("amoled");
     mockHasProject(false);
     const { unmount } = render(<DesktopApp />);
     const root = document.documentElement;
     expect(root.classList.contains("openreel-desktop")).toBe(true);
     expect(root.classList.contains("dark")).toBe(true);
     expect(root.dataset.theme).toBe("dark");
+    expect(root.classList.contains("amoled")).toBe(true);
     unmount();
     expect(root.classList.contains("openreel-desktop")).toBe(false);
   });

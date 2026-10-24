@@ -34,7 +34,7 @@ function resize(width: number) {
 describe("compact editing workspace", () => {
   const originalWidth = window.innerWidth;
   beforeEach(() => {
-    resize(390);
+    resize(820);
     const panels = useUIStore.getState().panels;
     useUIStore.setState({ keyframeEditorOpen: false, selectedItems: [], panels: {
       ...panels, agentChat: { ...panels.agentChat, visible: false },
@@ -44,7 +44,7 @@ describe("compact editing workspace", () => {
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); resize(originalWidth); });
 
-  it("keeps preview, media search, inspector and timeline state mounted across phone tabs and desktop resize", () => {
+  it("keeps preview, media search, inspector and timeline state mounted across tablet tabs and desktop resize", () => {
     const view = render(<EditorInterface />);
     const canvas = view.getByLabelText("Video preview");
     const media = view.getByLabelText("Media search") as HTMLInputElement;
@@ -60,14 +60,21 @@ describe("compact editing workspace", () => {
     expect(view.getByLabelText("Media search")).toBe(media);
     expect(media.value).toBe("family"); expect(title.value).toBe("My video");
     expect(timeline.value).toBe("scroll 500");
-    resize(820);
-    expect(view.getByRole("navigation", { name: "Editor workspace" })).toBeInTheDocument();
     resize(1600);
     expect(view.queryByRole("navigation", { name: "Editor workspace" })).toBeNull();
     expect(view.container.querySelector("#editor-panel-inspector")).not.toHaveAttribute("hidden");
     expect(view.getByLabelText("Video preview")).toBe(canvas);
-    resize(390);
+    resize(820);
+    expect(view.getByRole("navigation", { name: "Editor workspace" })).toBeInTheDocument();
     expect(title.value).toBe("My video");
+  });
+
+  it("uses the phone editor with a bottom tool bar on phone widths", () => {
+    resize(390);
+    const view = render(<EditorInterface />);
+    expect(view.getByRole("navigation", { name: "Editor tools" })).toBeInTheDocument();
+    expect(view.queryByRole("navigation", { name: "Editor workspace" })).toBeNull();
+    expect(view.getByLabelText("Video preview")).toBeInTheDocument();
   });
 
   it("has no AI tab and closes an AI panel left open by an older version", () => {

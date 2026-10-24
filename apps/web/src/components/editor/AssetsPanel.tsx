@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image as ImageIcon, Film, Music, Plus, Upload, Trash2,
   Square, Circle, Triangle, Star, ArrowRight, Hexagon, FileCode, AlertTriangle,
@@ -48,7 +48,7 @@ const formatDuration = (seconds: number): string => {
  * Shows thumbnail with metadata below (not overlaid)
  */
 type MediaViewMode = "large" | "small" | "list";
-type AssetsTab =
+export type AssetsTab =
   | "media"
   | "text"
   | "graphics"
@@ -619,9 +619,13 @@ const LoadingIndicator: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
-export const AssetsPanel: React.FC = () => {
+/** `tab` opens a section directly; `hideRail` drops the section rail (phone sheets). */
+export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({ tab, hideRail = false }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<AssetsTab>("media");
+  const [activeTab, setActiveTab] = useState<AssetsTab>(tab ?? "media");
+  useEffect(() => {
+    if (tab) setActiveTab(tab);
+  }, [tab]);
   const playheadPosition = useTimelineStore((state) => state.playheadPosition);
   const selectedIds = useUIStore((state) => state.selectedItems);
 
@@ -1506,7 +1510,7 @@ export const AssetsPanel: React.FC = () => {
       className="w-full h-full bg-bg-1 overflow-hidden flex flex-row relative"
     >
       {/* ── Vertical tool rail (icon + label, left) ───────────── */}
-      <div className="flex flex-col items-center gap-1 px-0 py-[14px] border-r border-border bg-bg-1 overflow-y-auto scrollbar-none shrink-0 w-[92px]">
+      {!hideRail && <div className="flex flex-col items-center gap-1 px-0 py-[14px] border-r border-border bg-bg-1 overflow-y-auto scrollbar-none shrink-0 w-[92px]">
         {ASSETS_TABS.map((tab) => {
           const Icon = TAB_ICONS[tab.value];
           const isActive = activeTab === tab.value;
@@ -1531,7 +1535,7 @@ export const AssetsPanel: React.FC = () => {
             </button>
           );
         })}
-      </div>
+      </div>}
 
       {/* ── Body: section content fills the remaining space ──── */}
       <div className="flex-1 flex flex-col min-w-0 h-full bg-bg-1 relative">

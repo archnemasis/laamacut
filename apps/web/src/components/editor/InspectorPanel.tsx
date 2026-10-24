@@ -39,6 +39,7 @@ import { ColorSelector } from "../../motion/components/primitives";
 import {
   getTabIdsForClipType,
   type InspectorClipType,
+  type InspectorTabId,
 } from "./inspector/clip-tabs.config";
 import { InspectorClipHeader } from "./inspector/shell/InspectorClipHeader";
 import { InspectorTabErrorBoundary } from "./inspector/shell/InspectorTabErrorBoundary";
@@ -119,7 +120,8 @@ const EmptyState: React.FC = () => (
   </div>
 );
 
-export const InspectorPanel: React.FC = () => {
+/** `only` limits a clip to one section, for the phone editor's clip tools. */
+export const InspectorPanel: React.FC<{ only?: InspectorTabId }> = ({ only }) => {
   // Stores
   const {
     getClip,
@@ -848,8 +850,11 @@ export const InspectorPanel: React.FC = () => {
     clipType === "sticker";
 
   const tabIds = useMemo(
-    () => getTabIdsForClipType(clipType as InspectorClipType | null),
-    [clipType],
+    () =>
+      getTabIdsForClipType(clipType as InspectorClipType | null).filter(
+        (id) => !only || id === only,
+      ),
+    [clipType, only],
   );
 
   return (
@@ -874,16 +879,16 @@ export const InspectorPanel: React.FC = () => {
 
       <div className="overflow-y-auto flex-1 min-h-0 custom-scrollbar">
       <div className="py-[18px] px-5">
-        {selectedTimelineClip && selectedClipIds.length === 1 && (
+        {!only && selectedTimelineClip && selectedClipIds.length === 1 && (
           <QuickEditBar clipId={selectedTimelineClip.id} onCleanAudio={handleEnhanceAudio} isCleaningAudio={isEnhancingAudio} />
         )}
-        <Section title="Multi-Camera Editing" sectionId="multicam">
+        {!only && <Section title="Multi-Camera Editing" sectionId="multicam">
           <InspectorTabErrorBoundary>
             <React.Suspense fallback={<p role="status">Loading camera tools…</p>}>
               <MultiCameraPanel key={project.id} />
             </React.Suspense>
           </InspectorTabErrorBoundary>
-        </Section>
+        </Section>}
         {selectedClipIds.length > 1 ? (
           <MultiClipInspector clipIds={selectedClipIds} />
         ) : selectedClip ? (

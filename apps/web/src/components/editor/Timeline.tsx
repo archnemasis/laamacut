@@ -972,7 +972,7 @@ export const Timeline: React.FC = () => {
       className="h-full bg-tl-bg flex flex-col min-h-0 relative overflow-hidden"
     >
       {/* ── Timeline toolbar (mock: 48px line-icon tools + emerald zoom slider) ── */}
-      <div className="flex items-center h-12 px-4 gap-4 bg-bg-1 border-b border-border shrink-0 relative z-50">
+      <div data-timeline-toolbar className="flex items-center h-12 px-4 gap-4 bg-bg-1 border-b border-border shrink-0 relative z-50">
         <TLTool onClick={undo} disabled={!canUndo()} title="Undo (⌘Z)">
           <Undo2 size={16} aria-hidden />
         </TLTool>

@@ -4,6 +4,7 @@ import { useProjectStore } from "../../../stores/project-store";
 import { GeneralPanel } from "./GeneralPanel";
 import { useUIStore } from "../../../stores/ui-store";
 import { keyboardShortcuts } from "../../../services/keyboard-shortcuts";
+import { useThemeStore } from "../../../stores/theme-store";
 
 describe("GeneralPanel project frame rate", () => {
   const originalUpdateSettings = useProjectStore.getState().updateSettings;
@@ -72,5 +73,26 @@ describe("GeneralPanel preferences", () => {
     useProjectStore.setState({ hasOpenProject: false });
     render(<GeneralPanel />);
     expect(screen.queryByRole("combobox", { name: "Editing frame rate" })).toBeNull();
+  });
+});
+
+describe("GeneralPanel appearance", () => {
+  afterEach(() => {
+    cleanup();
+    useThemeStore.getState().setMode("dark");
+  });
+
+  it("switches between Dark, AMOLED black, Light and Match system", () => {
+    useThemeStore.getState().setMode("dark");
+    render(<GeneralPanel />);
+    const choices = screen.getAllByRole("radio").map((radio) => radio.textContent);
+    expect(choices).toEqual(["Dark", "AMOLED black", "Light", "Match system"]);
+
+    fireEvent.click(screen.getByRole("radio", { name: "AMOLED black" }));
+    expect(useThemeStore.getState().mode).toBe("amoled");
+    expect(screen.getByRole("radio", { name: "AMOLED black" })).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+    expect(useThemeStore.getState().mode).toBe("light");
   });
 });

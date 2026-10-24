@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type ThemeMode = "light" | "dark" | "auto";
+/** "amoled" is dark mode with pure-black surfaces for OLED screens. */
+export type ThemeMode = "light" | "dark" | "amoled" | "auto";
 
 interface ThemeState {
   mode: ThemeMode;
@@ -21,52 +22,54 @@ const calculateIsDark = (mode: ThemeMode): boolean => {
   if (mode === "auto") {
     return getSystemTheme() === "dark";
   }
-  return mode === "dark";
+  return mode === "dark" || mode === "amoled";
+};
+
+/** Put the theme on <html> so portaled dialogs and menus match the app. */
+export const applyThemeToDocument = (mode: ThemeMode, isDark: boolean): void => {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  root.classList.toggle("dark", isDark);
+  root.classList.toggle("amoled", mode === "amoled");
+  root.dataset.theme = isDark ? "dark" : "light";
+};
+
+export const THEME_LABELS: Record<ThemeMode, string> = {
+  dark: "Dark",
+  amoled: "AMOLED black",
+  light: "Light",
+  auto: "Match system",
+};
+
+export const NEXT_MODE: Record<ThemeMode, ThemeMode> = {
+  dark: "amoled",
+  amoled: "light",
+  light: "auto",
+  auto: "dark",
 };
 
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      mode: "light",
-      isDark: false,
+      mode: "dark",
+      isDark: true,
 
       setMode: (mode: ThemeMode) => {
         const isDark = calculateIsDark(mode);
         set({ mode, isDark });
-
-        if (isDark) {
-          document.documentElement.classList.add("dark");
-          document.documentElement.dataset.theme = "dark";
-        } else {
-          document.documentElement.classList.remove("dark");
-          document.documentElement.dataset.theme = "light";
-        }
+        applyThemeToDocument(mode, isDark);
       },
 
       toggleTheme: () => {
-        const currentMode = get().mode;
-        const nextMode: ThemeMode =
-          currentMode === "light"
-            ? "dark"
-            : currentMode === "dark"
-              ? "auto"
-              : "light";
-        get().setMode(nextMode);
+        get().setMode(NEXT_MODE[get().mode]);
       },
     }),
     {
       name: "openreel-theme",
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const isDark = calculateIsDark(state.mode);
-          state.isDark = isDark;
-          if (isDark) {
-            document.documentElement.classList.add("dark");
-            document.documentElement.dataset.theme = "dark";
-          } else {
-            document.documentElement.classList.remove("dark");
-            document.documentElement.dataset.theme = "light";
-          }
+          state.isDark = calculateIsDark(state.mode);
+          applyThemeToDocument(state.mode, state.isDark);
         }
       },
     },
@@ -79,16 +82,8 @@ if (typeof window !== "undefined") {
   mediaQuery.addEventListener("change", (e) => {
     const state = useThemeStore.getState();
     if (state.mode === "auto") {
-      const isDark = e.matches;
-      useThemeStore.setState({ isDark });
-
-      if (isDark) {
-        document.documentElement.classList.add("dark");
-        document.documentElement.dataset.theme = "dark";
-      } else {
-        document.documentElement.classList.remove("dark");
-        document.documentElement.dataset.theme = "light";
-      }
+      useThemeStore.setState({ isDark: e.matches });
+      applyThemeToDocument("auto", e.matches);
     }
   });
 }

@@ -24,6 +24,8 @@ import { useExportRunner, extForFormat, exportFilename, type ExportDeliveryMode 
 import { ScreenRecorder } from "./ScreenRecorder";
 import { HistoryPanel } from "./inspector/HistoryPanel";
 import { ProjectSwitcher } from "./ProjectSwitcher";
+import { useRouter } from "../../hooks/use-router";
+import { useSettingsStore } from "../../stores/settings-store";
 import { SettingsDialog } from "./settings/SettingsDialog";
 import { Icon } from "@/icons/Icon";
 import { toast } from "../../stores/notification-store";
@@ -49,7 +51,10 @@ type ExportType =
   | "1080p-60"
   | "project";
 
-export const Toolbar: React.FC = () => {
+/** `phone` gives the CapCut-style top bar: close and settings on the left, Export on the right. */
+export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
+  const { navigate } = useRouter();
+  const openSettings = useSettingsStore((state) => state.openSettings);
   const project = useProjectStore((state) => state.project);
   const loopStart = useTimelineStore((state) => state.loopStart);
   const loopEnd = useTimelineStore((state) => state.loopEnd);
@@ -380,10 +385,21 @@ export const Toolbar: React.FC = () => {
   ];
 
   return (
-    <header className="h-[60px] flex items-center gap-2 px-2 sm:gap-[18px] sm:px-[18px] bg-bg-1 border-b border-border shrink-0 z-30 relative">
+    <header className={`flex items-center shrink-0 z-30 relative ${phone ? "h-14 gap-1 px-2 bg-bg" : "h-[60px] gap-2 px-2 sm:gap-[18px] sm:px-[18px] bg-bg-1 border-b border-border"}`}>
+
+      {phone && (
+        <div className="flex flex-1 items-center gap-1">
+          <button type="button" aria-label="Close project" onClick={() => navigate("welcome")} className="grid h-11 w-11 place-items-center rounded-full text-fg hover:bg-hover">
+            <X size={24} aria-hidden />
+          </button>
+          <button type="button" aria-label="Settings" onClick={() => openSettings()} className="grid h-11 w-11 place-items-center rounded-full text-fg hover:bg-hover">
+            <MoreHorizontal size={24} aria-hidden />
+          </button>
+        </div>
+      )}
 
       {/* ─── Center: project name ─────────────────────────────── */}
-      <div className="flex flex-1 min-w-0 items-center justify-center gap-1.5">
+      {!phone && <div className="flex flex-1 min-w-0 items-center justify-center gap-1.5">
         <div className="hidden sm:block min-w-0">
         <ToolcraftTextInputControl
           label="Project name"
@@ -404,7 +420,7 @@ export const Toolbar: React.FC = () => {
         />
         </div>
         <ProjectSwitcher />
-      </div>
+      </div>}
 
       {/* ─── Right: export only ───────────────────────────────── */}
       <div className="flex items-center justify-end shrink-0">
@@ -444,11 +460,11 @@ export const Toolbar: React.FC = () => {
               onClick={openExportDialog}
               disabled={!hasTimelineContent}
               title={hasTimelineContent ? "Choose export settings" : "Add media or text to the timeline to export"}
-              className="rounded-l-[8px] rounded-r-none bg-accent px-[18px] py-[9px] text-[13px] font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`bg-accent font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed ${phone ? "rounded-xl px-5 py-2.5 text-[15px]" : "rounded-l-[8px] rounded-r-none px-[18px] py-[9px] text-[13px]"}`}
             >
               Export
             </button>
-            <DropdownMenu
+            {!phone && <DropdownMenu
               isMenuOpen={isExportOpen}
               onOpenChange={setIsExportOpen}
               hasChevron={false}
@@ -543,7 +559,7 @@ export const Toolbar: React.FC = () => {
                 {project.settings.width}×{project.settings.height} •{" "}
                 {project.settings.frameRate}fps
               </Text>
-            </DropdownMenu>
+            </DropdownMenu>}
           </div>
         )}
       </div>

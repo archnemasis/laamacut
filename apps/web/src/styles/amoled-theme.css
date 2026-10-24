@@ -1,0 +1,38 @@
+/* AMOLED black: the dark theme with pure-black surfaces, so OLED screens
+   switch those pixels off. ThemeStore puts .amoled next to .dark on <html>.
+   The html:root prefix outranks the dark tokens in index.css and the
+   desktop tokens in desktop-theme.css, whichever loads last. */
+html:root.amoled.dark,
+html:root.amoled.dark .openreel-desktop,
+html:root.amoled.dark [data-theme="dark"],
+html:root.amoled.dark .dark {
+  --bg: #000000;
+  --bg-1: #000000;
+  --bg-2: #0d0d0f;
+  --bg-3: #17171a;
+  --bg-elev: #0d0d0f;
+  --border: #1f1f23;
+  --border-strong: #2c2c31;
+  --hover: #141417;
+  --track-bg: #050506;
+  --tl-bg: #000000;
+  --stage-bg: #000000;
+  --screen-bg: #000000;
+
+  --background: 0 0% 0%;
+  --card: 0 0% 4%;
+  --popover: 0 0% 5%;
+  --secondary: 0 0% 9%;
+  --muted: 0 0% 9%;
+  --accent-hsl: 0 0% 12%;
+  --input: 0 0% 14%;
+}
+
+html:root.amoled.dark [data-astryx-theme="neutral"],
+html:root.amoled.dark[data-astryx-theme="neutral"] {
+  --color-background-surface: #0d0d0f;
+  --color-background-body: #000000;
+  --color-background-card: #000000;
+  --color-background-popover: #0d0d0f;
+  --color-background-muted: #0d0d0f;
+}

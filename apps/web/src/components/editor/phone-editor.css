@@ -1,0 +1,15 @@
+/* Phone editor: the preview and timeline drop their desktop chrome, since
+   PhoneEditor supplies its own transport row and tool bar. */
+.phone-editor [data-preview-header],
+.phone-editor [data-preview-controls],
+.phone-editor [data-timeline-toolbar] {
+  display: none;
+}
+
+.phone-editor .phone-preview > * {
+  height: 100%;
+}
+
+.phone-editor .phone-sheet-body > * {
+  min-height: 100%;
+}

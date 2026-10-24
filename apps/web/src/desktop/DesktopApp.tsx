@@ -56,12 +56,13 @@ export function DesktopApp(): JSX.Element {
     });
   }, []);
 
-  // The desktop app is always dark. Dialogs and menus portal to <body>, so the
-  // theme has to live on <html> rather than only on the app container.
+  // Dialogs and menus portal to <body>, so the desktop tokens and the chosen
+  // theme (Settings → Appearance) have to live on <html>, not only on the app.
   useEffect(() => {
     const root = document.documentElement;
     root.classList.add("openreel-desktop");
-    useThemeStore.getState().setMode("dark");
+    const theme = useThemeStore.getState();
+    theme.setMode(theme.mode);
     return () => root.classList.remove("openreel-desktop");
   }, []);
 

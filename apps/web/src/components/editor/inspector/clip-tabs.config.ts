@@ -33,7 +33,7 @@ export const TAB_DEFS: Record<InspectorTabId, InspectorTabDef> = {
   audio: { id: "audio", label: "Audio", icon: Volume2 },
   speed: { id: "speed", label: "Speed", icon: Gauge },
   animate: { id: "animate", label: "Animate", icon: Film },
-  ai: { id: "ai", label: "AI", icon: Sparkles },
+  ai: { id: "ai", label: "Captions & tools", icon: Sparkles },
   style: { id: "style", label: "Style", icon: Type },
 };
 

@@ -1,0 +1,82 @@
+import "../../test/install-local-storage-mock";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { useUIStore } from "../../stores/ui-store";
+
+const actions = vi.hoisted(() => ({
+  splitTimelineItem: vi.fn(async () => undefined),
+  deleteTimelineItem: vi.fn(async () => undefined),
+  duplicateTimelineItem: vi.fn(async () => undefined),
+  getSplittableTimelineItemIds: vi.fn((_project: unknown, ids: string[]) => ids),
+}));
+vi.mock("../../utils/timeline-item-actions", () => actions);
+
+const projectState = vi.hoisted(() => ({
+  project: {
+    settings: { width: 1920, height: 1080, frameRate: 30 },
+    mediaLibrary: { items: [{ id: "m-video", type: "video" }] },
+    timeline: {
+      duration: 7,
+      tracks: [{ id: "t1", clips: [{ id: "clip-1", mediaId: "m-video" }] }],
+    },
+  },
+  undo: () => undefined,
+  redo: () => undefined,
+  canUndo: () => false,
+  canRedo: () => false,
+  updateSettings: async () => undefined,
+  setCanvasBackground: () => undefined,
+}));
+vi.mock("../../stores/project-store", () => {
+  const useProjectStore = (selector: (s: typeof projectState) => unknown) => selector(projectState);
+  useProjectStore.getState = () => projectState;
+  return { useProjectStore };
+});
+
+vi.mock("./Toolbar", () => ({ Toolbar: () => <header>Top bar</header> }));
+vi.mock("./Preview", () => ({ Preview: () => <div>Preview</div> }));
+vi.mock("./Timeline", () => ({ Timeline: () => <div>Timeline</div> }));
+vi.mock("./AssetsPanel", () => ({
+  AssetsPanel: ({ tab }: { tab: string }) => <div data-testid="assets-panel">{tab}</div>,
+}));
+vi.mock("./InspectorPanel", () => ({
+  InspectorPanel: ({ only }: { only?: string }) => <div data-testid="inspector-panel">{only ?? "all"}</div>,
+}));
+
+import { PhoneEditor } from "./PhoneEditor";
+
+describe("PhoneEditor", () => {
+  beforeEach(() => useUIStore.setState({ selectedItems: [] }));
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("opens editor tools as bottom sheets", () => {
+    render(<PhoneEditor />);
+    const tools = screen.getByRole("navigation", { name: "Editor tools" });
+    expect(within(tools).queryByText(/AI/)).toBeNull();
+
+    fireEvent.click(within(tools).getByRole("button", { name: "Text" }));
+    expect(screen.getByRole("dialog", { name: "Text" })).toBeInTheDocument();
+    expect(screen.getByTestId("assets-panel")).toHaveTextContent("text");
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("swaps to clip tools when a clip is selected", () => {
+    useUIStore.setState({ selectedItems: [{ type: "clip", id: "clip-1" }] });
+    render(<PhoneEditor />);
+    const tools = screen.getByRole("navigation", { name: "Clip tools" });
+
+    fireEvent.click(within(tools).getByRole("button", { name: "Speed" }));
+    expect(screen.getByTestId("inspector-panel")).toHaveTextContent("speed");
+
+    fireEvent.click(within(tools).getByRole("button", { name: "Split" }));
+    expect(actions.splitTimelineItem).toHaveBeenCalledWith(projectState, "clip-1", expect.any(Number));
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to editor tools" }));
+    expect(useUIStore.getState().selectedItems).toEqual([]);
+  });
+});

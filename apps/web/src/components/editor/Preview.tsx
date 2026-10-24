@@ -109,6 +109,7 @@ import { resolvePlaybackLoop, resolvePlaybackStart } from "../../utils/playback-
 import { ProcessingOverlay } from "./ProcessingOverlay";
 import { editingFrameDurationMs } from "./editing-frame-rate";
 import { APPS_BY_RATIO, AppIcon } from "./aspect-apps";
+import { ASPECT_PRESETS } from "./canvas-presets";
 import {
   getPersonSegmentationEngine,
   getBackgroundRemovalEngine,
@@ -350,19 +351,6 @@ const computeFitScale = (
     );
   return { x: drawWidth / canvasWidth, y: drawHeight / canvasHeight };
 };
-
-const ASPECT_PRESETS: Array<{
-  label: string;
-  width: number;
-  height: number;
-}> = [
-  { label: "16:9", width: 1920, height: 1080 },
-  { label: "9:16", width: 1080, height: 1920 },
-  { label: "1:1", width: 1080, height: 1080 },
-  { label: "4:5", width: 1080, height: 1350 },
-  { label: "4:3", width: 1440, height: 1080 },
-  { label: "21:9", width: 2560, height: 1080 },
-];
 
 const aspectLabelFor = (width: number, height: number): string => {
   const ratio = width / height;
@@ -7660,7 +7648,7 @@ export const Preview: React.FC = () => {
     >
       {/* ── Panel bar header (mockup: 'Player') ───────────────── */}
       {!isMaximized && !isFullscreen && (
-        <div className="flex items-center px-3.5 py-2 border-b border-border bg-bg-1 gap-2.5 min-h-[38px] shrink-0">
+        <div data-preview-header className="flex items-center px-3.5 py-2 border-b border-border bg-bg-1 gap-2.5 min-h-[38px] shrink-0">
           <Text type="label" color="primary" weight="semibold" className="text-[13px] tracking-tight text-fg m-0">Player</Text>
           <div className="ml-auto flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-accent" title="Live preview" />
@@ -8083,6 +8071,7 @@ export const Preview: React.FC = () => {
 
       {/* Player Controls with integrated Scrub Bar */}
       <div
+        data-preview-controls
         className={`shrink-0 border-t border-border transition-all duration-300 ${
           isMaximized || isFullscreen
             ? "z-50 bg-bg-1 backdrop-blur-sm"
