@@ -18,6 +18,7 @@ import { SOCIAL_MEDIA_PRESETS, type SocialMediaCategory } from "@openreel/core";
 import { useRouter } from "../../hooks/use-router";
 import { useEditorPreload } from "../../hooks/useEditorPreload";
 import { useAnalytics, AnalyticsEvents } from "../../hooks/useAnalytics";
+import llamaUrl from "../../assets/laamacut-llama.png?url";
 
 const TemplateGallery = lazy(() =>
   import("./TemplateGallery").then((module) => ({ default: module.TemplateGallery })),
@@ -69,72 +70,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
 ];
 
 const OpenReelLogo: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <svg
-    viewBox="0 0 490 490"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-  >
-    <path
-      d="M245 24.5C123.223 24.5 24.5 123.223 24.5 245s98.723 220.5 220.5 220.5 220.5-98.723 220.5-220.5S366.777 24.5 245 24.5Z"
-      stroke="currentColor"
-      strokeWidth="30.625"
-    />
-    <g>
-      <path
-        d="M245 98v73.5"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M392 245h-73.5"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M245 392v-73.5"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M98 245h73.5"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="m348.941 141.059-51.965 51.965"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="m348.941 348.941-51.965-51.965"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="m141.059 348.941 51.965-51.965"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="m141.059 141.059 51.965 51.965"
-        stroke="currentColor"
-        strokeWidth="24.5"
-        strokeLinecap="round"
-      />
-    </g>
-    <path
-      d="M294 245a49 49 0 0 1-49 49 49 49 0 0 1-49-49 49 49 0 0 1 98 0"
-      fill="currentColor"
-    />
-  </svg>
+  <img src={llamaUrl} alt="" className={className} draggable={false} />
 );
 
 type ViewMode = "home" | "templates" | "recent";
@@ -266,7 +202,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
                 <OpenReelLogo className="w-full h-full" />
               </div>
               <Text type="body" color="primary" weight="semibold" className="text-xl text-text-primary tracking-tight">
-                Open Reel Video
+                Laamacut
               </Text>
             </div>
 
