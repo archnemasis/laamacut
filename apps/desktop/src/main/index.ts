@@ -133,13 +133,26 @@ function createWindow(): void {
       webSecurity: true,
     },
   });
-  // The editor opens maximized. Windows applies the launcher's "normal window"
-  // style to the first show, so maximize on the next tick after it.
+  // The editor opens maximized. When launched from a shortcut, Windows applies
+  // the launcher's "normal window" style just after the first show and undoes
+  // the maximize, so re-assert it if that happens during startup.
   win.once("ready-to-show", () => {
     win.show();
+    const startBounds = win.getBounds();
+    win.maximize();
+    // The state lags the resize event, so check again a moment later. Only undo
+    // a snap back to the starting position; a drag by the user lands elsewhere.
+    const reassert = () => {
+      setTimeout(() => {
+        if (win.isDestroyed() || win.isMaximized()) return;
+        const bounds = win.getBounds();
+        if (bounds.x === startBounds.x && bounds.y === startBounds.y) win.maximize();
+      }, 50);
+    };
+    win.on("resize", reassert);
     setTimeout(() => {
-      if (!win.isDestroyed()) win.maximize();
-    }, 0);
+      if (!win.isDestroyed()) win.removeListener("resize", reassert);
+    }, 5000);
   });
   attachUnsavedGuard(win);
   installNavigationGuard(win, APP_INDEX);
