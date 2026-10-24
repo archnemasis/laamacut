@@ -1,24 +1,14 @@
-import React, { useCallback } from "react";
+import React, { useState } from "react";
 import { ToolcraftSwitchControl } from "@openreel/ui";
-import { ToolcraftButton as Button } from "@openreel/ui";
 import { ToolcraftClickableCard as ClickableCard } from "@openreel/ui";
-import { ToolcraftNumberInputControl } from "@openreel/ui";
 import { ToolcraftSelectControl as Selector } from "@openreel/ui";
 import { ToolcraftText as Text } from "@openreel/ui";
-import { ToolcraftTextInputControl as TextInput } from "@openreel/ui";
-import { useSettingsStore, SERVICE_REGISTRY, type TtsProvider, type LlmProvider, type AggregatorProvider } from "../../../stores/settings-store";
+import { useSettingsStore } from "../../../stores/settings-store";
 import { useProjectStore } from "../../../stores/project-store";
+import { useUIStore } from "../../../stores/ui-store";
+import { keyboardShortcuts } from "../../../services/keyboard-shortcuts";
 import { EDITING_FRAME_RATE_OPTIONS } from "../editing-frame-rate";
-
-const ASPECT_PRESETS: Array<{ label: string; width: number; height: number }> = [
-  { label: "16:9 Landscape (1080p)", width: 1920, height: 1080 },
-  { label: "9:16 Vertical (TikTok/Reels)", width: 1080, height: 1920 },
-  { label: "1:1 Square", width: 1080, height: 1080 },
-  { label: "4:5 Portrait", width: 1080, height: 1350 },
-  { label: "4:3 Standard", width: 1440, height: 1080 },
-  { label: "21:9 Cinematic", width: 2560, height: 1080 },
-  { label: "4K Landscape", width: 3840, height: 2160 },
-];
+import type { PreviewQuality } from "../preview/preview-resolution";
 
 const BACKGROUND_SWATCHES = [
   "#000000",
@@ -33,270 +23,82 @@ const BACKGROUND_SWATCHES = [
   "#0EA5E9",
 ];
 
-export const GeneralPanel: React.FC = () => {
-  const {
-    autoSave,
-    autoSaveInterval,
-    defaultTtsProvider,
-    defaultLlmProvider,
-    llmBaseUrl,
-    llmModel,
-    defaultAggregator,
-    configuredServices,
-    setAutoSave,
-    setAutoSaveInterval,
-    setDefaultTtsProvider,
-    setDefaultLlmProvider,
-    setLlmBaseUrl,
-    setLlmModel,
-    setDefaultAggregator,
-  } = useSettingsStore();
+const PREVIEW_QUALITY_CHOICES: { value: PreviewQuality; label: string }[] = [
+  { value: "auto", label: "Auto (matches the player size)" },
+  { value: "full", label: "Full" },
+  { value: "half", label: "Half" },
+  { value: "quarter", label: "Quarter" },
+];
 
-  const projectWidth = useProjectStore((s) => s.project.settings.width);
-  const projectHeight = useProjectStore((s) => s.project.settings.height);
-  const projectFrameRate = useProjectStore(
-    (s) => s.project.settings.frameRate,
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-1">
+      <Text display="block" type="body" color="primary" className="pb-1 text-sm font-semibold">
+        {title}
+      </Text>
+      <div className="divide-y divide-border rounded-lg border border-border bg-background-tertiary px-3">
+        {children}
+      </div>
+    </section>
   );
+}
+
+function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2.5">
+      <div className="min-w-0">
+        <Text display="block" type="supporting" color="primary" className="text-sm">
+          {label}
+        </Text>
+        {hint && (
+          <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
+            {hint}
+          </Text>
+        )}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+export const GeneralPanel: React.FC = () => {
+  const { autoSave, autoSaveInterval, setAutoSave, setAutoSaveInterval } = useSettingsStore();
+
+  const snapSettings = useUIStore((s) => s.snapSettings);
+  const setSnapEnabled = useUIStore((s) => s.setSnapEnabled);
+  const setSnapToClips = useUIStore((s) => s.setSnapToClips);
+  const setSnapToPlayhead = useUIStore((s) => s.setSnapToPlayhead);
+  const setSnapToGrid = useUIStore((s) => s.setSnapToGrid);
+  const playbackQuality = useUIStore((s) => s.playbackQuality);
+  const setPlaybackQuality = useUIStore((s) => s.setPlaybackQuality);
+
+  const [shortcutPreset, setShortcutPreset] = useState(() => keyboardShortcuts.getActivePreset());
+
+  const hasOpenProject = useProjectStore((s) => s.hasOpenProject);
+  const projectFrameRate = useProjectStore((s) => s.project.settings.frameRate);
   const updateProjectSettings = useProjectStore((s) => s.updateSettings);
-  const backgroundFillMode = useProjectStore(
-    (s) => s.project.timeline.backgroundFillMode,
-  );
-  const layoutBackgroundColor = useProjectStore(
-    (s) => s.project.timeline.layoutBackgroundColor,
-  );
+  const backgroundFillMode = useProjectStore((s) => s.project.timeline.backgroundFillMode);
+  const layoutBackgroundColor = useProjectStore((s) => s.project.timeline.layoutBackgroundColor);
   const setCanvasBackground = useProjectStore((s) => s.setCanvasBackground);
 
-  const [draftWidth, setDraftWidth] = React.useState(String(projectWidth));
-  const [draftHeight, setDraftHeight] = React.useState(String(projectHeight));
-
-  React.useEffect(() => {
-    setDraftWidth(String(projectWidth));
-    setDraftHeight(String(projectHeight));
-  }, [projectWidth, projectHeight]);
-
-  const applyDimensions = useCallback(
-    async (width: number, height: number) => {
-      const w = Math.max(16, Math.min(7680, Math.round(width)));
-      const h = Math.max(16, Math.min(7680, Math.round(height)));
-      await updateProjectSettings({ width: w, height: h });
-    },
-    [updateProjectSettings],
-  );
-
-  const handleApplyCustom = useCallback(() => {
-    const w = Number(draftWidth);
-    const h = Number(draftHeight);
-    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-      applyDimensions(w, h);
-    }
-  }, [draftWidth, draftHeight, applyDimensions]);
-
-  const ttsProviders = SERVICE_REGISTRY.filter((s) => s.id === "elevenlabs");
-
-  const llmProviders = SERVICE_REGISTRY.filter(
-    (s) => s.id === "openai-compatible" || s.id === "anthropic-compatible",
-  );
-
-  const aggregatorProviders = SERVICE_REGISTRY.filter(
-    (s) =>
-      s.id === "kie-ai" ||
-      s.id === "freepik" ||
-      configuredServices.includes(s.id),
-  );
   return (
-    <div className="space-y-6 pb-4">
-      {/* Project Composition */}
-      <div className="space-y-4">
-        <div>
-          <Text type="body" color="primary" display="block" className="text-sm font-medium">
-            Project Composition
-          </Text>
-          <Text type="supporting" color="secondary" display="block" className="mt-0.5 text-xs">
-            Set the canvas dimensions for your project. Pick a preset for TikTok,
-            Reels, YouTube, or enter custom values.
-          </Text>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {ASPECT_PRESETS.map((preset) => {
-            const isActive =
-                preset.width === projectWidth && preset.height === projectHeight;
-            return (
-              <ClickableCard
-                key={preset.label}
-                label={preset.label}
-                onClick={() => applyDimensions(preset.width, preset.height)}
-                padding={3}
-                variant={isActive ? "green" : "muted"}
-                className={`text-left text-xs border ${
-                  isActive
-                    ? "border-primary bg-primary/10 text-text-primary"
-                    : "border-border bg-background-tertiary text-text-secondary hover:text-text-primary hover:border-primary/40"
-                }`}
-              >
-                <Text type="supporting" color="inherit" display="block" className="font-medium">
-                  {preset.label}
-                </Text>
-                <Text type="supporting" color="secondary" display="block" className="mt-0.5 text-[10px]">
-                  {preset.width} × {preset.height}
-                </Text>
-              </ClickableCard>
-            );
-          })}
-        </div>
-
-        <div className="flex items-end gap-2">
-          <ToolcraftNumberInputControl
-            label="Width"
-            size="md"
-            width="100%"
-            min={16}
-            max={7680}
-            value={Number.isFinite(Number(draftWidth)) ? Number(draftWidth) : null}
-            onChange={(value) => setDraftWidth(String(value))}
-          />
-          <ToolcraftNumberInputControl
-            label="Height"
-            size="md"
-            width="100%"
-            min={16}
-            max={7680}
-            value={Number.isFinite(Number(draftHeight)) ? Number(draftHeight) : null}
-            onChange={(value) => setDraftHeight(String(value))}
-          />
-          <Button
-            label="Apply"
-            onClick={handleApplyCustom}
-            variant="primary"
-            size="md"
-            className="shrink-0"
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background-tertiary p-3">
-          <div>
-            <Text display="block" type="supporting" color="primary" className="text-sm font-medium">
-              Editing frame rate
-            </Text>
-            <Text type="supporting" color="secondary" className="mt-0.5 block text-[11px]">
-              Controls preview playback, frame stepping, and the default export rate.
-              Existing clip timing stays unchanged.
-            </Text>
-          </div>
-          <Selector
-            label="Editing frame rate"
-            isLabelHidden
-            size="md"
-            width={160}
-            value={String(projectFrameRate)}
-            onChange={(value) => {
-              const frameRate = Number(value);
-              if (Number.isFinite(frameRate) && frameRate > 0) {
-                void updateProjectSettings({ frameRate });
-              }
-            }}
-            options={EDITING_FRAME_RATE_OPTIONS.map((option) => ({
-              label: option.label,
-              value: String(option.value),
-            }))}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Text type="supporting" color="secondary" display="block" className="text-xs font-medium">
-            Background fill
-          </Text>
-          <Text type="supporting" color="secondary" display="block" className="text-[11px]">
-            Fills the canvas around clips that don&apos;t match the aspect ratio.
-          </Text>
-          <div className="flex flex-wrap items-center gap-2">
-            <ClickableCard
-              label="No background fill"
-              onClick={() => setCanvasBackground(undefined, undefined)}
-              padding={2}
-              variant={!backgroundFillMode ? "green" : "muted"}
-              className={`border px-3 py-1.5 text-xs ${
-                !backgroundFillMode
-                  ? "border-primary bg-primary/10 text-text-primary"
-                  : "border-border bg-background-tertiary text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              None
-            </ClickableCard>
-            <ClickableCard
-              label="Blur background fill"
-              onClick={() =>
-                setCanvasBackground("blur", layoutBackgroundColor)
-              }
-              padding={2}
-              variant={backgroundFillMode === "blur" ? "green" : "muted"}
-              className={`border px-3 py-1.5 text-xs ${
-                backgroundFillMode === "blur"
-                  ? "border-primary bg-primary/10 text-text-primary"
-                  : "border-border bg-background-tertiary text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              Blur
-            </ClickableCard>
-            {BACKGROUND_SWATCHES.map((hex) => {
-              const isActive =
-                backgroundFillMode === "color" &&
-                layoutBackgroundColor?.toLowerCase() === hex.toLowerCase();
-              return (
-                <ClickableCard
-                  key={hex}
-                  label={`Background color ${hex}`}
-                  onClick={() => setCanvasBackground("color", hex)}
-                  padding={0}
-                  variant="transparent"
-                  style={{ backgroundColor: hex }}
-                  className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                    isActive
-                      ? "border-primary scale-110"
-                      : "border-border hover:scale-105"
-                  }`}
-                />
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="h-px bg-border" />
-
-      {/* Auto-save */}
-      <div className="space-y-4">
-        <Text type="body" color="primary" className="text-sm font-medium">
-          Auto-Save
-        </Text>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <Text display="block" type="supporting" color="secondary" className="text-sm">
-              Enable auto-save
-            </Text>
-            <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
-              Automatically save your project at regular intervals
-            </Text>
-          </div>
+    <div className="space-y-5 pb-4">
+      <Section title="Saving">
+        <Row label="Auto-save" hint="Save your project automatically while you edit">
           <ToolcraftSwitchControl
-            ariaLabel="Enable auto-save"
+            ariaLabel="Auto-save"
             checked={autoSave}
             onCheckedChange={setAutoSave}
             showLabel={false}
           />
-        </div>
-
+        </Row>
         {autoSave && (
-          <div className="flex items-center gap-3">
-            <Text type="supporting" color="secondary" className="whitespace-nowrap text-sm">
-              Save every
-            </Text>
+          <Row label="Save every">
             <Selector
               label="Auto-save interval"
               isLabelHidden
               size="md"
-              width={150}
+              width={160}
               value={String(autoSaveInterval)}
               onChange={(value) => setAutoSaveInterval(Number(value))}
               options={[
@@ -308,120 +110,160 @@ export const GeneralPanel: React.FC = () => {
                 { label: "30 minutes", value: "30" },
               ]}
             />
-          </div>
+          </Row>
         )}
-      </div>
+      </Section>
 
-      <div className="h-px bg-border" />
+      <Section title="Playback">
+        <Row label="Preview quality" hint="Lower quality plays smoother on slower computers. Exports are not affected.">
+          <Selector
+            label="Preview quality"
+            isLabelHidden
+            size="md"
+            width={230}
+            value={playbackQuality}
+            onChange={(value) => setPlaybackQuality(value as PreviewQuality)}
+            options={PREVIEW_QUALITY_CHOICES}
+          />
+        </Row>
+      </Section>
 
-      {/* AI connections */}
-      <div className="space-y-4">
-        <Text display="block" type="body" color="primary" className="text-sm font-medium">
-          AI Connections
-        </Text>
-        <Text display="block" type="supporting" color="secondary" className="text-xs">
-          Connect a compatible endpoint you control. Laamacut does not choose a vendor or model for you.
-        </Text>
+      <Section title="Timeline">
+        <Row label="Snapping" hint="Clips snap into place while you drag them (N)">
+          <ToolcraftSwitchControl
+            ariaLabel="Snapping"
+            checked={snapSettings.enabled}
+            onCheckedChange={setSnapEnabled}
+            showLabel={false}
+          />
+        </Row>
+        {snapSettings.enabled && (
+          <>
+            <Row label="Snap to clip edges">
+              <ToolcraftSwitchControl
+                ariaLabel="Snap to clip edges"
+                checked={snapSettings.snapToClips}
+                onCheckedChange={setSnapToClips}
+                showLabel={false}
+              />
+            </Row>
+            <Row label="Snap to playhead">
+              <ToolcraftSwitchControl
+                ariaLabel="Snap to playhead"
+                checked={snapSettings.snapToPlayhead}
+                onCheckedChange={setSnapToPlayhead}
+                showLabel={false}
+              />
+            </Row>
+            <Row label="Snap to grid">
+              <ToolcraftSwitchControl
+                ariaLabel="Snap to grid"
+                checked={snapSettings.snapToGrid}
+                onCheckedChange={setSnapToGrid}
+                showLabel={false}
+              />
+            </Row>
+          </>
+        )}
+      </Section>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Text type="supporting" color="secondary" className="text-sm">
-              Text to Speech/Voice To Speech/Sound Effects
-            </Text>
+      <Section title="Keyboard">
+        <Row label="Shortcut layout" hint="Use the keyboard shortcuts of the editor you know">
+          <Selector
+            label="Shortcut layout"
+            isLabelHidden
+            size="md"
+            width={200}
+            value={shortcutPreset}
+            onChange={(value) => {
+              keyboardShortcuts.applyPreset(value);
+              setShortcutPreset(value);
+            }}
+            options={keyboardShortcuts.getPresets().map((preset) => ({
+              label: preset.name,
+              value: preset.id,
+            }))}
+          />
+        </Row>
+      </Section>
+
+      {hasOpenProject && (
+        <Section title="This project">
+          <Row label="Editing frame rate" hint="Preview playback and frame stepping. Export frame rate is set when you export.">
             <Selector
-              label="Text to Speech provider"
+              label="Editing frame rate"
               isLabelHidden
               size="md"
-              width={180}
-              value={defaultTtsProvider}
-              onChange={(value) => setDefaultTtsProvider(value as TtsProvider)}
-              options={ttsProviders.map((s) => ({ label: s.label, value: s.id }))}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Text type="supporting" color="secondary" className="text-sm">
-              Creative tools API format
-            </Text>
-            <Selector
-              label="Creative tools API format"
-              isLabelHidden
-              size="md"
-              width={180}
-              value={defaultLlmProvider ?? ""}
-              onChange={(value) =>
-                setDefaultLlmProvider((value || null) as LlmProvider | null)
-              }
-              options={[
-                { label: "Choose API format…", value: "" },
-                ...llmProviders.map((s) => ({ label: s.label, value: s.id })),
-              ]}
-            />
-          </div>
-
-          {defaultLlmProvider ? (
-            <div className="space-y-3 rounded-lg border border-border bg-background-tertiary p-3">
-              <div>
-                <Text display="block" type="supporting" color="secondary" className="text-sm font-medium">
-                  {defaultLlmProvider === "anthropic-compatible"
-                    ? "Anthropic-compatible endpoint"
-                    : "OpenAI-compatible endpoint"}
-                </Text>
-                <Text type="supporting" color="secondary" className="mt-0.5 block text-xs">
-                  Enter your API host and the exact tool-capable model ID exposed by that host.
-                </Text>
-              </div>
-              <TextInput
-                label="Base URL"
-                value={llmBaseUrl}
-                onChange={setLlmBaseUrl}
-                placeholder={
-                  defaultLlmProvider === "anthropic-compatible"
-                    ? "https://gateway.example/v1"
-                    : "http://localhost:11434/v1"
+              width={160}
+              value={String(projectFrameRate)}
+              onChange={(value) => {
+                const frameRate = Number(value);
+                if (Number.isFinite(frameRate) && frameRate > 0) {
+                  void updateProjectSettings({ frameRate });
                 }
-                width="100%"
-              />
-              <TextInput
-                label="Model ID"
-                value={llmModel}
-                onChange={setLlmModel}
-                placeholder="Enter any model ID from your endpoint"
-                width="100%"
-              />
-              <Text type="supporting" color="secondary" className="block text-[11px] leading-relaxed">
-                Used by voice scripts and shader generation. Configure timeline chat in the AI Editor settings tab.
-              </Text>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-border bg-background-tertiary p-3">
-              <Text type="supporting" color="secondary" className="block text-xs">
-                Choose an API format to configure your host and model.
-              </Text>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Text display="block" type="supporting" color="secondary" className="text-sm">
-                AI Aggregator
-              </Text>
-              <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
-                Video/image generation, upscaling, and creative AI tools
-              </Text>
-            </div>
-            <Selector
-              label="AI Aggregator provider"
-              isLabelHidden
-              size="md"
-              width={180}
-              value={defaultAggregator}
-              onChange={(value) => setDefaultAggregator(value as AggregatorProvider)}
-              options={aggregatorProviders.map((s) => ({ label: s.label, value: s.id }))}
+              }}
+              options={EDITING_FRAME_RATE_OPTIONS.map((option) => ({
+                label: option.label,
+                value: String(option.value),
+              }))}
             />
+          </Row>
+          <div className="space-y-2 py-2.5">
+            <Text display="block" type="supporting" color="primary" className="text-sm">
+              Background fill
+            </Text>
+            <Text display="block" type="supporting" color="secondary" className="text-xs">
+              Fills the canvas around clips that don&apos;t match the ratio.
+            </Text>
+            <div className="flex flex-wrap items-center gap-2">
+              <ClickableCard
+                label="No background fill"
+                onClick={() => setCanvasBackground(undefined, undefined)}
+                padding={2}
+                variant={!backgroundFillMode ? "green" : "muted"}
+                className={`border px-3 py-1.5 text-xs ${
+                  !backgroundFillMode
+                    ? "border-primary bg-primary/10 text-text-primary"
+                    : "border-border bg-background-tertiary text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                None
+              </ClickableCard>
+              <ClickableCard
+                label="Blur background fill"
+                onClick={() => setCanvasBackground("blur", layoutBackgroundColor)}
+                padding={2}
+                variant={backgroundFillMode === "blur" ? "green" : "muted"}
+                className={`border px-3 py-1.5 text-xs ${
+                  backgroundFillMode === "blur"
+                    ? "border-primary bg-primary/10 text-text-primary"
+                    : "border-border bg-background-tertiary text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                Blur
+              </ClickableCard>
+              {BACKGROUND_SWATCHES.map((hex) => {
+                const isActive =
+                  backgroundFillMode === "color" &&
+                  layoutBackgroundColor?.toLowerCase() === hex.toLowerCase();
+                return (
+                  <ClickableCard
+                    key={hex}
+                    label={`Background color ${hex}`}
+                    onClick={() => setCanvasBackground("color", hex)}
+                    padding={0}
+                    variant="transparent"
+                    style={{ backgroundColor: hex }}
+                    className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                      isActive ? "border-primary scale-110" : "border-border hover:scale-105"
+                    }`}
+                  />
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </div>
+        </Section>
+      )}
     </div>
   );
 };

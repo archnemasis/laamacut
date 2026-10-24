@@ -132,8 +132,8 @@ describe("listRecentProjects", () => {
     const entries = await listRecentProjects();
 
     expect(entries).toEqual([
-      { id: "save-b1", name: "Beta", savedAt: 3000 },
-      { id: "save-a2", name: "Alpha", savedAt: 2000 },
+      { id: "save-b1", projectId: "proj-b", name: "Beta", savedAt: 3000, preview: undefined },
+      { id: "save-a2", projectId: "proj-a", name: "Alpha", savedAt: 2000, preview: undefined },
     ]);
   });
 

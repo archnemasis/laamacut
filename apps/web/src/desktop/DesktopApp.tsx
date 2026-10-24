@@ -18,7 +18,8 @@ import { useSettingsStore } from "../stores/settings-store";
 import { useThemeStore } from "../stores/theme-store";
 import { SettingsDialog } from "../components/editor/settings/SettingsDialog";
 import { ToolcraftButton as Button } from "@openreel/ui";
-import { Settings, Sparkles } from "@/icons/lucide-compat";
+import { MoreHorizontal, Sparkles } from "@/icons/lucide-compat";
+import { captureProjectPreview } from "../services/project-previews";
 import "./theme/desktop-theme.css";
 
 function detectPlatform(): string {
@@ -70,6 +71,15 @@ export function DesktopApp(): JSX.Element {
     return () => root.classList.remove("openreel-desktop");
   }, []);
 
+  // Refresh the start screen preview of the open project whenever it saves.
+  useEffect(() => {
+    const onSaved = () => {
+      void captureProjectPreview(useProjectStore.getState().project);
+    };
+    autoSaveManager.on("saved", onSaved);
+    return () => autoSaveManager.off("saved", onSaved);
+  }, []);
+
   // Forward uncaught renderer errors + unhandled rejections to the native crash
   // collector so editor-side faults are captured alongside main-process crashes.
   useEffect(() => installRendererCrashHandlers(), []);
@@ -115,14 +125,6 @@ export function DesktopApp(): JSX.Element {
           />
         ) : null}
         {hasProject ? <DesktopExportButton /> : null}
-        <Button
-          label="Settings"
-          variant="secondary"
-          size="sm"
-          icon={<Settings size={15} aria-hidden />}
-          onClick={() => useSettingsStore.getState().openSettings()}
-          className="mr-2"
-        />
       </DesktopTitleBar>
       <div className="min-h-0 flex-1">
         <ErrorBoundary
@@ -145,6 +147,15 @@ export function DesktopApp(): JSX.Element {
         </ErrorBoundary>
       </div>
       <UpdateBanner />
+      <button
+        type="button"
+        aria-label="Settings"
+        title="Settings"
+        onClick={() => useSettingsStore.getState().openSettings()}
+        className="fixed bottom-4 right-4 z-40 grid h-10 w-10 place-items-center rounded-full border border-border bg-bg-1 text-fg-2 shadow-md transition-colors hover:border-accent hover:text-fg focus-visible:border-accent focus-visible:outline-none"
+      >
+        <MoreHorizontal size={20} aria-hidden />
+      </button>
       <SettingsDialog />
     </div>
   );

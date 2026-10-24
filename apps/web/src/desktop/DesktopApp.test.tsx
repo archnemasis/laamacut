@@ -118,7 +118,7 @@ describe("DesktopApp", () => {
     expect(useUIStore.getState().panels.agentChat.visible).toBe(false);
   });
 
-  it("keeps settings reachable from the desktop title bar", () => {
+  it("keeps settings reachable from the bottom-right button", () => {
     mockHasProject(false);
     const view = render(<DesktopApp />);
 
