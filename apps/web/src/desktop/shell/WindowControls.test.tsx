@@ -24,4 +24,17 @@ describe("WindowControls", () => {
     expect(win.minimize).toHaveBeenCalledTimes(1);
     expect(win.close).toHaveBeenCalledTimes(1);
   });
+  it("shows Maximize while restored and toggles on click", async () => {
+    render(<WindowControls platform="win32" />);
+    fireEvent.click(await screen.findByLabelText("Maximize"));
+    expect(win.toggleMaximize).toHaveBeenCalledTimes(1);
+  });
+  it("shows Restore Down while maximized and updates after a resize", async () => {
+    win.isMaximized.mockResolvedValue(true);
+    render(<WindowControls platform="win32" />);
+    expect(await screen.findByLabelText("Restore Down")).toBeInTheDocument();
+    win.isMaximized.mockResolvedValue(false);
+    fireEvent(window, new Event("resize"));
+    expect(await screen.findByLabelText("Maximize")).toBeInTheDocument();
+  });
 });
