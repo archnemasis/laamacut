@@ -77,7 +77,7 @@ function fitWithin(
 }
 
 function resolveFrameRate(frameRate?: number): number {
-  return frameRate && frameRate > 0 ? Math.min(frameRate, 60) : 30;
+  return frameRate && frameRate > 0 ? Math.min(frameRate, 120) : 30;
 }
 
 function videoKbpsFor(

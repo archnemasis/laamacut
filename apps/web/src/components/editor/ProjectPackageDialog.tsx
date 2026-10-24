@@ -64,7 +64,7 @@ export function ProjectPackageDialog({ onClose }: { onClose: () => void }) {
         // Request the picker before any async work to preserve user activation.
         const picker = (window as Window & { showSaveFilePicker?: (options: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
         if (!picker) throw new Error("Use Download backup in this browser.");
-        const handle = await picker.call(window, { suggestedName: exportFilename(snapshot.name, "oreelpack"), types: [{ description: "OpenReel project with media", accept: { "application/octet-stream": [".oreelpack"] } }] });
+        const handle = await picker.call(window, { suggestedName: exportFilename(snapshot.name, "oreelpack"), types: [{ description: "Hypercut project with media", accept: { "application/octet-stream": [".oreelpack"] } }] });
         abort.signal.throwIfAborted();
         writable = await handle.createWritable();
       }

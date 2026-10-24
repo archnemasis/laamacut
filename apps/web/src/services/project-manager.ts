@@ -319,7 +319,7 @@ class ProjectManager {
     if (isDesktopFs()) {
       const filePath = await window.openreel!.fs.showSaveDialog({
         defaultPath: `${project.name}.oreel`,
-        filters: [{ name: "OpenReel Project", extensions: ["oreel", "json"] }],
+        filters: [{ name: "Hypercut Project", extensions: ["oreel", "json"] }],
       });
       if (!filePath) return false;
       await window.openreel!.fs.writeFile(
@@ -343,7 +343,7 @@ class ProjectManager {
         suggestedName: `${project.name}.oreel`,
         types: [
           {
-            description: "OpenReel Project",
+            description: "Hypercut Project",
             accept: { "application/json": [".oreel", ".json"] },
           },
         ],
@@ -415,7 +415,7 @@ class ProjectManager {
   async openProject(): Promise<Project | null> {
     if (isDesktopFs()) {
       const filePath = await window.openreel!.fs.showOpenDialog({
-        filters: [{ name: "OpenReel Project", extensions: ["oreel", "json"] }],
+        filters: [{ name: "Hypercut Project", extensions: ["oreel", "json"] }],
       });
       if (!filePath) return null;
       const content = await window.openreel!.fs.readFile(filePath);
@@ -438,7 +438,7 @@ class ProjectManager {
         const [handle] = await win.showOpenFilePicker!({
           types: [
             {
-              description: "OpenReel Project",
+              description: "Hypercut Project",
               accept: { "application/json": [".oreel", ".json"] },
             },
           ],

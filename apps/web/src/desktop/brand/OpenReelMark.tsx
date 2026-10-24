@@ -41,7 +41,7 @@ export function OpenReelMark({
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       role="img"
-      aria-label="OpenReel"
+      aria-label="Hypercut"
     >
       <circle
         cx={CENTER}

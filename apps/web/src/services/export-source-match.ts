@@ -8,7 +8,7 @@ export interface SourceExportMatch {
   sourceName: string;
 }
 
-const STANDARD_FRAME_RATES = [24, 25, 30, 50, 60];
+const STANDARD_FRAME_RATES = [24, 25, 30, 50, 60, 90, 100, 120];
 
 function snapFrameRate(frameRate: number): number {
   if (!(frameRate > 0)) return 30;
@@ -25,7 +25,7 @@ function recommendedBitrateKbps(width: number, height: number, frameRate: number
   const bitsPerPixel = 0.12;
   const fps = frameRate > 0 ? frameRate : 30;
   const kbps = Math.round((width * height * fps * bitsPerPixel) / 1000);
-  return Math.min(60000, Math.max(2500, kbps));
+  return Math.min(150000, Math.max(2500, kbps));
 }
 
 function pickSourceVideo(project: Project): MediaItem | null {

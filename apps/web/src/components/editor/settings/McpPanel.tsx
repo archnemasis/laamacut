@@ -108,7 +108,7 @@ export const McpPanel: React.FC = () => {
           Desktop only
         </Text>
         <Text type="supporting" color="secondary" className="mt-1 max-w-sm text-xs">
-          The MCP server runs inside the OpenReel desktop app, letting external AI
+          The MCP server runs inside the Hypercut desktop app, letting external AI
           clients (Claude Desktop, Cursor, Cline) edit your project. Open OpenReel
           on desktop to configure it.
         </Text>

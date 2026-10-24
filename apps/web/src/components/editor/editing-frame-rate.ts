@@ -12,6 +12,10 @@ export const EDITING_FRAME_RATE_OPTIONS: ReadonlyArray<{
   { value: 50, label: "50 fps" },
   { value: 59.94, label: "59.94 fps" },
   { value: 60, label: "60 fps" },
+  { value: 90, label: "90 fps" },
+  { value: 100, label: "100 fps" },
+  { value: 119.88, label: "119.88 fps" },
+  { value: 120, label: "120 fps" },
 ];
 
 export function normalizeEditingFrameRate(frameRate: number): number {

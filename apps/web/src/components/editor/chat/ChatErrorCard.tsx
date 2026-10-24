@@ -78,7 +78,7 @@ export function formatChatError(rawError: string): ChatErrorPresentation {
     return {
       title: "Couldn’t reach the endpoint",
       message:
-        "Check the host URL and confirm the endpoint is online. In a browser, the host must also allow CORS requests from OpenReel.",
+        "Check the host URL and confirm the endpoint is online. In a browser, the host must also allow CORS requests from Hypercut.",
       action: "ai-editor",
       actionLabel: "Check endpoint",
       details: raw,
