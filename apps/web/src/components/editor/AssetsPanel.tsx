@@ -16,14 +16,12 @@ import { useUIStore } from "../../stores/ui-store";
 import { useTimelineStore } from "../../stores/timeline-store";
 import type { MediaItem } from "@openreel/core";
 import { AspectRatioMatchDialog } from "./dialogs/AspectRatioMatchDialog";
-import { AIGenTab } from "./AIGenTab";
 import { RecipesTab } from "./panels/RecipesTab";
 import { TemplatesTab } from "./panels/TemplatesTab";
 import {
   EffectsPanel,
   TransitionsPanel,
 } from "./panels/EffectsTransitionsPanel";
-import { useTtsAudioStore } from "../../stores/tts-store";
 import { toast } from "../../stores/notification-store";
 import { saveFileHandle, saveDirectoryHandle } from "../../services/media-storage";
 import { ToolcraftButton as Button } from "@openreel/ui";
@@ -56,7 +54,6 @@ type AssetsTab =
   | "graphics"
   | "effects"
   | "transitions"
-  | "ai"
   | "recipes"
   | "templates";
 
@@ -89,11 +86,6 @@ const ASSETS_TABS: ReadonlyArray<{
     value: "transitions",
     label: "Transitions",
     description: "Drag transitions onto a clip's edge.",
-  },
-  {
-    value: "ai",
-    label: "AI Generate",
-    description: "Generate clips, captions, and assisted edits.",
   },
   {
     value: "recipes",
@@ -197,7 +189,6 @@ const TAB_ICONS: Record<AssetsTab, React.ElementType> = {
   graphics: Shapes,
   effects: Zap,
   transitions: Shuffle,
-  ai: Sparkles,
   recipes: Wand2,
   templates: LayoutTemplate,
 };
@@ -630,17 +621,9 @@ const LoadingIndicator: React.FC<{ message: string }> = ({ message }) => (
 
 export const AssetsPanel: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTabRaw] = useState<AssetsTab>("media");
-  const ttsHasUnsaved = useTtsAudioStore((s) => s.generatedAudio !== null && !s.isAudioSaved);
+  const [activeTab, setActiveTab] = useState<AssetsTab>("media");
   const playheadPosition = useTimelineStore((state) => state.playheadPosition);
   const selectedIds = useUIStore((state) => state.selectedItems);
-
-  const setActiveTab = useCallback((tab: AssetsTab) => {
-    if (activeTab === "ai" && tab !== "ai" && ttsHasUnsaved) {
-      toast.warning("Unsaved audio discarded", "Save to media or download next time to keep it.");
-    }
-    setActiveTabRaw(tab);
-  }, [activeTab, ttsHasUnsaved]);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -1498,12 +1481,6 @@ export const AssetsPanel: React.FC = () => {
         return (
           <div className="flex min-h-0 flex-1 flex-col border-t border-border/70 bg-bg-1">
             <TransitionsPanel />
-          </div>
-        );
-      case "ai":
-        return (
-          <div className="flex min-h-0 flex-1 flex-col border-t border-border/70 bg-background-secondary content-area-fix">
-            <AIGenTab />
           </div>
         );
       case "recipes":

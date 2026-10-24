@@ -13,12 +13,10 @@ import { installRendererCrashHandlers, reportRendererCrash } from "./crash-repor
 import { installMcpListener } from "../services/agent/mcp-listener";
 import { getLiveEditorHost } from "../services/agent/host-singleton";
 import { createExportJobRunner } from "../services/agent/export-job-runner";
-import { useUIStore } from "../stores/ui-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { useThemeStore } from "../stores/theme-store";
 import { SettingsDialog } from "../components/editor/settings/SettingsDialog";
-import { ToolcraftButton as Button } from "@openreel/ui";
-import { MoreHorizontal, Sparkles } from "@/icons/lucide-compat";
+import { MoreHorizontal } from "@/icons/lucide-compat";
 import { captureProjectPreview } from "../services/project-previews";
 import "./theme/desktop-theme.css";
 
@@ -31,10 +29,6 @@ function detectPlatform(): string {
 export function DesktopApp(): JSX.Element {
   const platform = detectPlatform();
   const hasProject = useProjectStore((state) => state.hasOpenProject);
-  const agentChatVisible = useUIStore(
-    (state) => state.panels.agentChat?.visible ?? false,
-  );
-  const togglePanel = useUIStore((state) => state.togglePanel);
 
   // Drive native-menu actions into the app: undo/redo hit the project store
   // directly; new/open/export are broadcast as events for the relevant UI to
@@ -113,17 +107,6 @@ export function DesktopApp(): JSX.Element {
   return (
     <div className="openreel-desktop isolate flex h-screen w-screen flex-col overflow-hidden bg-bg text-fg">
       <DesktopTitleBar platform={platform}>
-        {hasProject ? (
-          <Button
-            label="AI Editor"
-            variant={agentChatVisible ? "primary" : "secondary"}
-            size="sm"
-            icon={<Sparkles size={15} aria-hidden />}
-            onClick={() => togglePanel("agentChat")}
-            className="mr-2"
-            aria-pressed={agentChatVisible}
-          />
-        ) : null}
         {hasProject ? <DesktopExportButton /> : null}
       </DesktopTitleBar>
       <div className="min-h-0 flex-1">

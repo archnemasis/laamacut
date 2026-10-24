@@ -14,10 +14,13 @@ export function DesktopTitleBar({ platform, children }: { platform: string; chil
         <OpenReelMark size={16} className="text-accent" />
         <span className="text-xs font-semibold tracking-wide text-fg-2">Laamacut</span>
       </div>
-      <div className="flex items-center" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-        {children}
+      {/* App actions (Export) sit with the window buttons on the right. */}
+      <div className="flex h-full items-center">
+        <div className="flex items-center pr-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+          {children}
+        </div>
+        <WindowControls platform={platform} />
       </div>
-      <WindowControls platform={platform} />
     </header>
   );
 }

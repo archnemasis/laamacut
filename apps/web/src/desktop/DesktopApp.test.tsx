@@ -91,31 +91,20 @@ describe("DesktopApp", () => {
     expect(getByTestId("desktop-workspace")).toBeTruthy();
   });
 
-  it("keeps video editing actions available for stale motion state", () => {
-    mockHasProject(true);
-    const editView = render(<DesktopApp />);
-    expect(editView.getByRole("button", { name: "Video Export" })).toBeTruthy();
-    editView.unmount();
-
-    useUIStore.setState({ desktopPage: "motion" });
-    const motionView = render(<DesktopApp />);
-    expect(motionView.getByRole("button", { name: "Video Export" })).toBeTruthy();
-    expect(motionView.getByRole("button", { name: "AI Editor" })).toBeTruthy();
-  });
-
-  it("toggles the AI Editor side panel from the desktop title bar", () => {
+  it("puts Export beside the window buttons and has no AI Editor button", () => {
     mockHasProject(true);
     const view = render(<DesktopApp />);
-    const button = view.getByRole("button", { name: "AI Editor" });
+    const exportButton = view.getByRole("button", { name: "Video Export" });
+    const minimize = view.getByRole("button", { name: "Minimize" });
+    expect(exportButton.parentElement?.parentElement).toBe(minimize.closest("header > div:last-child"));
+    expect(view.queryByRole("button", { name: "AI Editor" })).toBeNull();
+  });
 
-    expect(button).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(button);
-
-    expect(useUIStore.getState().panels.agentChat.visible).toBe(true);
-    expect(button).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.click(button);
-    expect(useUIStore.getState().panels.agentChat.visible).toBe(false);
+  it("keeps Export available for stale motion state", () => {
+    mockHasProject(true);
+    useUIStore.setState({ desktopPage: "motion" });
+    const view = render(<DesktopApp />);
+    expect(view.getByRole("button", { name: "Video Export" })).toBeTruthy();
   });
 
   it("keeps settings reachable from the bottom-right button", () => {
