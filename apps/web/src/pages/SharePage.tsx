@@ -94,10 +94,10 @@ export const SharePage: React.FC<SharePageProps> = ({ shareId }) => {
             <AlertCircle size={40} className="text-text-muted" />
           </div>
           <div>
-            <Text type="body" color="primary" weight="bold" className="text-2xl text-text-primary">
+            <Text display="block" type="body" color="primary" weight="bold" className="text-2xl text-text-primary">
               Video Not Found
             </Text>
-            <Text type="supporting" color="secondary" className="text-text-muted mt-2">
+            <Text display="block" type="supporting" color="secondary" className="text-text-muted mt-2">
               This video doesn't exist or the link is invalid.
             </Text>
           </div>
@@ -122,10 +122,10 @@ export const SharePage: React.FC<SharePageProps> = ({ shareId }) => {
             <Clock size={40} className="text-warning" />
           </div>
           <div>
-            <Text type="body" color="primary" weight="bold" className="text-2xl text-text-primary">
+            <Text display="block" type="body" color="primary" weight="bold" className="text-2xl text-text-primary">
               Link Expired
             </Text>
-            <Text type="supporting" color="secondary" className="text-text-muted mt-2">
+            <Text display="block" type="supporting" color="secondary" className="text-text-muted mt-2">
               This share link has expired. Share links are only valid for 24
               hours.
             </Text>
@@ -151,8 +151,8 @@ export const SharePage: React.FC<SharePageProps> = ({ shareId }) => {
             <AlertCircle size={40} className="text-error" />
           </div>
           <div>
-            <Text type="body" color="primary" weight="bold" className="text-2xl text-text-primary">Error</Text>
-            <Text type="supporting" color="secondary" className="text-text-muted mt-2">
+            <Text display="block" type="body" color="primary" weight="bold" className="text-2xl text-text-primary">Error</Text>
+            <Text display="block" type="supporting" color="secondary" className="text-text-muted mt-2">
               {error || "Something went wrong"}
             </Text>
           </div>

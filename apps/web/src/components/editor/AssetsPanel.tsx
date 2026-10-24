@@ -1014,7 +1014,7 @@ export const AssetsPanel: React.FC = () => {
                   type="button"
                   aria-label="Import media"
                   onClick={triggerFileInput}
-                  className="flex-1 flex items-center justify-center gap-[7px] bg-bg border border-border rounded-[9px] p-[10px] font-medium text-[13px] text-fg-2"
+                  className="flex-1 min-w-0 flex items-center justify-center gap-[6px] bg-bg border border-border rounded-[9px] px-2 py-[10px] font-medium text-[13px] text-fg-2"
                 >
                   <svg
                     width="15"
@@ -1035,7 +1035,7 @@ export const AssetsPanel: React.FC = () => {
                   type="button"
                   aria-label="Record"
                   onClick={() => openModal("recorder")}
-                  className="flex-1 flex items-center justify-center gap-[7px] bg-bg border border-border rounded-[9px] p-[10px] font-medium text-[13px] text-fg-2"
+                  className="flex-1 min-w-0 flex items-center justify-center gap-[6px] bg-bg border border-border rounded-[9px] px-2 py-[10px] font-medium text-[13px] text-fg-2"
                 >
                   <svg
                     width="15"
@@ -1058,7 +1058,7 @@ export const AssetsPanel: React.FC = () => {
                       prev === "none" ? "asc" : prev === "asc" ? "desc" : "none",
                     )
                   }
-                  className="w-[42px] flex items-center justify-center bg-bg border border-border rounded-[9px]"
+                  className="w-[42px] shrink-0 flex items-center justify-center bg-bg border border-border rounded-[9px]"
                 >
                   <svg
                     width="16"

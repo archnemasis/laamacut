@@ -150,14 +150,14 @@ export const EffectsTab: React.FC<EffectsTabProps> = ({
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 flex items-center gap-2">
                       <Sparkles size={11} className="text-primary shrink-0" />
-                      <Text
+                      <Text display="block"
                         type="supporting"
                         color="primary"
                         className="truncate text-[11px] font-medium"
                       >
                         {application.name}
                       </Text>
-                      <Text
+                      <Text display="block"
                         type="supporting"
                         color="secondary"
                         className="shrink-0 text-[9px] capitalize"

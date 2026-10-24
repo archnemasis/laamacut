@@ -70,10 +70,10 @@ export const MarkersPanel: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Flag size={14} className="text-fg-2" aria-hidden />
-          <Text type="body" color="primary" weight="bold" className="text-xs">
+          <Text display="block" type="body" color="primary" weight="bold" className="text-xs">
             Markers
           </Text>
-          <Text type="supporting" color="secondary" className="text-xs">
+          <Text display="block" type="supporting" color="secondary" className="text-xs">
             ({markers.length})
           </Text>
         </div>
@@ -172,10 +172,10 @@ export const MarkersPanel: React.FC = () => {
                       className="flex-1"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <Text type="supporting" color="primary" className="text-xs">
+                        <Text display="block" type="supporting" color="primary" className="text-xs">
                           {marker.label}
                         </Text>
-                        <Text
+                        <Text display="block"
                           type="supporting"
                           color="secondary"
                           className="text-[10px] font-mono"

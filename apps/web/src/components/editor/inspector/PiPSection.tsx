@@ -333,10 +333,10 @@ export const PiPSection: React.FC<PiPSectionProps> = ({ clipId }) => {
       >
         <PictureInPicture2 size={16} className="text-primary" />
         <div className="flex-1 flex flex-col gap-0.5">
-          <Text type="supporting" color="primary" className="text-[11px] font-medium">
+          <Text display="block" type="supporting" color="primary" className="text-[11px] font-medium">
             Picture-in-Picture
           </Text>
-          <Text type="supporting" color="secondary" className="text-[9px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[9px]">
             Position and scale video overlay
           </Text>
         </div>

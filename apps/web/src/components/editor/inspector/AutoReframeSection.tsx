@@ -314,10 +314,10 @@ export const AutoReframeSection: React.FC<AutoReframeSectionProps> = ({
         {isProcessing && (
           <Card variant="muted" padding={2} className="space-y-1">
             <div className="flex items-center justify-between">
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {progressMessage}
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {progress}%
               </Text>
             </div>

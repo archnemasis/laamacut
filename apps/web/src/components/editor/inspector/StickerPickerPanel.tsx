@@ -312,10 +312,10 @@ export const StickerPickerPanel: React.FC = () => {
                 className="mx-auto mb-2 text-fg-3 opacity-50"
                 aria-hidden
               />
-              <Text type="supporting" color="secondary" className="text-[10px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[10px]">
                 No stickers yet
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px] mt-1">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px] mt-1">
                 Import custom stickers below
               </Text>
             </div>

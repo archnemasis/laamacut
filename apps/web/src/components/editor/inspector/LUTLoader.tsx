@@ -304,7 +304,7 @@ export const LUTLoader: React.FC<LUTLoaderProps> = ({
               <Text type="supporting" color="primary" className="block truncate text-[10px]">
                 {fileName || "LUT Loaded"}
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {lutData.size}x{lutData.size}x{lutData.size} LUT
               </Text>
             </div>

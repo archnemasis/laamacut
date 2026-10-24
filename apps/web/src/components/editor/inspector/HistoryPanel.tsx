@@ -325,10 +325,10 @@ export const HistoryPanel: React.FC = () => {
 
       <div className="p-2 border-t border-border bg-bg-2">
         <div className="flex items-center justify-between text-[10px] text-fg-3">
-          <Text type="supporting" color="secondary" className="text-[10px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[10px]">
             {undoCount} actions
           </Text>
-          <Text type="supporting" color="secondary" className="text-[10px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[10px]">
             {redoCount} redoable
           </Text>
         </div>

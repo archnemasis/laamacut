@@ -190,18 +190,18 @@ export const AutoCutSilenceSection: React.FC<AutoCutSilenceSectionProps> = ({
         {analysisResult && (
           <Card variant="muted" padding={3}>
             <div className="flex items-center justify-between mb-1">
-              <Text type="supporting" color="secondary">
+              <Text display="block" type="supporting" color="secondary">
                 Silent Sections Found
               </Text>
-              <Text type="body" color="primary" weight="bold">
+              <Text display="block" type="body" color="primary" weight="bold">
                 {analysisResult.silentRegions.length}
               </Text>
             </div>
             <div className="flex items-center justify-between">
-              <Text type="supporting" color="secondary">
+              <Text display="block" type="supporting" color="secondary">
                 Total Silence
               </Text>
-              <Text type="supporting" color="primary">
+              <Text display="block" type="supporting" color="primary">
                 {analysisResult.totalSilenceDuration.toFixed(1)}s of{" "}
                 {analysisResult.clipDuration.toFixed(1)}s (
                 {Math.round(
@@ -218,10 +218,10 @@ export const AutoCutSilenceSection: React.FC<AutoCutSilenceSectionProps> = ({
         {(isAnalyzing || isCutting) && (
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {progressMessage}
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {progress}%
               </Text>
             </div>

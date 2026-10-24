@@ -1363,14 +1363,14 @@ export const ClipTransitionSection: React.FC<ClipTransitionSectionProps> = ({
               className="space-y-2 border border-border bg-bg-1"
             >
               <div className="space-y-1">
-                <Text
+                <Text display="block"
                   type="supporting"
                   color="primary"
                   className="text-[10px] font-medium"
                 >
                   {edgeTransition.title}
                 </Text>
-                <Text
+                <Text display="block"
                   type="supporting"
                   color="secondary"
                   className="text-[9px]"
@@ -1417,14 +1417,14 @@ export const ClipTransitionSection: React.FC<ClipTransitionSectionProps> = ({
                 className="space-y-2 border border-border bg-bg-1"
               >
                 <div className="space-y-1">
-                  <Text
+                  <Text display="block"
                     type="supporting"
                     color="primary"
                     className="text-[10px] font-medium"
                   >
                     {adjacentTransition.title}
                   </Text>
-                  <Text
+                  <Text display="block"
                     type="supporting"
                     color="secondary"
                     className="text-[9px]"

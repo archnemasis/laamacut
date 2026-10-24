@@ -80,10 +80,10 @@ const EQBand: React.FC<{
         onChange={onChange}
       />
     </div>
-    <Text type="supporting" color="secondary" className="text-[8px]">
+    <Text display="block" type="supporting" color="secondary" className="text-[8px]">
       {frequency}
     </Text>
-    <Text type="supporting" color="secondary" className="font-mono text-[8px]">
+    <Text display="block" type="supporting" color="secondary" className="font-mono text-[8px]">
       {gain > 0 ? "+" : ""}
       {gain}
     </Text>

@@ -240,10 +240,10 @@ export const AutoEditPanel: React.FC<AutoEditPanelProps> = ({ onClose }) => {
 
           <div className="space-y-1.5">
             <div className="flex justify-between">
-              <Text type="supporting" color="secondary" weight="bold" className="text-[10px]">
+              <Text display="block" type="supporting" color="secondary" weight="bold" className="text-[10px]">
                 Sensitivity
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {Math.round(sensitivity * 100)}%
               </Text>
             </div>
@@ -261,10 +261,10 @@ export const AutoEditPanel: React.FC<AutoEditPanelProps> = ({ onClose }) => {
 
           <div className="space-y-1.5">
             <div className="flex justify-between">
-              <Text type="supporting" color="secondary" weight="bold" className="text-[10px]">
+              <Text display="block" type="supporting" color="secondary" weight="bold" className="text-[10px]">
                 Min Clip Duration
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {minClipDuration.toFixed(1)}s
               </Text>
             </div>
@@ -310,18 +310,18 @@ export const AutoEditPanel: React.FC<AutoEditPanelProps> = ({ onClose }) => {
               </Text>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Text type="supporting" color="secondary" className="text-[9px]">
+                  <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                     Cuts:{" "}
                   </Text>
-                  <Text type="supporting" className="text-[9px]">
+                  <Text display="block" type="supporting" className="text-[9px]">
                     {preview.cuts.length}
                   </Text>
                 </div>
                 <div>
-                  <Text type="supporting" color="secondary" className="text-[9px]">
+                  <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                     Duration:{" "}
                   </Text>
-                  <Text type="supporting" className="text-[9px]">
+                  <Text display="block" type="supporting" className="text-[9px]">
                     {preview.totalDuration.toFixed(1)}s
                   </Text>
                 </div>

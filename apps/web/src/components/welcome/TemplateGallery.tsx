@@ -196,10 +196,10 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
           <div className="w-14 h-14 rounded-2xl bg-background-tertiary flex items-center justify-center mb-4">
             <Layers size={24} className="text-text-muted" />
           </div>
-          <Text type="supporting" color="primary" weight="medium" className="text-base text-text-primary mb-1">
+          <Text display="block" type="supporting" color="primary" weight="medium" className="text-base text-text-primary mb-1">
             No templates found
           </Text>
-          <Text type="supporting" color="secondary" className="text-sm text-text-muted">
+          <Text display="block" type="supporting" color="secondary" className="text-sm text-text-muted">
             Try adjusting your search or filter
           </Text>
         </div>

@@ -696,10 +696,10 @@ export const MaskSection: React.FC<MaskSectionProps> = ({ clipId }) => {
       >
         <Square size={16} className="text-primary" />
         <div className="flex flex-1 flex-col gap-0.5">
-          <Text type="supporting" color="primary" className="text-[11px] font-medium">
+          <Text display="block" type="supporting" color="primary" className="text-[11px] font-medium">
             Masking
           </Text>
-          <Text type="supporting" color="secondary" className="text-[9px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[9px]">
             Control visible regions of clip
           </Text>
         </div>

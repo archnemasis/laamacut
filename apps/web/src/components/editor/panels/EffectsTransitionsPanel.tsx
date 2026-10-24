@@ -1763,10 +1763,10 @@ export const TransitionsPanel: React.FC = () => {
             return (
               <section key={category}>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <Text type="supporting" color="secondary" weight="bold" className="text-[9.5px] uppercase">
+                  <Text display="block" type="supporting" color="secondary" weight="bold" className="text-[9.5px] uppercase">
                     {category}
                   </Text>
-                  <Text type="supporting" color="secondary" className="font-mono text-[9px]">
+                  <Text display="block" type="supporting" color="secondary" className="font-mono text-[9px]">
                     {items.length}
                   </Text>
                 </div>

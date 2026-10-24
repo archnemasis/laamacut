@@ -172,10 +172,10 @@ export const MotionTrackingSection: React.FC<MotionTrackingSectionProps> = ({
       <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg border border-primary/30">
         <Target size={16} className="text-primary" />
         <div className="flex flex-1 flex-col gap-0.5">
-          <Text type="supporting" color="primary" weight="medium">
+          <Text display="block" type="supporting" color="primary" weight="medium">
             Motion Tracking
           </Text>
-          <Text type="supporting" color="secondary" className="text-[9px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[9px]">
             Track objects to attach elements
           </Text>
         </div>
@@ -298,8 +298,8 @@ export const MotionTrackingSection: React.FC<MotionTrackingSectionProps> = ({
 
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[10px]">
-              <Text type="supporting" color="secondary">Analyzing frames...</Text>
-              <Text type="supporting" color="primary" className="font-mono">
+              <Text display="block" type="supporting" color="secondary">Analyzing frames...</Text>
+              <Text display="block" type="supporting" color="primary" className="font-mono">
                 {Math.round(state.progress)}%
               </Text>
             </div>

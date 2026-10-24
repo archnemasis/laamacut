@@ -76,6 +76,9 @@ export const EditorActionRail: React.FC = () => {
       <SunMoon size={16} aria-hidden />
     );
   const themeActionLabel = `Theme: ${themeLabel}. Switch to ${nextThemeLabel}`;
+  // The desktop app is always dark, so it has no theme toggle.
+  const isDesktop =
+    typeof window !== "undefined" && window.openreel?.platform === "desktop";
 
   return (
     <nav
@@ -145,15 +148,17 @@ export const EditorActionRail: React.FC = () => {
 
       <div className="flex-1" />
 
-      <Tooltip content={themeActionLabel} placement="end">
-        <IconButton
-          label={themeActionLabel}
-          icon={themeIcon}
-          size="sm"
-          variant="secondary"
-          onClick={toggleTheme}
-        />
-      </Tooltip>
+      {!isDesktop && (
+        <Tooltip content={themeActionLabel} placement="end">
+          <IconButton
+            label={themeActionLabel}
+            icon={themeIcon}
+            size="sm"
+            variant="secondary"
+            onClick={toggleTheme}
+          />
+        </Tooltip>
+      )}
 
       <DropdownMenu
         placement="end"

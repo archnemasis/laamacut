@@ -41,10 +41,10 @@ const TaskItem: React.FC<{ task: ProcessingTask }> = ({ task }) => {
       {getIcon()}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <Text type="supporting" weight="bold" maxLines={1}>
+          <Text display="block" type="supporting" weight="bold" maxLines={1}>
             {PROCESSING_TYPE_LABELS[task.type]}
           </Text>
-          <Text type="supporting" className={`text-[10px] ${getStatusColor()}`}>
+          <Text display="block" type="supporting" className={`text-[10px] ${getStatusColor()}`}>
             {task.status === "processing" ? `${task.progress}%` : task.status}
           </Text>
         </div>
@@ -115,10 +115,10 @@ export const ProcessingOverlay: React.FC = () => {
 
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
-            <Text type="supporting" color="secondary" className="text-[10px]">
+            <Text display="block" type="supporting" color="secondary" className="text-[10px]">
               Overall Progress
             </Text>
-            <Text type="supporting" color="secondary" className="text-[10px] font-mono">
+            <Text display="block" type="supporting" color="secondary" className="text-[10px] font-mono">
               {progress}%
             </Text>
           </div>

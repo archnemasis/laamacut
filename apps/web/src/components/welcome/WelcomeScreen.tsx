@@ -165,13 +165,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
               </Text>
             </div>
 
-            <Text type="body" color="primary" weight="bold" className="text-4xl sm:text-5xl text-text-primary tracking-tight mb-3">
+            <Text display="block" type="body" color="primary" weight="bold" className="text-4xl sm:text-5xl text-text-primary tracking-tight mb-3">
               From idea to export.
             </Text>
-            <Text type="supporting" color="secondary" className="text-xl text-text-secondary mb-8">
+            <Text display="block" type="supporting" color="secondary" className="text-xl text-text-secondary mb-8">
               In your browser.
             </Text>
-            <Text type="supporting" color="secondary" className="text-base text-text-muted max-w-md">
+            <Text display="block" type="supporting" color="secondary" className="text-base text-text-muted max-w-md">
               Pick a shape and start editing. Quality, frame rate and bitrate are set when you export.
             </Text>
           </div>

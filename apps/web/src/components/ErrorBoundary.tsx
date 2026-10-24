@@ -43,10 +43,10 @@ export class ErrorBoundary extends React.Component<
 
       return (
         <div className="flex flex-col items-center justify-center p-8 text-center bg-background-secondary/50 rounded-lg m-2">
-          <Text type="supporting" weight="medium" className="text-red-400 text-sm mb-2">
+          <Text display="block" type="supporting" weight="medium" className="text-red-400 text-sm mb-2">
             Something went wrong
           </Text>
-          <Text type="supporting" color="secondary" className="text-text-muted text-xs mb-4 max-w-xs">
+          <Text display="block" type="supporting" color="secondary" className="text-text-muted text-xs mb-4 max-w-xs">
             {this.state.error?.message || "An unexpected error occurred"}
           </Text>
           <Button

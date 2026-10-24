@@ -150,10 +150,10 @@ export const RecoveryDialog: React.FC<RecoveryDialogProps> = ({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <Text type="supporting" color="primary" weight="medium" className="text-sm truncate group-hover:text-primary transition-colors">
+                        <Text display="block" type="supporting" color="primary" weight="medium" className="text-sm truncate group-hover:text-primary transition-colors">
                           {save.projectName}
                         </Text>
-                        <Text type="supporting" color="secondary" className="text-xs text-text-muted mt-1">
+                        <Text display="block" type="supporting" color="secondary" className="text-xs text-text-muted mt-1">
                           {formatDate(save.timestamp)}
                         </Text>
                       </div>

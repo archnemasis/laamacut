@@ -245,10 +245,10 @@ export const MusicLibraryPanel: React.FC = () => {
       <Card variant="green" padding={2} className="flex items-center gap-2 border border-primary/30">
         <Music size={16} className="text-primary" aria-hidden />
         <div className="flex flex-col gap-0.5">
-          <Text type="body" color="primary" weight="bold" className="text-[11px]">
+          <Text display="block" type="body" color="primary" weight="bold" className="text-[11px]">
             Music & SFX
           </Text>
-          <Text type="supporting" color="secondary" className="text-[9px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[9px]">
             Royalty-free sounds
           </Text>
         </div>

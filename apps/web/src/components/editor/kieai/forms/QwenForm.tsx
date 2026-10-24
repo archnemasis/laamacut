@@ -48,10 +48,10 @@ export function QwenForm({ value, onChange, onSubmit, isLoading }: Props) {
           valueDisplay="none"
         />
         <div className="flex justify-between">
-          <Text type="supporting" color="secondary" className="text-[10px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[10px]">
             Preserve
           </Text>
-          <Text type="supporting" color="secondary" className="text-[10px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[10px]">
             Remake
           </Text>
         </div>

@@ -394,10 +394,10 @@ export const EmphasisAnimationSection: React.FC<
           <div className="pt-3 border-t border-border space-y-3">
             <div className="flex items-center gap-2 text-primary">
               <Clock size={12} />
-              <Text type="supporting" className="text-[10px] font-medium text-primary">
+              <Text display="block" type="supporting" className="text-[10px] font-medium text-primary">
                 Timing
               </Text>
-              <Text type="supporting" color="secondary" className="ml-auto text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="ml-auto text-[9px]">
                 Clip: {formatTime(clipDuration)}
               </Text>
             </div>

@@ -51,7 +51,7 @@ const ToolButton: React.FC<{
       {icon}
     </div>
     <div className="text-left">
-      <Text
+      <Text display="block"
         type="supporting"
         weight="medium"
         className={`text-[11px] font-medium block ${
@@ -60,7 +60,7 @@ const ToolButton: React.FC<{
       >
         {label}
       </Text>
-      <Text type="supporting" color="secondary" className="text-[9px]">
+      <Text display="block" type="supporting" color="secondary" className="text-[9px]">
         {description}
       </Text>
     </div>
@@ -161,18 +161,18 @@ const CloneSourceIndicator: React.FC<{
       </div>
       <div className="mt-2 flex items-center gap-4">
         <div className="flex items-center gap-1">
-          <Text type="supporting" color="secondary" className="text-[9px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[9px]">
             X:
           </Text>
-          <Text type="supporting" color="primary" className="text-[9px] font-mono">
+          <Text display="block" type="supporting" color="primary" className="text-[9px] font-mono">
             {Math.round(source.x)}
           </Text>
         </div>
         <div className="flex items-center gap-1">
-          <Text type="supporting" color="secondary" className="text-[9px]">
+          <Text display="block" type="supporting" color="secondary" className="text-[9px]">
             Y:
           </Text>
-          <Text type="supporting" color="primary" className="text-[9px] font-mono">
+          <Text display="block" type="supporting" color="primary" className="text-[9px] font-mono">
             {Math.round(source.y)}
           </Text>
         </div>
@@ -339,10 +339,10 @@ export const RetouchingSection: React.FC<RetouchingSectionProps> = ({
         <div className="flex items-start gap-2">
           <MousePointer2 size={14} className="text-fg-3 mt-0.5" />
           <div className="flex flex-col gap-1">
-            <Text type="supporting" color="primary" weight="medium">
+            <Text display="block" type="supporting" color="primary" weight="medium">
               How to use
             </Text>
-            <Text type="supporting" color="secondary" className="mt-1 text-[9px]">
+            <Text display="block" type="supporting" color="secondary" className="mt-1 text-[9px]">
               {activeTool === "spotHeal" &&
                 "Click and drag over blemishes to remove them. The tool samples surrounding pixels to blend seamlessly."}
               {activeTool === "cloneStamp" &&

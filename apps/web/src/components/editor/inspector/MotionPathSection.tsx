@@ -239,10 +239,10 @@ export const MotionPathSection: React.FC<MotionPathSectionProps> = ({
 
           <Card variant="muted" padding={3} className="flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <Text type="supporting" color="secondary" className="text-[10px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[10px]">
                 Path Points
               </Text>
-              <Text type="body" color="primary" className="text-sm font-medium">
+              <Text display="block" type="body" color="primary" className="text-sm font-medium">
                 {pointCount} points
               </Text>
             </div>

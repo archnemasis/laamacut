@@ -317,15 +317,15 @@ export const EditorInterface: React.FC = () => {
         <div className="text-center">
           {initError ? (
             <div role="alert" className="max-w-md space-y-4 px-6">
-              <Text type="body" weight="bold">The editor couldn't start</Text>
-              <Text type="supporting" className="text-status-error text-xs">{initError}</Text>
+              <Text display="block" type="body" weight="bold">The editor couldn't start</Text>
+              <Text display="block" type="supporting" className="text-status-error text-xs">{initError}</Text>
               <Button label="Try again" onClick={retry} variant="primary" />
             </div>
           ) : (
             <div role="status">
               <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <Text type="supporting" color="primary" className="text-fg-2 text-sm">Initializing editor…</Text>
-              <Text type="supporting" color="secondary" className="text-fg-muted text-xs mt-2">{initStatus}</Text>
+              <Text display="block" type="supporting" color="primary" className="text-fg-2 text-sm">Initializing editor…</Text>
+              <Text display="block" type="supporting" color="secondary" className="text-fg-muted text-xs mt-2">{initStatus}</Text>
             </div>
           )}
         </div>

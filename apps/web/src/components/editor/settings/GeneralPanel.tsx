@@ -108,10 +108,10 @@ export const GeneralPanel: React.FC = () => {
       {/* Project Composition */}
       <div className="space-y-4">
         <div>
-          <Text type="body" color="primary" className="text-sm font-medium">
+          <Text type="body" color="primary" display="block" className="text-sm font-medium">
             Project Composition
           </Text>
-          <Text type="supporting" color="secondary" className="mt-0.5 text-xs">
+          <Text type="supporting" color="secondary" display="block" className="mt-0.5 text-xs">
             Set the canvas dimensions for your project. Pick a preset for TikTok,
             Reels, YouTube, or enter custom values.
           </Text>
@@ -134,10 +134,10 @@ export const GeneralPanel: React.FC = () => {
                     : "border-border bg-background-tertiary text-text-secondary hover:text-text-primary hover:border-primary/40"
                 }`}
               >
-                <Text type="supporting" color="inherit" className="font-medium">
+                <Text type="supporting" color="inherit" display="block" className="font-medium">
                   {preset.label}
                 </Text>
-                <Text type="supporting" color="secondary" className="mt-0.5 text-[10px]">
+                <Text type="supporting" color="secondary" display="block" className="mt-0.5 text-[10px]">
                   {preset.width} × {preset.height}
                 </Text>
               </ClickableCard>
@@ -169,12 +169,13 @@ export const GeneralPanel: React.FC = () => {
             onClick={handleApplyCustom}
             variant="primary"
             size="md"
+            className="shrink-0"
           />
         </div>
 
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background-tertiary p-3">
           <div>
-            <Text type="supporting" color="primary" className="text-sm font-medium">
+            <Text display="block" type="supporting" color="primary" className="text-sm font-medium">
               Editing frame rate
             </Text>
             <Text type="supporting" color="secondary" className="mt-0.5 block text-[11px]">
@@ -202,10 +203,10 @@ export const GeneralPanel: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          <Text type="supporting" color="secondary" className="text-xs font-medium">
+          <Text type="supporting" color="secondary" display="block" className="text-xs font-medium">
             Background fill
           </Text>
-          <Text type="supporting" color="secondary" className="text-[11px]">
+          <Text type="supporting" color="secondary" display="block" className="text-[11px]">
             Fills the canvas around clips that don&apos;t match the aspect ratio.
           </Text>
           <div className="flex flex-wrap items-center gap-2">
@@ -271,10 +272,10 @@ export const GeneralPanel: React.FC = () => {
 
         <div className="flex items-center justify-between">
           <div>
-            <Text type="supporting" color="secondary" className="text-sm">
+            <Text display="block" type="supporting" color="secondary" className="text-sm">
               Enable auto-save
             </Text>
-            <Text type="supporting" color="secondary" className="mt-0.5 text-xs">
+            <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
               Automatically save your project at regular intervals
             </Text>
           </div>
@@ -315,10 +316,10 @@ export const GeneralPanel: React.FC = () => {
 
       {/* AI connections */}
       <div className="space-y-4">
-        <Text type="body" color="primary" className="text-sm font-medium">
+        <Text display="block" type="body" color="primary" className="text-sm font-medium">
           AI Connections
         </Text>
-        <Text type="supporting" color="secondary" className="text-xs">
+        <Text display="block" type="supporting" color="secondary" className="text-xs">
           Connect a compatible endpoint you control. Laamacut does not choose a vendor or model for you.
         </Text>
 
@@ -361,7 +362,7 @@ export const GeneralPanel: React.FC = () => {
           {defaultLlmProvider ? (
             <div className="space-y-3 rounded-lg border border-border bg-background-tertiary p-3">
               <div>
-                <Text type="supporting" color="secondary" className="text-sm font-medium">
+                <Text display="block" type="supporting" color="secondary" className="text-sm font-medium">
                   {defaultLlmProvider === "anthropic-compatible"
                     ? "Anthropic-compatible endpoint"
                     : "OpenAI-compatible endpoint"}
@@ -402,10 +403,10 @@ export const GeneralPanel: React.FC = () => {
 
           <div className="flex items-center justify-between">
             <div>
-              <Text type="supporting" color="secondary" className="text-sm">
+              <Text display="block" type="supporting" color="secondary" className="text-sm">
                 AI Aggregator
               </Text>
-              <Text type="supporting" color="secondary" className="mt-0.5 text-xs">
+              <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
                 Video/image generation, upscaling, and creative AI tools
               </Text>
             </div>

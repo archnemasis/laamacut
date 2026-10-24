@@ -125,10 +125,10 @@ export const RecentProjects: React.FC<RecentProjectsProps> = ({
         <div className="w-14 h-14 rounded-2xl bg-background-tertiary flex items-center justify-center mb-4">
           <Clock size={24} className="text-text-muted" />
         </div>
-        <Text type="body" color="primary" weight="medium" className="text-base text-text-primary mb-2">
+        <Text display="block" type="body" color="primary" weight="medium" className="text-base text-text-primary mb-2">
           No Recent Projects
         </Text>
-        <Text type="supporting" color="secondary" className="text-sm text-text-muted text-center max-w-md">
+        <Text display="block" type="supporting" color="secondary" className="text-sm text-text-muted text-center max-w-md">
           Your recently opened projects will appear here. Start a new project or
           use a template to get started.
         </Text>

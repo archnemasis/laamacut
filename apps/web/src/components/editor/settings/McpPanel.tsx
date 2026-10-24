@@ -104,12 +104,12 @@ export const McpPanel: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Plug size={28} className="mb-3 text-text-muted" />
-        <Text type="body" color="primary" className="text-sm font-medium">
+        <Text display="block" type="body" color="primary" className="text-sm font-medium">
           Desktop only
         </Text>
-        <Text type="supporting" color="secondary" className="mt-1 max-w-sm text-xs">
+        <Text display="block" type="supporting" color="secondary" className="mt-1 max-w-sm text-xs">
           The MCP server runs inside the Laamacut desktop app, letting external AI
-          clients (Claude Desktop, Cursor, Cline) edit your project. Open OpenReel
+          clients (Claude Desktop, Cursor, Cline) edit your project. Open Laamacut
           on desktop to configure it.
         </Text>
       </div>
@@ -126,10 +126,10 @@ export const McpPanel: React.FC = () => {
     <div className="space-y-6">
       <div className="space-y-4">
         <div>
-          <Text type="body" color="primary" className="text-sm font-medium">
+          <Text display="block" type="body" color="primary" className="text-sm font-medium">
             MCP Server
           </Text>
-          <Text type="supporting" color="secondary" className="mt-0.5 text-xs">
+          <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
             A local Model Context Protocol server lets AI clients drive this
             editor through the same tools as the built-in chat. It listens on
             loopback only and requires the bearer token below.
@@ -137,10 +137,10 @@ export const McpPanel: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Text type="supporting" color="secondary" className="w-20 shrink-0 text-xs">
+          <Text display="block" type="supporting" color="secondary" className="w-20 shrink-0 text-xs">
             Status
           </Text>
-          <Text
+          <Text display="block"
             type="supporting"
             className={`inline-flex items-center gap-1.5 text-xs font-medium ${
               status?.running ? "text-status-success" : "text-text-muted"
@@ -157,10 +157,10 @@ export const McpPanel: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Text type="supporting" color="secondary" className="w-20 shrink-0 text-xs">
+          <Text display="block" type="supporting" color="secondary" className="w-20 shrink-0 text-xs">
             Tools
           </Text>
-          <Text type="supporting" color="secondary" className="text-xs">
+          <Text display="block" type="supporting" color="secondary" className="text-xs">
             {toolCount === null
               ? status?.running
                 ? "Checking catalog…"
@@ -233,10 +233,10 @@ export const McpPanel: React.FC = () => {
 
       <div className="space-y-3">
         <div>
-          <Text type="body" color="primary" className="text-sm font-medium">
+          <Text display="block" type="body" color="primary" className="text-sm font-medium">
             Available Workflows
           </Text>
-          <Text type="supporting" color="secondary" className="mt-0.5 text-xs">
+          <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
             The live catalog includes focused tools for each desktop workspace.
           </Text>
         </div>
@@ -248,10 +248,10 @@ export const McpPanel: React.FC = () => {
             ["Project Operations", "Inspect, import, save, undo, export and diagnostics"],
           ].map(([label, description]) => (
             <div key={label} className="rounded-md border border-border bg-background px-3 py-2.5">
-              <Text type="supporting" color="primary" className="text-xs font-medium">
+              <Text display="block" type="supporting" color="primary" className="text-xs font-medium">
                 {label}
               </Text>
-              <Text type="supporting" color="secondary" className="mt-1 text-[11px] leading-4">
+              <Text display="block" type="supporting" color="secondary" className="mt-1 text-[11px] leading-4">
                 {description}
               </Text>
             </div>
@@ -263,10 +263,10 @@ export const McpPanel: React.FC = () => {
 
       <div className="space-y-4">
         <div>
-          <Text type="body" color="primary" className="text-sm font-medium">
+          <Text display="block" type="body" color="primary" className="text-sm font-medium">
             Client Setup
           </Text>
-          <Text type="supporting" color="secondary" className="mt-0.5 text-xs">
+          <Text display="block" type="supporting" color="secondary" className="mt-0.5 text-xs">
             Add this to your MCP client config (Claude Desktop, Cursor, Cline).
             The shim connects to the running app automatically.
           </Text>
@@ -296,10 +296,10 @@ export const McpPanel: React.FC = () => {
         </Text>
         <div className="flex items-center justify-between">
           <div>
-            <Text type="supporting" color="secondary" className="text-sm">
+            <Text display="block" type="supporting" color="secondary" className="text-sm">
               Auto-allow destructive actions
             </Text>
-            <Text type="supporting" color="secondary" className="mt-0.5 max-w-md text-xs">
+            <Text display="block" type="supporting" color="secondary" className="mt-0.5 max-w-md text-xs">
               When off, destructive or expensive tool calls over MCP
               are refused with a confirmation-required notice. Turn on only if you
               trust every connected local client.

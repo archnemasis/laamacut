@@ -6,6 +6,9 @@
    Surfaces: charcoal-neutral (hue ~250, low chroma).
    Accent: purple (hue ~305).
    ============================================================ */
+/* DesktopApp also puts the class on <html> so dialogs and menus, which
+   render in portals outside the app container, get the same tokens. */
+:root.openreel-desktop,
 .openreel-desktop {
   color-scheme: dark;
 

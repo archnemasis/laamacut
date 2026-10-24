@@ -180,10 +180,10 @@ export const StabilizationSection: React.FC<StabilizationSectionProps> = ({
       {processing && stage && (
         <Card variant="muted" padding={2} className="space-y-1">
           <div className="flex items-center justify-between">
-            <Text type="supporting" color="secondary" className="text-xs">
+            <Text display="block" type="supporting" color="secondary" className="text-xs">
               {stageLabel}
             </Text>
-            <Text type="supporting" color="secondary" className="text-xs">
+            <Text display="block" type="supporting" color="secondary" className="text-xs">
               {progress}%
             </Text>
           </div>

@@ -366,10 +366,10 @@ const KeyframeItem: React.FC<{
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <Text type="supporting" color="secondary">
+          <Text display="block" type="supporting" color="secondary">
             {keyframe.time.toFixed(2)}s
           </Text>
-          <Text type="supporting" color="secondary">
+          <Text display="block" type="supporting" color="secondary">
             •
           </Text>
           <ToolcraftNumberInputControl
@@ -557,10 +557,10 @@ export const KeyframesSection: React.FC<KeyframesSectionProps> = ({
           padding={2}
           className="flex items-center justify-between gap-3 border border-border"
         >
-          <Text type="supporting" color="secondary">
+          <Text display="block" type="supporting" color="secondary">
             Value at {playheadPosition.toFixed(2)}s
           </Text>
-          <Text type="supporting" color="primary" className="font-mono">
+          <Text display="block" type="supporting" color="primary" className="font-mono">
             {typeof currentValue === "number"
               ? currentValue.toFixed(2)
               : String(currentValue)}

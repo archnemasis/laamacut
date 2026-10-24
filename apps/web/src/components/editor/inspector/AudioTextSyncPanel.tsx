@@ -147,7 +147,7 @@ export const AudioTextSyncPanel: React.FC<BeatSyncPanelProps> = ({ clipId }) => 
               <Text type="supporting" color="secondary" className="block text-[10px]">
                 BPM Detected
               </Text>
-              <Text type="body" color="primary" weight="bold" className="text-lg">
+              <Text display="block" type="body" color="primary" weight="bold" className="text-lg">
                 {beatAnalysis.bpm}
               </Text>
             </div>
@@ -155,7 +155,7 @@ export const AudioTextSyncPanel: React.FC<BeatSyncPanelProps> = ({ clipId }) => 
               <Text type="supporting" color="secondary" className="block text-[10px]">
                 Beats
               </Text>
-              <Text type="body" color="primary" weight="bold" className="text-sm">
+              <Text display="block" type="body" color="primary" weight="bold" className="text-sm">
                 {beatAnalysis.beats.length}
               </Text>
             </div>
@@ -270,7 +270,7 @@ export const AudioTextSyncPanel: React.FC<BeatSyncPanelProps> = ({ clipId }) => 
                         <Text type="supporting" color="primary" className="block text-[10px]">
                           {mode.label}
                         </Text>
-                        <Text type="supporting" color="secondary" className="text-[9px]">
+                        <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                           {mode.desc}
                         </Text>
                       </ClickableCard>
@@ -339,10 +339,10 @@ export const AudioTextSyncPanel: React.FC<BeatSyncPanelProps> = ({ clipId }) => 
                     key={timing.clipId}
                     className="flex items-center justify-between text-[9px]"
                   >
-                    <Text type="supporting" color="secondary" className="text-[9px]">
+                    <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                       Clip {idx + 1}
                     </Text>
-                    <Text type="supporting" color="primary" className="text-[9px]">
+                    <Text display="block" type="supporting" color="primary" className="text-[9px]">
                       {timing.newStartTime.toFixed(2)}s – {(timing.newStartTime + timing.newDuration).toFixed(2)}s
                     </Text>
                   </div>

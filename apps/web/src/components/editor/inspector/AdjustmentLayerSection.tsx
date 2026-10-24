@@ -509,10 +509,10 @@ export const AdjustmentLayerSection: React.FC<AdjustmentLayerSectionProps> = ({
                         onClick={() => handleBlendModeChange(layer.id, mode.id)}
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <Text type="supporting" color="primary">
+                          <Text display="block" type="supporting" color="primary">
                             {mode.name}
                           </Text>
-                          <Text
+                          <Text display="block"
                             type="supporting"
                             color="secondary"
                             className="text-[9px]"

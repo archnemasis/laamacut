@@ -834,10 +834,10 @@ export const NoiseReductionSection: React.FC<NoiseReductionSectionProps> = ({
             className="border border-border/70 bg-bg-1/60"
           >
             <div className="flex items-center justify-between gap-2">
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 Current mode: {activePreset.label}
               </Text>
-              <Text
+              <Text display="block"
                 type="supporting"
                 className={`rounded-full px-2 py-0.5 text-[8px] font-medium ${
                   enabled

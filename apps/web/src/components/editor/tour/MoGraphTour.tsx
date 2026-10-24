@@ -193,8 +193,8 @@ export const MoGraphTour: React.FC = () => {
               <Sparkles size={16} className="text-white" />
             </div>
             <div className="flex-1">
-              <Text type="label" weight="semibold" className="text-white text-sm">{step.title}</Text>
-              <Text type="supporting" className="text-white/60 text-[10px]">
+              <Text display="block" type="label" weight="semibold" className="text-white text-sm">{step.title}</Text>
+              <Text display="block" type="supporting" className="text-white/60 text-[10px]">
                 Motion Graphics Tour • Step {currentStep + 1} of {totalSteps}
               </Text>
             </div>

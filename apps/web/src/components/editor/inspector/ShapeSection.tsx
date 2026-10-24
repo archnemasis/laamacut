@@ -150,10 +150,10 @@ const ShapeTypeDisplay: React.FC<{
         {shapeIcons[shapeType] || <Square size={16} />}
       </div>
       <div className="flex flex-col gap-0.5">
-        <Text type="supporting" color="primary" weight="medium" className="capitalize">
+        <Text display="block" type="supporting" color="primary" weight="medium" className="capitalize">
           {shapeType}
         </Text>
-        <Text type="supporting" color="secondary" className="text-[9px]">
+        <Text display="block" type="supporting" color="secondary" className="text-[9px]">
           Shape clip
         </Text>
       </div>

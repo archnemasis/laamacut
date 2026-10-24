@@ -138,7 +138,7 @@ const LayerItem: React.FC<{
 
       {/* Layer Name */}
       <div className="flex-1 min-w-0">
-        <Text
+        <Text display="block"
           type="supporting"
           className={`text-[10px] font-medium truncate block ${
             layer.visible ? "text-fg" : "text-fg-3"
@@ -146,7 +146,7 @@ const LayerItem: React.FC<{
         >
           {layer.name}
         </Text>
-        <Text type="supporting" color="secondary" className="text-[9px] capitalize">
+        <Text display="block" type="supporting" color="secondary" className="text-[9px] capitalize">
           {layer.type}
         </Text>
       </div>

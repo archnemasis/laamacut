@@ -171,10 +171,10 @@ export const StartFromScratch: React.FC<StartFromScratchProps> = ({
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <Text type="supporting" color="primary" weight="medium" className="text-xs text-text-primary truncate">
+                          <Text display="block" type="supporting" color="primary" weight="medium" className="text-xs text-text-primary truncate">
                             {presetInfo?.name || presetId}
                           </Text>
-                          <Text type="supporting" color="secondary" className="text-[10px] text-text-muted">
+                          <Text display="block" type="supporting" color="secondary" className="text-[10px] text-text-muted">
                             {presetData.width}×{presetData.height}
                           </Text>
                         </div>
@@ -191,10 +191,10 @@ export const StartFromScratch: React.FC<StartFromScratchProps> = ({
       <div className="flex items-start gap-3 p-4 bg-background-tertiary rounded-xl border border-border">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <div>
-          <Text type="supporting" color="primary" weight="medium" className="text-sm text-text-primary">
+          <Text display="block" type="supporting" color="primary" weight="medium" className="text-sm text-text-primary">
             {info?.name || selectedPreset} Format
           </Text>
-          <Text type="supporting" color="secondary" className="text-xs text-text-muted mt-1">
+          <Text display="block" type="supporting" color="secondary" className="text-xs text-text-muted mt-1">
             {preset.width}×{preset.height}px • {preset.frameRate || 30}fps
             {preset.maxDuration && ` • Max ${preset.maxDuration}s`}
             {preset.recommendedDuration &&

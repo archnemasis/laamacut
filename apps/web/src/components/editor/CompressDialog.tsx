@@ -278,19 +278,19 @@ export function CompressDialog({ isOpen, onClose }: CompressDialogProps) {
               {plan && (
                 <Card variant="muted" padding={3} className="border border-border">
                   <div className="flex items-center justify-between">
-                    <Text type="supporting" color="secondary">
+                    <Text display="block" type="supporting" color="secondary">
                       Estimated output
                     </Text>
-                    <Text type="label" weight="bold">
+                    <Text display="block" type="label" weight="bold">
                       {plan.width}x{plan.height} - ~{formatBytes(estimated)}
                     </Text>
                   </div>
                   {savings > 0 && originalBytes > 0 && (
                     <div className="mt-1 flex items-center justify-between">
-                      <Text type="supporting" color="secondary">
+                      <Text display="block" type="supporting" color="secondary">
                         from {formatBytes(originalBytes)}
                       </Text>
-                      <Text type="supporting" color="active" weight="bold">
+                      <Text display="block" type="supporting" color="active" weight="bold">
                         -{savings}% smaller
                       </Text>
                     </div>

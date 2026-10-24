@@ -44,18 +44,18 @@ export const CropSection: React.FC<CropSectionProps> = ({ clip }) => {
         <>
           <Card variant="muted" padding={2} className="space-y-0.5 border border-border">
             <div className="flex justify-between">
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 Crop Region:
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 {Math.round(crop.width * 100)}% × {Math.round(crop.height * 100)}%
               </Text>
             </div>
             <div className="flex justify-between">
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 Position:
               </Text>
-              <Text type="supporting" color="secondary" className="text-[9px]">
+              <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                 ({Math.round(crop.x * 100)}%, {Math.round(crop.y * 100)}%)
               </Text>
             </div>

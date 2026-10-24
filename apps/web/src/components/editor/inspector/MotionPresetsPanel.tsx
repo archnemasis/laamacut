@@ -296,7 +296,7 @@ const PresetCard: React.FC<PresetCardProps> = ({
         <Text type="supporting" color="primary" className="block truncate text-[10px] font-medium">
           {preset.name}
         </Text>
-        <Text type="supporting" color="secondary" className="text-[8px]">
+        <Text display="block" type="supporting" color="secondary" className="text-[8px]">
           {duration}s
         </Text>
       </div>

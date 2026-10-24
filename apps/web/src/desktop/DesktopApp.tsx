@@ -15,6 +15,7 @@ import { getLiveEditorHost } from "../services/agent/host-singleton";
 import { createExportJobRunner } from "../services/agent/export-job-runner";
 import { useUIStore } from "../stores/ui-store";
 import { useSettingsStore } from "../stores/settings-store";
+import { useThemeStore } from "../stores/theme-store";
 import { SettingsDialog } from "../components/editor/settings/SettingsDialog";
 import { ToolcraftButton as Button } from "@openreel/ui";
 import { Settings, Sparkles } from "@/icons/lucide-compat";
@@ -58,6 +59,15 @@ export function DesktopApp(): JSX.Element {
           break;
       }
     });
+  }, []);
+
+  // The desktop app is always dark. Dialogs and menus portal to <body>, so the
+  // theme has to live on <html> rather than only on the app container.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("openreel-desktop");
+    useThemeStore.getState().setMode("dark");
+    return () => root.classList.remove("openreel-desktop");
   }, []);
 
   // Forward uncaught renderer errors + unhandled rejections to the native crash

@@ -611,9 +611,9 @@ export const SpeedRampSection: React.FC<SpeedRampSectionProps> = ({ clip }) => {
           formatValue={() => `${currentSpeed.toFixed(2)}x`}
         />
         <div className="flex justify-between">
-          <Text type="supporting" color="secondary" className="text-[8px]">0.1x</Text>
-          <Text type="supporting" color="secondary" className="text-[8px]">1x</Text>
-          <Text type="supporting" color="secondary" className="text-[8px]">20x</Text>
+          <Text display="block" type="supporting" color="secondary" className="text-[8px]">0.1x</Text>
+          <Text display="block" type="supporting" color="secondary" className="text-[8px]">1x</Text>
+          <Text display="block" type="supporting" color="secondary" className="text-[8px]">20x</Text>
         </div>
       </div>
 
@@ -701,13 +701,13 @@ export const SpeedRampSection: React.FC<SpeedRampSectionProps> = ({ clip }) => {
                   padding={2}
                   className="flex items-center gap-2"
                 >
-                  <Text type="supporting" color="secondary" className="text-[9px]">
+                  <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                     #{index + 1}
                   </Text>
-                  <Text type="supporting" color="secondary" className="text-[9px]">
+                  <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                     {kf.time.toFixed(2)}s
                   </Text>
-                  <Text type="supporting" color="primary" className="text-[9px] font-mono">
+                  <Text display="block" type="supporting" color="primary" className="text-[9px] font-mono">
                     {kf.speed.toFixed(2)}x
                   </Text>
                   <IconButton
@@ -761,11 +761,11 @@ export const SpeedRampSection: React.FC<SpeedRampSectionProps> = ({ clip }) => {
                   className="flex items-center gap-2"
                 >
                   <Pause size={10} className="text-primary" aria-hidden />
-                  <Text type="supporting" color="secondary" className="text-[9px]">
+                  <Text display="block" type="supporting" color="secondary" className="text-[9px]">
                     {ff.startTime.toFixed(2)}s
                   </Text>
-                  <Text type="supporting" color="secondary" className="text-[9px]">for</Text>
-                  <Text type="supporting" color="primary" className="text-[9px] font-mono">
+                  <Text display="block" type="supporting" color="secondary" className="text-[9px]">for</Text>
+                  <Text display="block" type="supporting" color="primary" className="text-[9px] font-mono">
                     {ff.duration.toFixed(1)}s
                   </Text>
                   <IconButton

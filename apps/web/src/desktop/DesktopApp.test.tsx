@@ -66,6 +66,17 @@ describe("DesktopApp", () => {
     expect(container.querySelector(".openreel-desktop")).not.toBeNull();
   });
 
+  it("forces dark mode on <html> so portaled dialogs match", () => {
+    mockHasProject(false);
+    const { unmount } = render(<DesktopApp />);
+    const root = document.documentElement;
+    expect(root.classList.contains("openreel-desktop")).toBe(true);
+    expect(root.classList.contains("dark")).toBe(true);
+    expect(root.dataset.theme).toBe("dark");
+    unmount();
+    expect(root.classList.contains("openreel-desktop")).toBe(false);
+  });
+
   it("shows the start screen and hides the workspace when no project is open", () => {
     mockHasProject(false);
     const { getByText, queryByTestId } = render(<DesktopApp />);
