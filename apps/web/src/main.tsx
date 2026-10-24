@@ -10,6 +10,8 @@ import { registerServiceWorker } from "./services/service-worker";
 import { initCustomFonts } from "./components/editor/inspector/font-options";
 import { setEncoderBackendFactory } from "@openreel/core";
 import { NativeFFmpegBackend } from "./services/native-ffmpeg-backend";
+import { getAndroidSaver, installAndroidDownloads } from "./services/android-downloads";
+import { useThemeStore } from "./stores/theme-store";
 
 const DesktopApp = React.lazy(() =>
   import("./desktop/DesktopApp").then((module) => ({
@@ -31,7 +33,12 @@ if (isDesktop) {
   );
 }
 
-registerServiceWorker().then((registration) => {
+// The Android app ships its files inside the APK, so it needs no offline cache.
+if (getAndroidSaver()) {
+  installAndroidDownloads();
+  // Match the dark desktop app and the dark Android status bar.
+  useThemeStore.getState().setMode("dark");
+} else registerServiceWorker().then((registration) => {
   if (registration) {
   }
 });

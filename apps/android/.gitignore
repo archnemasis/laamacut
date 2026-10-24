@@ -1,0 +1,7 @@
+# Release signing key and its passwords: never commit these. Back them up;
+# the same key is needed to ship updates that install over the old app.
+keystore/
+android/keystore.properties
+
+# Built APKs
+release/

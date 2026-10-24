@@ -1,0 +1,9 @@
+{
+  "appId": "com.laamacut.app",
+  "appName": "Laamacut",
+  "webDir": "../web/dist",
+  "backgroundColor": "#0b0b0f",
+  "android": {
+    "allowMixedContent": false
+  }
+}

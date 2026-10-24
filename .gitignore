@@ -54,7 +54,6 @@ apps/cloud/node_modules/
 apps/cloud/dist/
 apps/cloud/.wrangler/
 apps/ios
-apps/android
 
 # Desktop bundled ffmpeg binaries (large; fetched/built per-platform, documented in MANIFEST.json)
 apps/desktop/resources/bin/**/ffmpeg
@@ -96,11 +95,11 @@ xcuserdata/
 *.p12
 *.pfx
 
-# Mobile apps stay in the private repository
+# Upstream mobile apps stay out of this repository (Laamacut ships apps/android)
 /Openreel Video/
 /Openreel Video Android/
 /apps/ios/
-/apps/android/
+
 
 # Local QA artifacts and machine-specific Android signing settings
 .codex-audit/

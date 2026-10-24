@@ -70,16 +70,12 @@ describe("compact editing workspace", () => {
     expect(title.value).toBe("My video");
   });
 
-  it("preserves AI drafts after switching panels and returns to timeline when AI closes", async () => {
+  it("has no AI tab and closes an AI panel left open by an older version", () => {
+    const panels = useUIStore.getState().panels;
+    useUIStore.setState({ panels: { ...panels, agentChat: { ...panels.agentChat, visible: true } } });
     const view = render(<EditorInterface />);
-    fireEvent.click(view.getByRole("button", { name: "AI" }));
-    const input = await view.findByLabelText("AI message") as HTMLInputElement;
-    input.value = "Make this shorter";
-    fireEvent.click(view.getByRole("button", { name: "Timeline" }));
-    fireEvent.click(view.getByRole("button", { name: "AI" }));
-    expect(view.getByLabelText("AI message")).toBe(input);
-    expect(input.value).toBe("Make this shorter");
-    fireEvent.click(view.getByRole("button", { name: "Close AI" }));
-    expect(view.getByRole("button", { name: "Timeline" })).toHaveAttribute("aria-pressed", "true");
+    expect(view.queryByRole("button", { name: "AI" })).toBeNull();
+    expect(view.queryByRole("button", { name: "AI editing" })).toBeNull();
+    expect(useUIStore.getState().panels.agentChat.visible).toBe(false);
   });
 });

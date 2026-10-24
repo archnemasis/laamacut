@@ -199,6 +199,10 @@ export const EditorInterface: React.FC = () => {
   const [timelineVh, setTimelineVh] = useState(DEFAULT_TIMELINE_VH);
 
   const chatVisible = panels.agentChat?.visible ?? false;
+  // The AI editor has no entry point any more; close one left open by an older version.
+  useEffect(() => {
+    if (useUIStore.getState().panels.agentChat?.visible) setPanelVisible("agentChat", false);
+  }, [setPanelVisible]);
   useEffect(() => {
     if (chatVisible) {
       setHasOpenedChat(true);
@@ -527,7 +531,7 @@ export const EditorInterface: React.FC = () => {
       {compact && (
         <nav aria-label="Editor workspace" className="editor-workspace-tabs">
           {([
-            ["timeline", "Timeline"], ["media", "Media"], ["inspector", "Edit"], ["chat", "AI"],
+            ["timeline", "Timeline"], ["media", "Media"], ["inspector", "Edit"],
           ] as const).map(([panel, label]) => (
             <button key={panel} type="button" aria-controls={`editor-panel-${panel}`} aria-pressed={compactPanel === panel}
               onClick={() => openCompactPanel(panel)} className={compactPanel === panel ? "text-accent bg-accent/10" : "text-fg-muted"}>
