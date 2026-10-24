@@ -3,18 +3,16 @@ import {
   Clock,
   Layers,
   ArrowRight,
-  Smartphone,
-  Monitor,
-  Square,
   FolderOpen,
+  Plus,
 } from "@/icons/lucide-compat";
 import { ToolcraftSwitchControl } from "@openreel/ui";
 import { ToolcraftButton as Button } from "@openreel/ui";
-import { ToolcraftClickableCard as ClickableCard } from "@openreel/ui";
 import { ToolcraftText as Text } from "@openreel/ui";
 import { useProjectStore } from "../../stores/project-store";
 import { useUIStore } from "../../stores/ui-store";
-import { SOCIAL_MEDIA_PRESETS, type SocialMediaCategory } from "@openreel/core";
+import { CreateFormatDialog } from "./CreateFormatDialog";
+import type { ProjectFormat } from "./project-formats";
 import { useRouter } from "../../hooks/use-router";
 import { useEditorPreload } from "../../hooks/useEditorPreload";
 import { useAnalytics, AnalyticsEvents } from "../../hooks/useAnalytics";
@@ -28,46 +26,6 @@ const RecentProjects = lazy(() =>
 );
 
 const LoadingView = () => <div role="status" className="p-6 text-center text-text-secondary">Loading…</div>;
-
-interface FormatOption {
-  id: string;
-  preset: SocialMediaCategory;
-  label: string;
-  description: string;
-  dimensions: string;
-  icon: React.ElementType;
-  gradient: string;
-}
-
-const FORMAT_OPTIONS: FormatOption[] = [
-  {
-    id: "vertical",
-    preset: "tiktok",
-    label: "Vertical",
-    description: "TikTok, Reels, Shorts",
-    dimensions: "1080 × 1920",
-    icon: Smartphone,
-    gradient: "from-purple-500/20 to-fuchsia-500/20",
-  },
-  {
-    id: "horizontal",
-    preset: "youtube-video",
-    label: "Horizontal",
-    description: "YouTube, Vimeo, Web",
-    dimensions: "1920 × 1080",
-    icon: Monitor,
-    gradient: "from-blue-500/20 to-cyan-500/20",
-  },
-  {
-    id: "square",
-    preset: "instagram-post",
-    label: "Square",
-    description: "Instagram, Facebook",
-    dimensions: "1080 × 1080",
-    icon: Square,
-    gradient: "from-orange-500/20 to-rose-500/20",
-  },
-];
 
 const OpenReelLogo: React.FC<{ className?: string }> = ({ className = "" }) => (
   <img src={llamaUrl} alt="" className={className} draggable={false} />
@@ -89,23 +47,22 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
   const { track } = useAnalytics();
 
   const [viewMode, setViewMode] = useState<ViewMode>(initialTab ?? "home");
-  const [hoveredFormat, setHoveredFormat] = useState<string | null>(null);
+  const [isFormatPickerOpen, setFormatPickerOpen] = useState(false);
 
   useEditorPreload(true);
 
   const handleCreateProject = useCallback(
-    (option: FormatOption) => {
-      const preset = SOCIAL_MEDIA_PRESETS[option.preset];
-      createNewProject(`New ${option.label} Video`, {
-        width: preset.width,
-        height: preset.height,
-        frameRate: preset.frameRate,
+    (format: ProjectFormat) => {
+      createNewProject(`New ${format.label} Video`, {
+        width: format.width,
+        height: format.height,
+        frameRate: format.frameRate,
       });
       track(AnalyticsEvents.PROJECT_CREATED, {
-        preset: option.preset,
-        width: preset.width,
-        height: preset.height,
-        frameRate: preset.frameRate ?? 30,
+        preset: format.id,
+        width: format.width,
+        height: format.height,
+        frameRate: format.frameRate,
         source: "quick_start",
       });
       navigate("editor");
@@ -130,7 +87,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (viewMode !== "home") {
+        if (isFormatPickerOpen) {
+          setFormatPickerOpen(false);
+        } else if (viewMode !== "home") {
           setViewMode("home");
         } else {
           navigate("editor");
@@ -139,7 +98,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, viewMode]);
+  }, [navigate, viewMode, isFormatPickerOpen]);
 
   if (viewMode === "templates") {
     return (
@@ -213,78 +172,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
               In your browser.
             </Text>
             <Text type="supporting" color="secondary" className="text-base text-text-muted max-w-md">
-              Pick a format and start creating. You can change this anytime.
+              Pick a shape and start editing. Quality, frame rate and bitrate are set when you export.
             </Text>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-10">
-            {FORMAT_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const isHovered = hoveredFormat === option.id;
-
-              return (
-                <ClickableCard
-                  key={option.id}
-                  label={`Create ${option.label} project`}
-                  onClick={() => handleCreateProject(option)}
-                  onMouseEnter={() => setHoveredFormat(option.id)}
-                  onMouseLeave={() => setHoveredFormat(null)}
-                  padding={6}
-                  variant="muted"
-                  className={`
-                    group relative flex flex-col items-center p-6 rounded-2xl
-                    bg-background-secondary border border-border
-                    hover:border-primary/40 hover:bg-background-tertiary
-                    transition-all duration-200
-                    ${isHovered ? "scale-[1.02] shadow-lg shadow-primary/5" : ""}
-                  `}
-                >
-                  <div
-                    className={`
-                    absolute inset-0 rounded-2xl bg-gradient-to-br ${option.gradient}
-                    opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                  `}
-                  />
-
-                  <div className="relative z-10 flex flex-col items-center">
-                    <div
-                      className={`
-                      w-16 h-16 mb-4 rounded-xl flex items-center justify-center
-                      bg-background-tertiary group-hover:bg-primary/10
-                      transition-colors duration-200
-                    `}
-                    >
-                      <Icon
-                        size={28}
-                        className="text-text-muted group-hover:text-primary transition-colors"
-                      />
-                    </div>
-
-                    <Text type="body" color="primary" weight="semibold" className="text-lg text-text-primary mb-1">
-                      {option.label}
-                    </Text>
-                    <Text type="supporting" color="secondary" className="text-sm text-text-muted mb-3">
-                      {option.description}
-                    </Text>
-                    <span className="text-xs font-mono text-text-muted/70 bg-background-tertiary px-2 py-1 rounded">
-                      {option.dimensions}
-                    </span>
-                  </div>
-
-                  <div
-                    className={`
-                    absolute bottom-4 left-1/2 -translate-x-1/2
-                    flex items-center gap-1 text-sm font-medium text-primary
-                    opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0
-                    transition-all duration-200
-                  `}
-                  >
-                    Start creating
-                    <ArrowRight size={14} />
-                  </div>
-                </ClickableCard>
-              );
-            })}
+          <div className="mb-10 flex justify-center">
+            <Button
+              label="Create a format"
+              variant="primary"
+              size="lg"
+              icon={<Plus size={18} aria-hidden />}
+              onClick={() => setFormatPickerOpen(true)}
+              className="rounded-xl px-8"
+            />
           </div>
 
           <div className="flex items-center justify-center gap-3">
@@ -332,6 +232,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
           </Text>
         </div>
       </div>
+
+      <CreateFormatDialog
+        isOpen={isFormatPickerOpen}
+        onClose={() => setFormatPickerOpen(false)}
+        onPick={handleCreateProject}
+      />
     </div>
   );
 };

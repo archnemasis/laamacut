@@ -1,16 +1,16 @@
 import type { JSX } from "react";
 import { useState, useEffect, useCallback } from "react";
-import { ToolcraftBadge } from "@openreel/ui";
+import { ToolcraftButton as Button } from "@openreel/ui";
 import { ToolcraftCard as Card } from "@openreel/ui";
 import { ToolcraftClickableCard as ClickableCard } from "@openreel/ui";
 import { ToolcraftHeading as Heading } from "@openreel/ui";
 import { ToolcraftText as Text } from "@openreel/ui";
-import { Smartphone, Monitor, Square, Film } from "@/icons/lucide-compat";
+import { Film, Plus } from "@/icons/lucide-compat";
 
 import { OpenReelMark } from "../brand/OpenReelMark";
 import { Icon } from "@/icons/Icon";
+import { CreateFormatDialog } from "../../components/welcome/CreateFormatDialog";
 import {
-  DESKTOP_FORMATS,
   startNewProject,
   listRecentProjects,
   openRecentProject,
@@ -18,16 +18,6 @@ import {
   type RecentEntry,
 } from "./desktop-project-actions";
 import { useUIStore } from "../../stores/ui-store";
-
-const FORMAT_ICONS: Record<string, React.ElementType> = {
-  vertical: Smartphone,
-  horizontal: Monitor,
-  square: Square,
-};
-
-function formatDimensions(format: NewProjectFormat): string {
-  return `${format.width} × ${format.height} · ${format.frameRate}fps`;
-}
 
 function formatSavedAt(savedAt: number): string {
   const date = new Date(savedAt);
@@ -42,6 +32,7 @@ export function DesktopStartScreen(): JSX.Element {
   const [recents, setRecents] = useState<RecentEntry[]>([]);
   const [loadingRecents, setLoadingRecents] = useState<boolean>(true);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [isFormatPickerOpen, setFormatPickerOpen] = useState(false);
   const setDesktopPage = useUIStore((state) => state.setDesktopPage);
 
   useEffect(() => {
@@ -76,8 +67,6 @@ export function DesktopStartScreen(): JSX.Element {
     startNewProject(format);
   }, [setDesktopPage]);
 
-  const formatModeLabel = "Video Editor";
-
   return (
     <div className="h-full overflow-y-auto bg-bg text-fg">
       <div className="mx-auto flex max-w-4xl flex-col gap-10 px-8 py-12">
@@ -87,40 +76,25 @@ export function DesktopStartScreen(): JSX.Element {
             <Heading level={1}>New Project</Heading>
           </div>
           <Text type="supporting" display="block" className="mt-1">
-            Choose a format. You can change this later.
+            Pick a shape and start editing. Quality, frame rate and bitrate are set when you export.
           </Text>
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {DESKTOP_FORMATS.map((format) => {
-              const FormatIcon = FORMAT_ICONS[format.id] ?? Film;
-              return (
-                <ClickableCard
-                  key={format.id}
-                  label={`${format.label} ${formatModeLabel}`}
-                  onClick={() => handleStartProject(format)}
-                  padding={5}
-                >
-                  <div className="relative flex flex-col items-start gap-3">
-                    <Icon
-                      name="plus.square"
-                      size={16}
-                      ariaHidden
-                      className="absolute right-0 top-0 text-fg-muted"
-                    />
-                    <span className="flex h-11 w-11 items-center justify-center rounded-md bg-accent-soft text-accent">
-                      <FormatIcon size={22} aria-hidden />
-                    </span>
-                    <Text type="large" weight="bold" display="block">
-                      {format.label}
-                    </Text>
-                    <Text type="code" color="secondary" display="block">
-                      {formatDimensions(format)}
-                    </Text>
-                    <ToolcraftBadge variant="success" label={formatModeLabel} />
-                  </div>
-                </ClickableCard>
-              );
-            })}
+          <div className="mt-6">
+            <Button
+              label="Create a format"
+              variant="primary"
+              size="lg"
+              icon={<Plus size={18} aria-hidden />}
+              onClick={() => setFormatPickerOpen(true)}
+            />
           </div>
+          <CreateFormatDialog
+            isOpen={isFormatPickerOpen}
+            onClose={() => setFormatPickerOpen(false)}
+            onPick={(format) => {
+              setFormatPickerOpen(false);
+              handleStartProject(format);
+            }}
+          />
         </section>
 
         <section>

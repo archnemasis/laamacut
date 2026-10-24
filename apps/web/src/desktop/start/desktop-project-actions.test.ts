@@ -26,8 +26,14 @@ beforeEach(() => {
 });
 
 describe("DESKTOP_FORMATS", () => {
-  it("contains vertical, horizontal, and square at 30fps with correct dimensions", () => {
-    expect(DESKTOP_FORMATS).toHaveLength(3);
+  it("contains vertical, horizontal, square and portrait at 30fps with correct dimensions", () => {
+    expect(DESKTOP_FORMATS).toHaveLength(4);
+    expect(DESKTOP_FORMATS.find((f) => f.id === "portrait")).toMatchObject({
+      label: "Portrait",
+      width: 1080,
+      height: 1350,
+      frameRate: 30,
+    });
     expect(DESKTOP_FORMATS.find((f) => f.id === "vertical")).toMatchObject({
       label: "Vertical",
       width: 1080,
