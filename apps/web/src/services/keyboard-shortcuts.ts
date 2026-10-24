@@ -507,8 +507,8 @@ const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
 const PRESETS: ShortcutPreset[] = [
   {
     id: "openreel",
-    name: "Hypercut Default",
-    description: "Default Hypercut shortcuts",
+    name: "Laamacut Default",
+    description: "Default Laamacut shortcuts",
     shortcuts: {},
   },
   {
@@ -756,7 +756,7 @@ class KeyboardShortcutsManager {
     Object.entries(preset.shortcuts).forEach(([id, key]) => {
       // A preset override takes precedence over the default binding it replaces.
       // Relocate that command so both remain accessible (Final Cut uses [ / ]
-      // for trimming, while Hypercut uses those keys for clip navigation).
+      // for trimming, while Laamacut uses those keys for clip navigation).
       const conflict = this.findConflict(key, id);
       if (conflict) {
         const alternative = `alt+${conflict.defaultKey}`;

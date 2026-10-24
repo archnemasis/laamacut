@@ -11,7 +11,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: "welcome",
     target: null,
-    title: "Welcome to Hypercut",
+    title: "Welcome to Laamacut",
     description:
       "A quick map of the current editor layout: tools on the left, playback in the center, timeline below, and properties on the right.",
     position: "center",

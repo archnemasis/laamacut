@@ -1,6 +1,6 @@
 {
-  "name": "Hypercut",
-  "short_name": "Hypercut",
+  "name": "Laamacut",
+  "short_name": "Laamacut",
   "description": "Professional browser-based video, audio, and photo editing application",
   "start_url": "/",
   "display": "standalone",

@@ -319,7 +319,7 @@ export const GeneralPanel: React.FC = () => {
           AI Connections
         </Text>
         <Text type="supporting" color="secondary" className="text-xs">
-          Connect a compatible endpoint you control. Hypercut does not choose a vendor or model for you.
+          Connect a compatible endpoint you control. Laamacut does not choose a vendor or model for you.
         </Text>
 
         <div className="space-y-3">
