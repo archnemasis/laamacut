@@ -117,6 +117,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
+    show: false,
     backgroundColor: isMac ? undefined : "#1b1b20",
     titleBarStyle: isMac ? "hiddenInset" : "hidden",
     titleBarOverlay: false,
@@ -131,6 +132,14 @@ function createWindow(): void {
       sandbox: true,
       webSecurity: true,
     },
+  });
+  // The editor opens maximized. Windows applies the launcher's "normal window"
+  // style to the first show, so maximize on the next tick after it.
+  win.once("ready-to-show", () => {
+    win.show();
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.maximize();
+    }, 0);
   });
   attachUnsavedGuard(win);
   installNavigationGuard(win, APP_INDEX);

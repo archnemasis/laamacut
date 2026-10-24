@@ -1,6 +1,6 @@
 import { useProjectStore } from "../../stores/project-store";
 import { checkForRecovery, type AutoSaveMetadata } from "../../services/auto-save";
-import { PROJECT_FORMATS } from "../../components/welcome/project-formats";
+import { NEW_PROJECT_SETTINGS, newProjectName } from "../../services/new-project";
 
 export interface NewProjectFormat {
   id: string;
@@ -10,14 +10,14 @@ export interface NewProjectFormat {
   frameRate: number;
 }
 
-export const DESKTOP_FORMATS: NewProjectFormat[] = PROJECT_FORMATS;
+export const DESKTOP_FORMATS: NewProjectFormat[] = [
+  { id: "vertical", label: "Vertical", width: 1080, height: 1920, frameRate: 30 },
+  { id: "horizontal", label: "Horizontal", width: 1920, height: 1080, frameRate: 30 },
+  { id: "square", label: "Square", width: 1080, height: 1080, frameRate: 30 },
+];
 
-export function startNewProject(format: NewProjectFormat): void {
-  useProjectStore.getState().createNewProject(format.label, {
-    width: format.width,
-    height: format.height,
-    frameRate: format.frameRate,
-  });
+export function startNewProject(): void {
+  useProjectStore.getState().createNewProject(newProjectName(), NEW_PROJECT_SETTINGS);
 }
 
 export function startNewMotionProject(format: NewProjectFormat): void {

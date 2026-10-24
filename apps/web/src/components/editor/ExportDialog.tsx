@@ -34,7 +34,7 @@ import {
   ToolcraftLayoutContent as LayoutContent,
   ToolcraftLayoutFooter as LayoutFooter,
 } from "@openreel/ui";
-import { ToolcraftNumberInputControl } from "@openreel/ui";
+import { ToolcraftNumberInputControl, ToolcraftTextInputControl } from "@openreel/ui";
 import { ToolcraftSelectableCard as SelectableCard } from "@openreel/ui";
 import { ToolcraftSelectControl as Selector } from "@openreel/ui";
 import { ToolcraftSliderControl } from "@openreel/ui";
@@ -100,6 +100,9 @@ interface ExportDialogProps {
   sourceMatch?: SourceExportMatch | null;
   hasAudio?: boolean;
   markedRange?: VideoExportSettings["range"] | null;
+  /** Current project name; with onRename, shows a Name field like CapCut. */
+  projectName?: string;
+  onRename?: (name: string) => void | Promise<unknown>;
 }
 
 type AspectRatioType = "vertical" | "square" | "horizontal";
@@ -189,6 +192,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   sourceMatch = null,
   hasAudio = true,
   markedRange = null,
+  projectName,
+  onRename,
 }) => {
   const [exportSection, setExportSection] = useState<"all" | "range">("all");
   const validMarkedRange = markedRange && Number.isFinite(markedRange.startTime)
@@ -199,6 +204,18 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     ? validMarkedRange ? validMarkedRange.endTime - validMarkedRange.startTime : 0
     : timelineDuration;
   useEffect(() => { if (isOpen) setExportSection("all"); }, [isOpen]);
+  const [exportName, setExportName] = useState(projectName ?? "");
+  useEffect(() => { if (isOpen) setExportName(projectName ?? ""); }, [isOpen, projectName]);
+  // Rename first so the exported file is named after the new project name.
+  const finishExport = useCallback((settings: VideoExportSettings, deliveryMode: ExportDeliveryMode) => {
+    const name = exportName.trim();
+    if (onRename && name && name !== projectName) {
+      void Promise.resolve(onRename(name)).then(() => onExport(settings, deliveryMode));
+    } else {
+      onExport(settings, deliveryMode);
+    }
+    onClose();
+  }, [exportName, onRename, projectName, onExport, onClose]);
   const applyExportSection = useCallback((settings: VideoExportSettings): VideoExportSettings => ({
     ...settings,
     range: exportSection === "range" && validMarkedRange ? { ...validMarkedRange } : undefined,
@@ -571,8 +588,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     if (guardrailBlocking || validationError || capabilityError) return;
     if (activeTab === "reduce") {
       if (!reducePlan) return;
-      onExport(applyExportSection(resolveBrowserSettings(compressionPlanToExportSettings(reducePlan))), delivery);
-      onClose();
+      finishExport(applyExportSection(resolveBrowserSettings(compressionPlanToExportSettings(reducePlan))), delivery);
       return;
     }
     const chosen =
@@ -585,16 +601,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       ...chosen,
       encodeMode: customSettings.encodeMode ?? "balanced",
     };
-    onExport(applyExportSection(resolveBrowserSettings(settings)), delivery);
-    onClose();
+    finishExport(applyExportSection(resolveBrowserSettings(settings)), delivery);
   }, [
     activeTab,
     quickSettings,
     selectedPreset,
     reducePlan,
     customSettings,
-    onExport,
-    onClose,
+    finishExport,
     guardrailBlocking,
     validationError,
     capabilityError,
@@ -616,9 +630,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       encodeMode: customSettings.encodeMode ?? "balanced",
     };
     if (getExportValidationError(settings, duration)) return;
-    onExport(applyExportSection(settings), delivery);
-    onClose();
-  }, [sourceMatch, customSettings, duration, onExport, onClose, delivery, applyExportSection]);
+    finishExport(applyExportSection(settings), delivery);
+  }, [sourceMatch, customSettings, duration, finishExport, delivery, applyExportSection]);
 
   const formatFileSize = (bitrate: number, durationSec: number): string => {
     const bytes = (bitrate * 1000 * durationSec) / 8;
@@ -673,6 +686,16 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         content={
           <LayoutContent className="flex min-h-0 flex-1 flex-col overflow-hidden bg-bg p-0">
             <div className="shrink-0 space-y-3 border-b border-border bg-bg-1 px-5 py-4">
+              {onRename && (
+                <ToolcraftTextInputControl
+                  label="Name"
+                  value={exportName}
+                  onChange={setExportName}
+                  placeholder="Project name"
+                  width="100%"
+                  maxLength={120}
+                />
+              )}
               <fieldset className="space-y-2">
                 <legend className="text-[12px] font-semibold text-fg">Export section</legend>
                 <div className="flex flex-wrap items-center gap-5 text-[12px] text-fg">

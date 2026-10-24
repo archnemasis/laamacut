@@ -69,7 +69,8 @@ export function DesktopExportButton(): JSX.Element {
         const ext = extForFormat(settings.format, settings.codec);
         const useWebCodecs = shouldUseWebCodecs(settings);
         const writable = await showSavePicker(
-          exportFilename(project.name, ext),
+          // Read the name now: the export dialog may have just renamed the project.
+          exportFilename(useProjectStore.getState().project.name, ext),
           ext,
           { streamToFile: useWebCodecs },
         );
@@ -191,6 +192,8 @@ export function DesktopExportButton(): JSX.Element {
         projectHeight={project?.settings?.height ?? 1080}
         frameRate={project?.settings?.frameRate ?? 30}
         sourceMatch={deriveSourceExportMatch(project)}
+        projectName={project?.name}
+        onRename={(name) => useProjectStore.getState().renameProject(name)}
       />
     </>
   );

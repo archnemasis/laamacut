@@ -228,7 +228,8 @@ export const Toolbar: React.FC = () => {
 
       try {
         const ext = extForFormat(settings.format);
-        const writable = await showSavePicker(exportFilename(project.name, ext), ext, { delivery });
+        // Read the name now: the export dialog may have just renamed the project.
+        const writable = await showSavePicker(exportFilename(useProjectStore.getState().project.name, ext), ext, { delivery });
 
         beginExport(writable);
 
@@ -569,6 +570,8 @@ export const Toolbar: React.FC = () => {
         sourceMatch={sourceMatch}
         hasAudio={project.timeline.tracks.some((track) => trackHasAudioItems(project, track.id))}
         markedRange={loopEnd > loopStart ? { startTime: loopStart, endTime: loopEnd } : null}
+        projectName={project.name}
+        onRename={renameProject}
       />
 
       <ScreenRecorder

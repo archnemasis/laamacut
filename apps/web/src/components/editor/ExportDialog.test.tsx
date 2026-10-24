@@ -157,6 +157,35 @@ describe("ExportDialog", () => {
     expect(screen.queryByRole("checkbox", { name: "4K ProRes HQ" })).not.toBeInTheDocument();
   });
 
+  describe("export name", () => {
+    it("renames the project before exporting", async () => {
+      const calls: string[] = [];
+      const onRename = vi.fn(async (name: string) => { calls.push(`rename:${name}`); });
+      const onExport = vi.fn(() => { calls.push("export"); });
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} onRename={onRename} projectName="Project Oct 24 21:30" duration={5} />);
+      expect(screen.getByLabelText("Name")).toHaveValue("Project Oct 24 21:30");
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "  My trip  " } });
+      fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
+      await waitFor(() => expect(onExport).toHaveBeenCalled());
+      expect(calls).toEqual(["rename:My trip", "export"]);
+    });
+
+    it("skips renaming when the name is unchanged or blank", () => {
+      const onRename = vi.fn();
+      const onExport = vi.fn();
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={onExport} onRename={onRename} projectName="Holiday" duration={5} />);
+      fireEvent.click(screen.getByRole("button", { name: "Export Video" }));
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "   " } });
+      expect(onRename).not.toHaveBeenCalled();
+      expect(onExport).toHaveBeenCalledTimes(1);
+    });
+
+    it("hides the Name field when renaming isn't wired up", () => {
+      render(<ExportDialog isOpen onClose={vi.fn()} onExport={vi.fn()} duration={5} />);
+      expect(screen.queryByLabelText("Name")).toBeNull();
+    });
+  });
+
   describe("CapCut-style export panel", () => {
     it("opens first and exports the project size at the recommended bitrate", () => {
       const onExport = vi.fn();

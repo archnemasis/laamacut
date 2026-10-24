@@ -11,8 +11,7 @@ import { ToolcraftButton as Button } from "@openreel/ui";
 import { ToolcraftText as Text } from "@openreel/ui";
 import { useProjectStore } from "../../stores/project-store";
 import { useUIStore } from "../../stores/ui-store";
-import { CreateFormatDialog } from "./CreateFormatDialog";
-import type { ProjectFormat } from "./project-formats";
+import { NEW_PROJECT_SETTINGS, newProjectName } from "../../services/new-project";
 import { useRouter } from "../../hooks/use-router";
 import { useEditorPreload } from "../../hooks/useEditorPreload";
 import { useAnalytics, AnalyticsEvents } from "../../hooks/useAnalytics";
@@ -47,28 +46,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
   const { track } = useAnalytics();
 
   const [viewMode, setViewMode] = useState<ViewMode>(initialTab ?? "home");
-  const [isFormatPickerOpen, setFormatPickerOpen] = useState(false);
 
   useEditorPreload(true);
 
-  const handleCreateProject = useCallback(
-    (format: ProjectFormat) => {
-      createNewProject(`New ${format.label} Video`, {
-        width: format.width,
-        height: format.height,
-        frameRate: format.frameRate,
-      });
-      track(AnalyticsEvents.PROJECT_CREATED, {
-        preset: format.id,
-        width: format.width,
-        height: format.height,
-        frameRate: format.frameRate,
-        source: "quick_start",
-      });
-      navigate("editor");
-    },
-    [createNewProject, navigate, track],
-  );
+  const handleCreateProject = useCallback(() => {
+    createNewProject(newProjectName(), NEW_PROJECT_SETTINGS);
+    track(AnalyticsEvents.PROJECT_CREATED, {
+      preset: "default",
+      ...NEW_PROJECT_SETTINGS,
+      source: "quick_start",
+    });
+    navigate("editor");
+  }, [createNewProject, navigate, track]);
 
   const handleTemplateApplied = useCallback(() => {
     navigate("editor");
@@ -87,9 +76,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isFormatPickerOpen) {
-          setFormatPickerOpen(false);
-        } else if (viewMode !== "home") {
+        if (viewMode !== "home") {
           setViewMode("home");
         } else {
           navigate("editor");
@@ -98,7 +85,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, viewMode, isFormatPickerOpen]);
+  }, [navigate, viewMode]);
 
   if (viewMode === "templates") {
     return (
@@ -172,19 +159,21 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
               In your browser.
             </Text>
             <Text display="block" type="supporting" color="secondary" className="text-base text-text-muted max-w-md">
-              Pick a shape and start editing. Quality, frame rate and bitrate are set when you export.
+              Pick the ratio in the editor. Name, quality, frame rate and bitrate are set when you export.
             </Text>
           </div>
 
           <div className="mb-10 flex justify-center">
-            <Button
-              label="Create a format"
-              variant="primary"
-              size="lg"
-              icon={<Plus size={18} aria-hidden />}
-              onClick={() => setFormatPickerOpen(true)}
-              className="rounded-xl px-8"
-            />
+            <button
+              type="button"
+              onClick={handleCreateProject}
+              className="group flex h-40 w-full max-w-xl items-center justify-center gap-4 rounded-2xl border border-border bg-bg-1 text-fg transition-colors hover:border-accent hover:bg-accent-soft focus-visible:border-accent focus-visible:outline-none"
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-fg transition-transform group-hover:scale-105">
+                <Plus size={28} aria-hidden />
+              </span>
+              <span className="text-2xl font-semibold">Create project</span>
+            </button>
           </div>
 
           <div className="flex items-center justify-center gap-3">
@@ -233,11 +222,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
         </div>
       </div>
 
-      <CreateFormatDialog
-        isOpen={isFormatPickerOpen}
-        onClose={() => setFormatPickerOpen(false)}
-        onPick={handleCreateProject}
-      />
     </div>
   );
 };

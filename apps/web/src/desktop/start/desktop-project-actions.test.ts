@@ -26,14 +26,8 @@ beforeEach(() => {
 });
 
 describe("DESKTOP_FORMATS", () => {
-  it("contains vertical, horizontal, square and portrait at 30fps with correct dimensions", () => {
-    expect(DESKTOP_FORMATS).toHaveLength(4);
-    expect(DESKTOP_FORMATS.find((f) => f.id === "portrait")).toMatchObject({
-      label: "Portrait",
-      width: 1080,
-      height: 1350,
-      frameRate: 30,
-    });
+  it("contains vertical, horizontal, and square at 30fps with correct dimensions", () => {
+    expect(DESKTOP_FORMATS).toHaveLength(3);
     expect(DESKTOP_FORMATS.find((f) => f.id === "vertical")).toMatchObject({
       label: "Vertical",
       width: 1080,
@@ -56,17 +50,16 @@ describe("DESKTOP_FORMATS", () => {
 });
 
 describe("startNewProject", () => {
-  it("calls createNewProject with the format label and dimensions", () => {
+  it("starts a 16:9, 30fps project with a dated placeholder name", () => {
     const createNewProject = vi.fn();
     mockedGetState.mockReturnValue({
       createNewProject,
     } as unknown as ReturnType<typeof useProjectStore.getState>);
 
-    const format = DESKTOP_FORMATS[1];
-    startNewProject(format);
+    startNewProject();
 
     expect(createNewProject).toHaveBeenCalledTimes(1);
-    expect(createNewProject).toHaveBeenCalledWith("Horizontal", {
+    expect(createNewProject).toHaveBeenCalledWith(expect.stringMatching(/^Project /), {
       width: 1920,
       height: 1080,
       frameRate: 30,

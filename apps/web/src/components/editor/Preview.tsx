@@ -108,6 +108,7 @@ import { captureNativeVideoFrame } from "./preview/video-frame";
 import { resolvePlaybackLoop, resolvePlaybackStart } from "../../utils/playback-loop";
 import { ProcessingOverlay } from "./ProcessingOverlay";
 import { editingFrameDurationMs } from "./editing-frame-rate";
+import { APPS_BY_RATIO, AppIcon } from "./aspect-apps";
 import {
   getPersonSegmentationEngine,
   getBackgroundRemovalEngine,
@@ -8194,7 +8195,7 @@ export const Preview: React.FC = () => {
                   className="fixed inset-0 z-40"
                   onClick={() => setShowAspectMenu(false)}
                 />
-                <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-bg-elev border border-border rounded-md shadow-md py-1 z-50 min-w-[120px]">
+                <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-bg-elev border border-border rounded-md shadow-md py-1 z-50 min-w-[180px]">
                   {ASPECT_PRESETS.map((opt) => {
                     const isActive =
                       settings.width === opt.width &&
@@ -8215,9 +8216,22 @@ export const Preview: React.FC = () => {
                           isActive ? "text-accent" : "text-fg-2"
                         }`}
                         >
-                        <span>{opt.label}</span>
-                        <span className="text-fg-3 text-[10px]">
-                          {opt.width}×{opt.height}
+                        <span className="flex items-center gap-2">
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
+                            <span
+                              className={`rounded-[2px] border ${isActive ? "border-accent" : "border-fg-3"}`}
+                              style={{
+                                width: 16 * Math.min(1, opt.width / opt.height),
+                                height: 16 * Math.min(1, opt.height / opt.width),
+                              }}
+                            />
+                          </span>
+                          <span className="w-9">{opt.label}</span>
+                          <span className="flex items-center gap-1.5 text-fg">
+                            {(APPS_BY_RATIO[opt.label] ?? []).map((icon) => (
+                              <AppIcon key={icon.slug} icon={icon} />
+                            ))}
+                          </span>
                         </span>
                       </Button>
                     );

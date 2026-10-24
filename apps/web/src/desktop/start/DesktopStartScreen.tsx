@@ -1,6 +1,5 @@
 import type { JSX } from "react";
 import { useState, useEffect, useCallback } from "react";
-import { ToolcraftButton as Button } from "@openreel/ui";
 import { ToolcraftCard as Card } from "@openreel/ui";
 import { ToolcraftClickableCard as ClickableCard } from "@openreel/ui";
 import { ToolcraftHeading as Heading } from "@openreel/ui";
@@ -9,12 +8,10 @@ import { Film, Plus } from "@/icons/lucide-compat";
 
 import { OpenReelMark } from "../brand/OpenReelMark";
 import { Icon } from "@/icons/Icon";
-import { CreateFormatDialog } from "../../components/welcome/CreateFormatDialog";
 import {
   startNewProject,
   listRecentProjects,
   openRecentProject,
-  type NewProjectFormat,
   type RecentEntry,
 } from "./desktop-project-actions";
 import { useUIStore } from "../../stores/ui-store";
@@ -32,7 +29,6 @@ export function DesktopStartScreen(): JSX.Element {
   const [recents, setRecents] = useState<RecentEntry[]>([]);
   const [loadingRecents, setLoadingRecents] = useState<boolean>(true);
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const [isFormatPickerOpen, setFormatPickerOpen] = useState(false);
   const setDesktopPage = useUIStore((state) => state.setDesktopPage);
 
   useEffect(() => {
@@ -62,9 +58,9 @@ export function DesktopStartScreen(): JSX.Element {
     }
   }, [setDesktopPage]);
 
-  const handleStartProject = useCallback((format: NewProjectFormat) => {
+  const handleStartProject = useCallback(() => {
     setDesktopPage("edit");
-    startNewProject(format);
+    startNewProject();
   }, [setDesktopPage]);
 
   return (
@@ -76,25 +72,18 @@ export function DesktopStartScreen(): JSX.Element {
             <Heading level={1}>New Project</Heading>
           </div>
           <Text type="supporting" display="block" className="mt-1">
-            Pick a shape and start editing. Quality, frame rate and bitrate are set when you export.
+            Pick the ratio in the editor. Name, quality, frame rate and bitrate are set when you export.
           </Text>
-          <div className="mt-6">
-            <Button
-              label="Create a format"
-              variant="primary"
-              size="lg"
-              icon={<Plus size={18} aria-hidden />}
-              onClick={() => setFormatPickerOpen(true)}
-            />
-          </div>
-          <CreateFormatDialog
-            isOpen={isFormatPickerOpen}
-            onClose={() => setFormatPickerOpen(false)}
-            onPick={(format) => {
-              setFormatPickerOpen(false);
-              handleStartProject(format);
-            }}
-          />
+          <button
+            type="button"
+            onClick={handleStartProject}
+            className="group mt-6 flex h-40 w-full items-center justify-center gap-4 rounded-xl border border-border bg-bg-1 text-fg transition-colors hover:border-accent hover:bg-accent-soft focus-visible:border-accent focus-visible:outline-none"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-fg transition-transform group-hover:scale-105">
+              <Plus size={28} aria-hidden />
+            </span>
+            <span className="text-2xl font-semibold">Create project</span>
+          </button>
         </section>
 
         <section>
