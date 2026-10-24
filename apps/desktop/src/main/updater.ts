@@ -34,7 +34,9 @@ function runCheckWhenLoaded(win: BrowserWindow, run: () => void): void {
 // changes guard first (autoInstallOnAppQuit fires on the normal quit sequence),
 // so updates never bypass the save prompt. No-op in dev (no published feed).
 export function initAutoUpdater(): void {
-  if (!app.isPackaged) return;
+  // Laamacut ships without an update feed, so never check OpenReel's.
+  const hasUpdateFeed = false;
+  if (!app.isPackaged || !hasUpdateFeed) return;
 
   // Notify → (user-consented) download → install on quit. The download is not
   // automatic; the renderer triggers it after telling the user an update
