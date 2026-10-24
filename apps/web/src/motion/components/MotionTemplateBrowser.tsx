@@ -19,11 +19,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  ads: "from-emerald-500/30 via-teal-500/20 to-green-500/30",
-  "lower-thirds": "from-emerald-500/30 via-teal-500/20 to-cyan-500/30",
+  ads: "from-purple-500/30 via-teal-500/20 to-green-500/30",
+  "lower-thirds": "from-purple-500/30 via-teal-500/20 to-cyan-500/30",
   "logo-reveals": "from-amber-500/30 via-orange-500/20 to-rose-500/30",
-  "social-hooks": "from-emerald-500/30 via-lime-500/20 to-orange-500/30",
-  "kinetic-typography": "from-sky-500/30 via-teal-500/20 to-emerald-500/30",
+  "social-hooks": "from-purple-500/30 via-lime-500/20 to-orange-500/30",
+  "kinetic-typography": "from-sky-500/30 via-teal-500/20 to-purple-500/30",
   "end-screens": "from-slate-500/30 via-zinc-500/20 to-stone-500/30",
 };
 

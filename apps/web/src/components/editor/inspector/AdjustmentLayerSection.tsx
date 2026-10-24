@@ -429,7 +429,7 @@ export const AdjustmentLayerSection: React.FC<AdjustmentLayerSectionProps> = ({
               }`}
               aria-hidden
             />
-            <Layers size={12} className="text-emerald-500" aria-hidden />
+            <Layers size={12} className="text-purple-500" aria-hidden />
             <Text
               type="supporting"
               color="primary"

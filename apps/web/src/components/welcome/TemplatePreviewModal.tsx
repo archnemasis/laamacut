@@ -222,7 +222,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-emerald-500/20 flex items-center justify-center">
+                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center">
                     <Play size={40} className="text-text-muted" />
                   </div>
                 )}

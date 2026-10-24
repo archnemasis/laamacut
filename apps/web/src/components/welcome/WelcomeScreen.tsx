@@ -47,7 +47,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
     description: "TikTok, Reels, Shorts",
     dimensions: "1080 × 1920",
     icon: Smartphone,
-    gradient: "from-emerald-500/20 to-teal-500/20",
+    gradient: "from-purple-500/20 to-fuchsia-500/20",
   },
   {
     id: "horizontal",
@@ -191,8 +191,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-background overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(34,197,94,0.05),transparent_60%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(34,197,94,0.03),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(147,51,234,0.05),transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(147,51,234,0.03),transparent_50%)]" />
 
       <div className="relative h-full flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-3xl">

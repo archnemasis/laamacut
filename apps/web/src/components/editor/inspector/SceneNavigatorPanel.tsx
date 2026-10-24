@@ -234,8 +234,8 @@ export const SceneNavigatorPanel: React.FC<SceneNavigatorPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-lg border border-emerald-500/30">
-        <Layers size={16} className="text-emerald-500" />
+      <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-purple-500/20 to-fuchsia-500/20 rounded-lg border border-purple-500/30">
+        <Layers size={16} className="text-purple-500" />
         <div className="flex flex-col gap-0.5">
           <span className="text-[11px] font-medium text-fg">
             Scene Navigator

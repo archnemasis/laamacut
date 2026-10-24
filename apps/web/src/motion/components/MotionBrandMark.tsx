@@ -19,8 +19,8 @@ export function MotionBrandMark({
       role="img"
       aria-label="Laamacut"
     >
-      <polygon points="16,2.5 16,16 4,16" fill="#2ee0a3" />
-      <polygon points="16,2.5 28,16 16,16" fill="#16c08a" />
+      <polygon points="16,2.5 16,16 4,16" fill="#c084fc" />
+      <polygon points="16,2.5 28,16 16,16" fill="#9333ea" />
       <polygon points="4,16 16,16 16,29.5" fill="#11a877" />
       <polygon points="16,16 28,16 16,29.5" fill="#0c9067" />
       <polygon

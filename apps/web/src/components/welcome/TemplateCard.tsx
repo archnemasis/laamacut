@@ -39,20 +39,20 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 };
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  tiktok: "from-emerald-500 to-cyan-500",
-  "instagram-reels": "from-emerald-500 to-teal-500",
-  "instagram-stories": "from-amber-500 to-emerald-500",
-  "instagram-post": "from-emerald-500 to-teal-500",
+  tiktok: "from-purple-500 to-cyan-500",
+  "instagram-reels": "from-purple-500 to-teal-500",
+  "instagram-stories": "from-amber-500 to-purple-500",
+  "instagram-post": "from-purple-500 to-teal-500",
   "youtube-shorts": "from-red-500 to-orange-500",
   "youtube-video": "from-red-600 to-red-400",
   facebook: "from-blue-600 to-blue-400",
   twitter: "from-sky-500 to-blue-500",
   linkedin: "from-blue-700 to-blue-500",
   pinterest: "from-red-500 to-rose-400",
-  intro: "from-emerald-500 to-green-500",
-  outro: "from-green-500 to-emerald-500",
+  intro: "from-purple-500 to-violet-500",
+  outro: "from-violet-500 to-purple-500",
   promo: "from-amber-500 to-orange-500",
-  "lower-third": "from-emerald-500 to-teal-500",
+  "lower-third": "from-purple-500 to-teal-500",
   slideshow: "from-teal-500 to-cyan-500",
   custom: "from-zinc-500 to-zinc-400",
 };
@@ -68,7 +68,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
   const isVertical = preset && preset.height > preset.width;
   const Icon = CATEGORY_ICONS[category] || Square;
   const gradient =
-    CATEGORY_GRADIENTS[category] || "from-primary to-emerald-500";
+    CATEGORY_GRADIENTS[category] || "from-primary to-purple-500";
 
   const formatDuration = (seconds: number): string => {
     if (seconds < 60) return `${seconds}s`;

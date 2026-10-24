@@ -1,10 +1,10 @@
 /* ============================================================
-   OpenReel Desktop — DaVinci-Resolve-style charcoal/emerald tokens
+   OpenReel Desktop — DaVinci-Resolve-style charcoal/purple tokens
    Scoped under .openreel-desktop. Overrides the same CSS variable
    names index.css defines so desktop components reuse the existing
    Tailwind utilities and inherit the Resolve look.
    Surfaces: charcoal-neutral (hue ~250, low chroma).
-   Accent: emerald (hue ~162).
+   Accent: purple (hue ~305).
    ============================================================ */
 .openreel-desktop {
   color-scheme: dark;
@@ -23,13 +23,13 @@
   --fg-muted: oklch(0.46 0.006 250);
 
   --hover: oklch(0.27 0.004 250);
-  --selected: oklch(0.3 0.03 162);
+  --selected: oklch(0.3 0.06 305);
 
-  --accent: oklch(0.7 0.15 162);
-  --accent-strong: oklch(0.63 0.16 162);
-  --accent-soft: oklch(0.3 0.05 162);
+  --accent: oklch(0.68 0.2 305);
+  --accent-strong: oklch(0.6 0.22 305);
+  --accent-soft: oklch(0.3 0.08 305);
   --accent-fg: oklch(0.16 0.004 250);
-  --accent-glow: oklch(0.7 0.15 162 / 0.35);
+  --accent-glow: oklch(0.68 0.2 305 / 0.35);
 
   --track-bg: oklch(0.2 0.004 250);
   --tl-bg: oklch(0.15 0.004 250);
@@ -52,7 +52,7 @@
   --card-foreground: 0 0% 93%;
   --popover: 220 7% 14%;
   --popover-foreground: 0 0% 93%;
-  --primary: 158 64% 52%;
+  --primary: 271 91% 65%;
   --primary-foreground: 220 8% 10%;
   --secondary: 220 6% 19%;
   --secondary-foreground: 0 0% 93%;
@@ -63,5 +63,5 @@
   --destructive: 0 62% 50%;
   --destructive-foreground: 0 0% 95%;
   --input: 220 6% 25%;
-  --ring: 158 64% 52%;
+  --ring: 271 91% 65%;
 }
