@@ -66,6 +66,15 @@ export class PreviewProxyCache {
     void this.drain();
   }
 
+  /** Use a preview copy made elsewhere (the Android app's hardware encoder) as a ready proxy. */
+  adopt(item: MediaItem, blob: Blob, preset: PreviewProxyPreset): void {
+    if (!this.project || item.type !== "video") return;
+    const current = this.project.mediaLibrary.items.find((candidate) => candidate.id === item.id);
+    if (!current || !sameSource(item, current)) return;
+    this.remove(item.id);
+    this.patch(item.id, { source: item, preset, status: "ready", progress: 1, enabled: true, blob, createdAt: Date.now() }, true);
+  }
+
   remove(id: string): void {
     this.jobs.get(id)?.abort();
     this.jobs.delete(id);

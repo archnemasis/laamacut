@@ -1,7 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const addMediaFilesToTimeline = vi.hoisted(() => vi.fn(async (_files: File[]) => 2));
+const addMediaFilesToTimeline = vi.hoisted(() =>
+  vi.fn(async (files: File[], onImported?: (index: number, mediaId: string) => void) => {
+    files.forEach((_, i) => onImported?.(i, `media-${i}`));
+    return files.length;
+  }),
+);
+const adopt = vi.hoisted(() => vi.fn());
+vi.mock("../../stores/preview-proxy-store", () => ({ previewProxyCache: { adopt } }));
+vi.mock("../../stores/project-store", () => ({
+  useProjectStore: { getState: () => ({ project: { mediaLibrary: { items: [0, 1, 2].map((i) => ({ id: `media-${i}`, type: "video" })) } } }) },
+}));
 vi.mock("../../services/phone-media", () => ({ addMediaFilesToTimeline }));
 
 import { PhoneMediaPicker } from "./PhoneMediaPicker";
@@ -19,9 +29,12 @@ const gallery = {
         : [{ uri: "content://p/1", name: "cat.jpg", mime: "image/jpeg", size: 5 }],
   })),
   thumbnail: vi.fn(async () => ({ data: "data:image/jpeg;base64,AAAA" })),
+  compress: vi.fn(async ({ uri }: { uri: string }) => ({ path: `file:///cache/${uri.split("/").pop()}.mp4` })),
+  discard: vi.fn(async () => undefined),
 };
 
 beforeEach(() => {
+  localStorage.removeItem("laamacut-phone-hd");
   vi.stubGlobal("IntersectionObserver", class {
     constructor(private cb: (entries: { isIntersecting: boolean }[]) => void) {}
     observe() { this.cb([{ isIntersecting: true }]); }
@@ -60,6 +73,25 @@ describe("PhoneMediaPicker gallery", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const files = addMediaFilesToTimeline.mock.calls[0][0];
     expect(files.map((f) => f.name)).toEqual(["party.mp4", "beach.mp4", "cat.jpg"]);
+
+    // HD is off by default: each video (not the photo) gets a 720p preview copy.
+    await waitFor(() => expect(adopt).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/2", height: 720 });
+    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/1", height: 720 });
+    expect(gallery.discard).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps full resolution when HD is on", async () => {
+    render(<PhoneMediaPicker onClose={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Select beach.mp4" }));
+    const hdSwitch = screen.getByRole("switch", { name: "HD" });
+    fireEvent.click(hdSwitch);
+    expect(hdSwitch).toHaveAttribute("aria-checked", "true");
+    expect(localStorage.getItem("laamacut-phone-hd")).toBe("1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(addMediaFilesToTimeline).toHaveBeenCalled());
+    expect(gallery.compress).not.toHaveBeenCalled();
   });
 
   it("explains how to allow access when it is refused", async () => {

@@ -21,7 +21,23 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import androidx.annotation.OptIn;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.MimeTypes;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.effect.Presentation;
+import androidx.media3.transformer.Composition;
+import androidx.media3.transformer.EditedMediaItem;
+import androidx.media3.transformer.Effects;
+import androidx.media3.transformer.ExportException;
+import androidx.media3.transformer.ExportResult;
+import androidx.media3.transformer.Transformer;
+
+import com.google.common.collect.ImmutableList;
+
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.util.UUID;
 
 /**
  * Lists the phone's videos and photos for the in-app picker, like CapCut.
@@ -154,5 +170,68 @@ public class GalleryPlugin extends Plugin {
                 call.reject(e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Make a small preview copy of a video with the phone's hardware encoder
+     * (H.264, `height` lines tall, default 720) for smooth editing on slower
+     * phones. Exports keep using the original. Resolves to the copy's file:// path.
+     */
+    @OptIn(markerClass = UnstableApi.class)
+    @PluginMethod
+    public void compress(PluginCall call) {
+        String uri = call.getString("uri");
+        int height = call.getInt("height", 720);
+        if (uri == null) {
+            call.reject("Missing uri");
+            return;
+        }
+        File dir = new File(getContext().getCacheDir(), "preview-copies");
+        if (!dir.exists() && !dir.mkdirs()) {
+            call.reject("Could not create the preview folder");
+            return;
+        }
+        File output = new File(dir, UUID.randomUUID() + ".mp4");
+        call.setKeepAlive(true);
+        getActivity().runOnUiThread(() -> {
+            Transformer transformer = new Transformer.Builder(getContext())
+                .setVideoMimeType(MimeTypes.VIDEO_H264)
+                .addListener(new Transformer.Listener() {
+                    @Override
+                    public void onCompleted(Composition composition, ExportResult result) {
+                        JSObject out = new JSObject();
+                        out.put("path", Uri.fromFile(output).toString());
+                        call.resolve(out);
+                        call.setKeepAlive(false);
+                    }
+
+                    @Override
+                    public void onError(Composition composition, ExportResult result, ExportException error) {
+                        output.delete();
+                        call.reject(error.getMessage(), error);
+                        call.setKeepAlive(false);
+                    }
+                })
+                .build();
+            EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(uri)))
+                .setEffects(new Effects(ImmutableList.of(), ImmutableList.of(Presentation.createForHeight(height))))
+                .build();
+            transformer.start(item, output.getAbsolutePath());
+        });
+    }
+
+    /** Delete a preview copy once the editor has loaded it. */
+    @PluginMethod
+    public void discard(PluginCall call) {
+        String path = call.getString("path");
+        if (path != null) {
+            String file = Uri.parse(path).getPath();
+            File dir = new File(getContext().getCacheDir(), "preview-copies");
+            if (file != null && new File(file).getParentFile() != null
+                && new File(file).getParentFile().getAbsolutePath().equals(dir.getAbsolutePath())) {
+                new File(file).delete();
+            }
+        }
+        call.resolve();
     }
 }

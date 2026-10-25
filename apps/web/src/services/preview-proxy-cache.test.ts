@@ -132,4 +132,19 @@ describe("session preview proxies", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(cache.store.getState().entries).toEqual({});
   });
+
+  it("adopts a ready-made phone preview copy for preview only", () => {
+    const item = media();
+    const copy = new Blob(["720p"], { type: "video/mp4" });
+    const generate = vi.fn();
+    const cache = new PreviewProxyCache({ loadOriginal: async () => item.blob!, generate });
+    cache.syncProject(project([item]));
+
+    cache.adopt(item, copy, "medium");
+
+    expect(generate).not.toHaveBeenCalled();
+    expect(cache.store.getState().entries[item.id]).toMatchObject({ status: "ready", enabled: true, preset: "medium" });
+    expect(cache.resolve("project", item).blob).toBe(copy);
+    expect(cache.resolve("project", item, "export").blob).toBe(item.blob);
+  });
 });

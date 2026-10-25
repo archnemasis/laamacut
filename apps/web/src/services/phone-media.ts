@@ -43,15 +43,19 @@ export function canvasForMedia(media: Pick<MediaItem, "metadata">): { width: num
  * main track. On an empty project the canvas takes the first picture's shape.
  * Returns how many files were added.
  */
-export async function addMediaFilesToTimeline(files: readonly File[]): Promise<number> {
+export async function addMediaFilesToTimeline(
+  files: readonly File[],
+  onImported?: (index: number, mediaId: string) => void,
+): Promise<number> {
   const store = useProjectStore.getState;
   const startedEmpty = !findMainTrack(store().project)?.clips.length;
   let added = 0;
 
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
     const imported = await store().importMedia(file);
     const mediaId = imported.success ? imported.actionId : undefined;
     if (!mediaId) continue;
+    onImported?.(index, mediaId);
 
     if (startedEmpty && added === 0) {
       const media = store().project.mediaLibrary.items.find((m) => m.id === mediaId);

@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "@/icons/lucide-compat";
 import { addMediaFilesToTimeline } from "../../services/phone-media";
 import {
+  attachPreviewCopy,
   galleryItemToFile,
   getGallery,
+  loadHdPreference,
+  saveHdPreference,
   type GalleryAccess,
   type GalleryItem,
   type GalleryKind,
@@ -73,6 +76,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
   const [fileTiles, setFileTiles] = useState<Tile[]>([]);
   const [order, setOrder] = useState<string[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
+  const [hd, setHd] = useState(loadHdPreference);
   const thumbCache = useRef(new Map<string, string>()).current;
   const loading = useRef<Record<GalleryKind, boolean>>({ video: false, photo: false });
   const urls = useRef<string[]>([]);
@@ -158,7 +162,16 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
         else if (tile.galleryItem) files.push(await galleryItemToFile(tile.galleryItem));
       }
       setProgress("Adding to timeline");
-      await addMediaFilesToTimeline(files);
+      // HD off: edit with a 720p copy made by the phone's encoder (smooth on
+      // slower phones). Exports always use the full-quality original.
+      await addMediaFilesToTimeline(files, (index, mediaId) => {
+        const item = picked[index]?.galleryItem;
+        if (!hd && item && picked[index].kind === "video") {
+          void attachPreviewCopy(item.uri, mediaId).catch((error: unknown) =>
+            console.warn("[PhoneMediaPicker] Preview copy failed; using the original:", error),
+          );
+        }
+      });
     } finally {
       setProgress(null);
       onClose();
@@ -292,7 +305,26 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
       </div>
 
       <footer className="flex h-16 shrink-0 items-center justify-between gap-3 border-t border-border px-4">
-        <span className="text-[13px] text-fg-2">{progress ?? (order.length > 0 ? `${order.length} selected` : "")}</span>
+        <span className="min-w-0 truncate text-[13px] text-fg-2">{progress ?? (order.length > 0 ? `${order.length} selected` : "")}</span>
+        {hasGallery && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={hd}
+            aria-label="HD"
+            title={hd ? "Full resolution: best quality, may lag on slower phones" : "Smooth editing with a 720p preview copy. Exports stay full quality"}
+            onClick={() => {
+              saveHdPreference(!hd);
+              setHd(!hd);
+            }}
+            className="ml-auto flex shrink-0 items-center gap-2 text-[15px] font-semibold"
+          >
+            <span className={`grid h-6 w-6 place-items-center rounded-full border-2 ${hd ? "border-accent bg-accent" : "border-fg-3"}`}>
+              {hd && <span className="h-2 w-2 rounded-full bg-white" />}
+            </span>
+            HD
+          </button>
+        )}
         <button
           type="button"
           onClick={() => void handleAdd()}

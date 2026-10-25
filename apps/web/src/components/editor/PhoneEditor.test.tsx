@@ -34,6 +34,7 @@ vi.mock("../../stores/project-store", () => {
 });
 
 vi.mock("./Toolbar", () => ({ Toolbar: () => <header>Top bar</header> }));
+vi.mock("../phone/PhoneMediaPicker", () => ({ PhoneMediaPicker: () => <div>Media picker</div> }));
 vi.mock("./Preview", () => ({ Preview: () => <div>Preview</div> }));
 vi.mock("./Timeline", () => ({ Timeline: () => <div>Timeline</div> }));
 vi.mock("./AssetsPanel", () => ({
