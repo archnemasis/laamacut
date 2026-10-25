@@ -94,7 +94,8 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-export const GeneralPanel: React.FC = () => {
+/** `showProjectSettings` false leaves out the open project's settings (phone Me page). */
+export const GeneralPanel: React.FC<{ showProjectSettings?: boolean }> = ({ showProjectSettings = true }) => {
   const { autoSave, autoSaveInterval, setAutoSave, setAutoSaveInterval } = useSettingsStore();
 
   const snapSettings = useUIStore((s) => s.snapSettings);
@@ -224,7 +225,7 @@ export const GeneralPanel: React.FC = () => {
         </Row>
       </Section>
 
-      {hasOpenProject && (
+      {showProjectSettings && hasOpenProject && (
         <Section title="This project">
           <Row label="Editing frame rate" hint="Preview playback and frame stepping. Export frame rate is set when you export.">
             <Selector

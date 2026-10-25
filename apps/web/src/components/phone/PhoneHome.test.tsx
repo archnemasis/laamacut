@@ -11,7 +11,7 @@ const actions = vi.hoisted(() => ({
 vi.mock("../../desktop/start/desktop-project-actions", () => actions);
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock("../../hooks/use-router", () => ({ useRouter: () => ({ navigate }) }));
-vi.mock("../editor/settings/SettingsDialog", () => ({ SettingsDialog: () => null }));
+vi.mock("../editor/settings/GeneralPanel", () => ({ GeneralPanel: () => <div>Settings panel</div> }));
 
 import { PhoneHome } from "./PhoneHome";
 import { takePhoneMediaPickerRequest } from "../../services/phone-media";
@@ -22,9 +22,16 @@ describe("PhoneHome", () => {
     vi.clearAllMocks();
   });
 
+  it("switches to the Me tab for settings", () => {
+    render(<PhoneHome />);
+    fireEvent.click(screen.getByRole("button", { name: "Me" }));
+    expect(screen.getByText("Settings panel")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Me" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("starts a new project straight into the media picker", () => {
     render(<PhoneHome />);
-    fireEvent.click(screen.getByRole("button", { name: "New project" }));
+    fireEvent.click(screen.getByRole("button", { name: "New video" }));
     expect(actions.startNewProject).toHaveBeenCalled();
     expect(takePhoneMediaPickerRequest()).toBe(true);
     expect(navigate).toHaveBeenCalledWith("editor");
