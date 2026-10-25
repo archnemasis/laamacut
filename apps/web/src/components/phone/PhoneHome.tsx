@@ -11,6 +11,7 @@ import {
 import { requestPhoneMediaPicker } from "../../services/phone-media";
 import { useRouter } from "../../hooks/use-router";
 import { GeneralPanel } from "../editor/settings/GeneralPanel";
+import "../editor/phone-editor.css";
 
 type HomeTab = "edit" | "me";
 
@@ -150,7 +151,7 @@ const TABS: { id: HomeTab; label: string; icon: LucideIcon }[] = [
 export function PhoneHome() {
   const [tab, setTab] = useState<HomeTab>("edit");
   return (
-    <div className="flex h-full w-full flex-col bg-bg text-fg">
+    <div className="phone-home flex h-full w-full flex-col bg-bg text-fg">
       {tab === "edit" ? <EditTab /> : <MeTab />}
       <nav aria-label="Home" className="flex h-16 shrink-0 border-t border-border bg-bg">
         {TABS.map(({ id, label, icon: Icon }) => (

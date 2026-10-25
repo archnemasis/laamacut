@@ -3,6 +3,8 @@ import {
   Check,
   ChevronLeft,
   Copy,
+  Diamond,
+  DiamondPlus,
   Film,
   Gauge,
   Layers,
@@ -38,6 +40,8 @@ import { Toolbar } from "./Toolbar";
 import { Preview } from "./Preview";
 import { PhoneTimeline } from "./PhoneTimeline";
 import { PhoneTextEditor } from "./PhoneTextEditor";
+import { PhoneGestures } from "./PhoneGestures";
+import { findSelectedVisual, hasKeyframeAt, toggleKeyframe } from "./phone-keyframes";
 import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
 import { takePhoneMediaPickerRequest } from "../../services/phone-media";
 import { useRouter } from "../../hooks/use-router";
@@ -240,6 +244,15 @@ export const PhoneEditor: React.FC = () => {
 
   const canSplit = getSplittableTimelineItemIds(project, selectedIds, playheadPosition).length > 0;
 
+  // The selected picture, text or graphic: what preview gestures and the keyframe button act on.
+  const selectedVisual = useMemo(
+    () => (selectedIds.length === 1 ? findSelectedVisual(selectedIds[0]) : null),
+    // project changes whenever the clip's transform or keyframes do
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedIds, project],
+  );
+  const keyframeHere = selectedVisual ? hasKeyframeAt(selectedVisual.keyframes, playheadPosition - selectedVisual.startTime) : false;
+
   const open = (next: Sheet) => setSheet(next);
 
   // Like CapCut, Edit, Adjust and Captions act on the picture clip under the playhead.
@@ -375,10 +388,13 @@ export const PhoneEditor: React.FC = () => {
     <div className="phone-editor flex h-full w-full flex-col overflow-hidden bg-bg text-fg">
       <Toolbar phone />
 
-      <div ref={previewRef} className="phone-preview min-h-0 shrink-0 basis-[48%] bg-black">
+      <div ref={previewRef} className="phone-preview relative min-h-0 shrink-0 basis-[48%] bg-black">
         <PanelErrorBoundary name="Stage">
           <Preview />
         </PanelErrorBoundary>
+        {selectedVisual && !isPlaying && (
+          <PhoneGestures selectedId={selectedVisual.id} onTapText={(clipId) => setTextEdit({ clipId, isNew: false })} />
+        )}
       </div>
 
       <div className="grid h-12 shrink-0 grid-cols-3 items-center px-3">
@@ -399,6 +415,17 @@ export const PhoneEditor: React.FC = () => {
           {isPlaying ? <Pause size={24} fill="currentColor" aria-hidden /> : <Play size={24} aria-hidden />}
         </button>
         <div className="flex justify-end gap-1">
+          {selectedVisual && selectedVisual.kind !== "shape" && (
+            <button
+              type="button"
+              aria-label={keyframeHere ? "Remove keyframe" : "Add keyframe"}
+              aria-pressed={keyframeHere}
+              onClick={() => toggleKeyframe(selectedVisual, playheadPosition - selectedVisual.startTime)}
+              className={`grid h-10 w-10 place-items-center ${keyframeHere ? "text-accent" : "text-fg"}`}
+            >
+              {keyframeHere ? <Diamond size={20} fill="currentColor" aria-hidden /> : <DiamondPlus size={20} aria-hidden />}
+            </button>
+          )}
           <button type="button" aria-label="Undo" disabled={!canUndo()} onClick={() => void undo()} className="grid h-10 w-10 place-items-center text-fg disabled:opacity-35">
             <Undo2 size={20} aria-hidden />
           </button>

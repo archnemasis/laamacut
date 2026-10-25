@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Music, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
+import { Music, Pencil, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
+import { getProjectPreview, setProjectCover } from "../../services/project-previews";
+import { reorderTrackClips } from "../../services/phone-media";
+import { toast } from "../../stores/notification-store";
 import type { Clip, MediaItem } from "@openreel/core";
 import { useProjectStore } from "../../stores/project-store";
 import { useTimelineStore } from "../../stores/timeline-store";
@@ -70,6 +73,22 @@ export function PhoneTimeline({
   const userScrollTimer = useRef<number | undefined>(undefined);
   const pinchRef = useRef<{ distance: number; pps: number } | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
+  // Long-press a main clip, then drag it sideways to reorder (CapCut).
+  const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
+  const dragRef = useRef<{ id: string; x0: number; dx: number } | null>(null);
+  const pressTimer = useRef<number | undefined>(undefined);
+  const [cover, setCover] = useState(() => getProjectPreview(project.id)?.cover ? getProjectPreview(project.id)?.image ?? null : null);
+
+  // While reordering, stop the finger from scrolling the timeline.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const block = (e: TouchEvent) => {
+      if (dragRef.current) e.preventDefault();
+    };
+    el.addEventListener("touchmove", block, { passive: false });
+    return () => el.removeEventListener("touchmove", block);
+  }, []);
 
   const half = width / 2;
   // A reopened project can report 0 until its next edit, so also measure the clips.
@@ -79,7 +98,7 @@ export function PhoneTimeline({
     0,
   );
   const selectedIds = useMemo(
-    () => new Set(selectedItems.filter((i) => i.type === "clip").map((i) => i.id)),
+    () => new Set(selectedItems.filter((i) => i.type === "clip" || i.type === "text-clip" || i.type === "shape-clip").map((i) => i.id)),
     [selectedItems],
   );
   const mediaById = useMemo(
@@ -217,6 +236,75 @@ export function PhoneTimeline({
     window.addEventListener("pointerup", up);
   };
 
+  const justDragged = useRef(false);
+
+  /** Drop a dragged main clip: order the clips by their centres, with the dragged one shifted. */
+  const dropClip = async (id: string, dx: number) => {
+    const track = lanes.mainTrack;
+    if (!track) return;
+    const clips = [...lanes.main].sort((a, b) => a.startTime - b.startTime);
+    const centreOf = (c: Clip) => c.startTime + c.duration / 2 + (c.id === id ? dx / pps : 0);
+    const order = [...clips].sort((a, b) => centreOf(a) - centreOf(b)).map((c) => c.id);
+    if (order.every((clipId, i) => clipId === clips[i].id)) return;
+    await reorderTrackClips(track.id, order);
+  };
+
+  const startPress = (clip: Clip) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (lanes.main.length < 2) return;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const cleanup = () => {
+      window.clearTimeout(pressTimer.current);
+      window.removeEventListener("pointermove", cancelIfMoved);
+      window.removeEventListener("pointerup", cleanup);
+      window.removeEventListener("pointercancel", cleanup);
+    };
+    const cancelIfMoved = (ev: PointerEvent) => {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) cleanup();
+    };
+    cleanup();
+    window.addEventListener("pointermove", cancelIfMoved);
+    window.addEventListener("pointerup", cleanup);
+    window.addEventListener("pointercancel", cleanup);
+    pressTimer.current = window.setTimeout(() => {
+      cleanup();
+      navigator.vibrate?.(15);
+      dragRef.current = { id: clip.id, x0, dx: 0 };
+      setDrag({ id: clip.id, dx: 0 });
+      const move = (ev: PointerEvent) => {
+        if (!dragRef.current) return;
+        dragRef.current.dx = ev.clientX - x0;
+        setDrag({ id: clip.id, dx: dragRef.current.dx });
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        const done = dragRef.current;
+        dragRef.current = null;
+        setDrag(null);
+        justDragged.current = true;
+        window.setTimeout(() => (justDragged.current = false), 50);
+        if (done) void dropClip(done.id, done.dx);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }, 380);
+  };
+
+  /** CapCut's Cover: the frame on the preview becomes the project's picture on the home screen. */
+  const setCoverFromPreview = () => {
+    const canvases = [...document.querySelectorAll<HTMLCanvasElement>("[data-preview-screen] canvas")];
+    const canvas = canvases.sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    if (!canvas) return;
+    const image = setProjectCover(project, canvas);
+    if (!image) return;
+    setCover(image);
+    toast.success("Cover set", "This frame now shows on your home screen.");
+  };
+  const coverImage = cover ?? thumbnailAt(mediaById.get(lanes.main[0]?.mediaId ?? ""), 0);
+
   const step = labelStep(pps);
   const rulerEnd = Math.max(duration, (width / pps) * 0.6);
   const ticks: number[] = [];
@@ -316,10 +404,26 @@ export function PhoneTimeline({
                     void muteTrack(lanes.mainTrack!.id, !mainMuted);
                   }}
                   className="absolute top-1/2 flex w-12 -translate-y-1/2 flex-col items-center gap-0.5 text-fg-2"
-                  style={{ left: -78 }}
+                  style={{ left: -136 }}
                 >
                   {mainMuted ? <VolumeX size={20} aria-hidden /> : <Volume2 size={20} aria-hidden />}
                   <span className="text-[10px] leading-tight">{mainMuted ? "Unmute" : "Mute clip"}</span>
+                </button>
+              )}
+              {lanes.main.length > 0 && (
+                <button
+                  type="button"
+                  aria-label="Set cover"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCoverFromPreview();
+                  }}
+                  className="absolute top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg bg-bg-3 bg-cover bg-center text-white"
+                  style={{ left: -76, backgroundImage: coverImage ? `url("${coverImage}")` : undefined }}
+                >
+                  <span aria-hidden className="absolute inset-0 bg-black/45" />
+                  <Pencil size={14} className="relative" aria-hidden />
+                  <span className="relative text-[10px] font-medium">Cover</span>
                 </button>
               )}
               {lanes.main.length === 0 && (
@@ -352,15 +456,19 @@ export function PhoneTimeline({
                     tabIndex={0}
                     aria-label={`Select ${media?.name ?? "clip"}`}
                     aria-pressed={selected}
+                    onPointerDown={startPress(clip)}
+                    onContextMenu={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      selectClip(clip.id, clip.trackId);
+                      if (!justDragged.current) selectClip(clip.id, clip.trackId);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") selectClip(clip.id, clip.trackId);
                     }}
-                    className={`absolute inset-y-0 overflow-visible ${selected ? "z-20" : ""}`}
-                    style={{ left, width: clipWidth }}
+                    className={`absolute inset-y-0 select-none overflow-visible ${selected ? "z-20" : ""} ${
+                      drag?.id === clip.id ? "z-40 scale-105 opacity-90 shadow-xl ring-2 ring-accent transition-transform" : ""
+                    }`}
+                    style={{ left, width: clipWidth, translate: drag?.id === clip.id ? `${drag.dx}px 0` : undefined }}
                   >
                     <div className={`flex h-full overflow-hidden bg-bg-3 ${selected ? "rounded-none" : "rounded-md"}`}>
                       {Array.from({ length: tiles }, (_, i) => {

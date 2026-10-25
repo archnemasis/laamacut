@@ -11,6 +11,8 @@ export interface ProjectPreview {
   image: string | null;
   width: number;
   height: number;
+  /** Chosen with the phone editor's Cover button; auto-saves keep it. */
+  cover?: boolean;
 }
 
 function readAll(): Record<string, ProjectPreview> {
@@ -65,7 +67,25 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Use the frame on `source` (the preview canvas) as the project's cover. */
+export function setProjectCover(project: Project, source: CanvasImageSource & { width: number; height: number }): string | null {
+  const { width, height } = project.settings;
+  const scale = MAX_SIZE / Math.max(width, height);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  const image = canvas.toDataURL("image/jpeg", 0.8);
+  const previews = readAll();
+  previews[project.id] = { image, width, height, cover: true };
+  writeAll(previews);
+  return image;
+}
+
 export async function captureProjectPreview(project: Project): Promise<void> {
+  if (readAll()[project.id]?.cover) return;
   const { width, height } = project.settings;
   const url = firstPictureUrl(project);
   let image: string | null = null;

@@ -39,6 +39,34 @@ export function canvasForMedia(media: Pick<MediaItem, "metadata">): { width: num
 }
 
 /**
+ * Lay a track's clips end to end in `orderedIds` order, starting where the
+ * first clip starts now, as one undo step. Clips are parked past the end
+ * first so no move lands on top of another clip.
+ */
+export async function reorderTrackClips(trackId: string, orderedIds: readonly string[]): Promise<void> {
+  const store = useProjectStore.getState();
+  const track = store.project.timeline.tracks.find((t) => t.id === trackId);
+  if (!track) return;
+  const byId = new Map(track.clips.map((c) => [c.id, c] as const));
+  const clips = orderedIds.map((id) => byId.get(id)).filter((c): c is NonNullable<typeof c> => Boolean(c));
+  if (clips.length < 2) return;
+  const start = Math.min(...clips.map((c) => c.startTime));
+  let park = trackEnd(track) + 10;
+  const parked = clips.map((clip) => {
+    const move = { clipId: clip.id, startTime: park, trackId };
+    park += clip.duration + 1;
+    return move;
+  });
+  let at = start;
+  const placed = clips.map((clip) => {
+    const move = { clipId: clip.id, startTime: at, trackId };
+    at += clip.duration;
+    return move;
+  });
+  await store.moveClips([...parked, ...placed]);
+}
+
+/**
  * Import files in the order they were picked and lay them end to end on the
  * main track. On an empty project the canvas takes the first picture's shape.
  * Returns how many files were added.
