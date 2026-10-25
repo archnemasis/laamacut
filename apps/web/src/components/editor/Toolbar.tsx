@@ -33,7 +33,7 @@ import { startNewProject } from "../../desktop/start/desktop-project-actions";
 import { requestPhoneMediaPicker } from "../../services/phone-media";
 import { CompressDialog } from "./CompressDialog";
 import { deriveSourceExportMatch } from "../../services/export-source-match";
-import { useExportRunner, extForFormat, exportFilename, mimeForExt, type ExportDeliveryMode, type ExportFileHandler } from "../../services/export-runner";
+import { useExportRunner, warmUpExport, extForFormat, exportFilename, mimeForExt, type ExportDeliveryMode, type ExportFileHandler } from "../../services/export-runner";
 import { ExportSavedDialog } from "./ExportSavedDialog";
 import { ScreenRecorder } from "./ScreenRecorder";
 import { HistoryPanel } from "./inspector/HistoryPanel";
@@ -352,6 +352,8 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
     setPhoneSettingsOpen(false);
     releaseExportedVideo();
     const current = useProjectStore.getState().project;
+    // The encoder, fonts and full-size originals load while you type the name.
+    warmUpExport(current);
     setPhoneRun({
       status: "naming",
       label: RESOLUTIONS.find((r) => r.value === phoneChoice.resolution)?.label ?? `${phoneChoice.resolution}p`,

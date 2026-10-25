@@ -145,7 +145,11 @@ function SavedPlayer({ url, still, aspect }: { url?: string; still?: string; asp
  */
 export function PhoneExportScreen({ status, progress, label, still, videoUrl, location, aspect, error, name, onName, onBack, onDone, onNewProject, onExportOptions }: PhoneExportScreenProps) {
   // The runner reports per phase, so progress can dip; the screen only counts up.
+  // Each new export starts the count again from 0.
   const peak = useRef(0);
+  const lastStatus = useRef(status);
+  if (status === "exporting" && lastStatus.current !== "exporting") peak.current = 0;
+  lastStatus.current = status;
   if (status === "naming") peak.current = 0;
   else peak.current = Math.max(peak.current, Math.min(100, progress));
   const percent = peak.current;

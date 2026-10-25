@@ -60,11 +60,40 @@ function progressCallback(requestId: string) {
   };
 }
 
+/** Where the Android app keeps its built-in copy of the fast model (see fetch-caption-model.mjs). */
+const BUNDLED_PATH = "/models/";
+
+/** True when this app was installed with the model built in (the Android app). */
+async function hasBundledModel(modelId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${BUNDLED_PATH}${modelId}/config.json`);
+    return response.ok && (response.headers.get("content-type") ?? "").includes("json");
+  } catch {
+    return false;
+  }
+}
+
 async function createWhisperModel(
   requestId: string,
   modelKey: WhisperModelKey,
 ): Promise<LoadedWhisperModel> {
   const modelId = WHISPER_MODELS[modelKey].id;
+  if (modelKey === "fast" && (await hasBundledModel(modelId))) {
+    // Built into the app: nothing to download, works offline.
+    env.allowLocalModels = true;
+    env.allowRemoteModels = false;
+    env.localModelPath = BUNDLED_PATH;
+    const wasm = env.backends.onnx.wasm;
+    if (wasm) wasm.wasmPaths = `${BUNDLED_PATH}ort/`;
+    const transcriber = await createPipeline("automatic-speech-recognition", modelId, {
+      device: "wasm",
+      dtype: "q8",
+      progress_callback: progressCallback(requestId),
+    });
+    return { transcriber, backend: "wasm" };
+  }
+  env.allowLocalModels = false;
+  env.allowRemoteModels = true;
   const canUseWebGPU = modelKey === "accurate" && "gpu" in navigator;
 
   if (canUseWebGPU) {

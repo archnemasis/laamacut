@@ -176,11 +176,11 @@ public class GalleryPlugin extends Plugin {
     }
 
     /** A preview copy only needs to look right on a phone screen, so it's encoded lighter. */
-    private static final int PREVIEW_BITRATE = 3_000_000;
+    private static final int PREVIEW_BITRATE = 2_000_000;
 
     /**
      * Make a small preview copy of a video with the phone's hardware encoder
-     * (H.264, `height` lines tall, default 720) for smooth editing on slower
+     * (H.264, `height` lines tall, default 540) for smooth editing on slower
      * phones. Exports keep using the original. Resolves to the copy's file://
      * path, or to no path when the video is already that small and needs no copy.
      */
@@ -188,7 +188,7 @@ public class GalleryPlugin extends Plugin {
     @PluginMethod
     public void compress(PluginCall call) {
         String uri = call.getString("uri");
-        int height = call.getInt("height", 720);
+        int height = call.getInt("height", 540);
         if (uri == null) {
             call.reject("Missing uri");
             return;

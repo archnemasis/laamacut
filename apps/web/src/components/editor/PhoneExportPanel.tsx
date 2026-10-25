@@ -7,7 +7,7 @@ export const RESOLUTIONS = [
   { value: 1440, label: "2K" },
   { value: 2160, label: "4K" },
 ] as const;
-export const FRAME_RATES = [24, 25, 30, 50, 60] as const;
+export const FRAME_RATES = [24, 25, 30, 50, 60, 120] as const;
 export const BITRATES = [5, 10, 20, 50, 100] as const;
 
 export interface PhoneExportChoice {
@@ -40,7 +40,7 @@ export function savePhoneExportChoice(choice: PhoneExportChoice): void {
 /** CapCut's recommended bitrate for a resolution and frame rate, in Mbps. */
 export function recommendedBitrate(resolution: number, frameRate: number): number {
   const base = resolution >= 2160 ? 40 : resolution >= 1440 ? 20 : resolution >= 1080 ? 12 : resolution >= 720 ? 6 : 3;
-  return Math.round(base * (frameRate > 30 ? 1.5 : 1));
+  return Math.round(base * (frameRate > 60 ? 2 : frameRate > 30 ? 1.5 : 1));
 }
 
 /** Export settings for the choice, keeping the project's shape with `resolution` as the short side. */

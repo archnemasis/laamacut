@@ -1,5 +1,12 @@
 import type { MediaItem, Project, Track } from "@openreel/core";
+import { create } from "zustand";
 import { useProjectStore } from "../stores/project-store";
+
+/**
+ * What the phone editor shows while picked media loads in after the picker
+ * closes: a black preview with this message, and no touches until it's done.
+ */
+export const usePhoneImportStore = create<{ loading: string | null }>(() => ({ loading: null }));
 
 let pickerRequested = false;
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "@/icons/lucide-compat";
-import { addMediaFilesToTimeline } from "../../services/phone-media";
+import { addMediaFilesToTimeline, usePhoneImportStore } from "../../services/phone-media";
 import {
   applyGalleryVideoExtras,
   galleryItemToFile,
@@ -69,7 +69,7 @@ function GalleryThumb({ uri, cache }: { uri: string; cache: Map<string, string> 
  * asking for permission) with Videos and Photos tabs; elsewhere it uses the
  * system file picker. Tap to select in order; Add lays them end to end.
  */
-export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
+export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => void }) {
   const gallery = getGallery();
   const [tab, setTab] = useState<GalleryKind>("video");
   const [access, setAccess] = useState<GalleryAccess | "checking">(gallery ? "checking" : "denied");
@@ -77,7 +77,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
   const [exhausted, setExhausted] = useState<Record<GalleryKind, boolean>>({ video: false, photo: false });
   const [fileTiles, setFileTiles] = useState<Tile[]>([]);
   const [order, setOrder] = useState<string[]>([]);
-  const [progress, setProgress] = useState<string | null>(null);
+  const progress = usePhoneImportStore((s) => s.loading);
   const [hd, setHd] = useState(loadHdPreference);
   const thumbCache = useRef(new Map<string, string>()).current;
   const loading = useRef<Record<GalleryKind, boolean>>({ video: false, photo: false });
@@ -156,12 +156,16 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
   const handleAdd = async () => {
     const picked = order.map((key) => tileByKey.get(key)).filter((t): t is Tile => Boolean(t));
     if (picked.length === 0) return;
+    // Straight back to the editor, like CapCut: it shows a black preview and
+    // blocks touches until everything below has loaded in.
+    const setProgress = (loading: string | null) => usePhoneImportStore.setState({ loading });
+    onClose(true);
     try {
       // Gallery videos get phone-decoded filmstrip frames so the timeline shows
-      // pictures from the start. With HD off the phone's 720p copy becomes the
+      // pictures from the start. With HD off the phone's small copy becomes the
       // clip while editing, so the full-size original never loads into memory
       // (that keeps lower-end phones smooth). Export reads the original.
-      setProgress(hd ? "Preparing videos" : "Preparing videos for smooth editing");
+      setProgress("Loading videos");
       const extras = await Promise.all(
         picked.map((tile) =>
           tile.galleryItem && tile.kind === "video" ? prepareGalleryVideo(tile.galleryItem.uri, hd) : undefined,
@@ -179,13 +183,12 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
       await addMediaFilesToTimeline(files, (index, mediaId) => {
         const prepared = extras[index];
         if (prepared) applyGalleryVideoExtras(mediaId, { filmstrip: prepared.filmstrip });
-        // Edited with the 720p copy; export swaps the original back in.
+        // Edited with the small copy; export swaps the original back in.
         const tile = picked[index];
         if (prepared?.previewCopy && tile.galleryItem) rememberGalleryOriginal(mediaId, tile.galleryItem);
       });
     } finally {
       setProgress(null);
-      onClose();
     }
   };
 
@@ -194,7 +197,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
   return (
     <div role="dialog" aria-label="Add media" className="fixed inset-0 z-[200] flex flex-col bg-bg text-fg">
       <header className="flex h-14 shrink-0 items-center px-2">
-        <button type="button" aria-label="Close" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full">
+        <button type="button" aria-label="Close" onClick={() => onClose()} className="grid h-11 w-11 place-items-center rounded-full">
           <X size={26} aria-hidden />
         </button>
         <span className="mx-auto pr-11 text-[17px] font-semibold">{hasGallery ? "Gallery" : "Add media"}</span>
@@ -323,7 +326,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
             role="switch"
             aria-checked={hd}
             aria-label="HD"
-            title={hd ? "Full resolution: best quality, may lag on slower phones" : "Smooth editing: videos are compressed to 720p. Turn on HD for full resolution"}
+            title={hd ? "Full resolution: best quality, may lag on slower phones" : "Smooth editing: videos are compressed to 540p. Turn on HD for full resolution"}
             onClick={() => {
               saveHdPreference(!hd);
               setHd(!hd);

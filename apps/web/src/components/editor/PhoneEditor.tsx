@@ -27,6 +27,7 @@ import {
   Shuffle,
   SlidersHorizontal,
   Captions,
+  Loader2,
   Maximize,
   Music,
   Plus,
@@ -49,7 +50,7 @@ import { PhoneGestures } from "./PhoneGestures";
 import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
 import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
-import { takePhoneMediaPickerRequest } from "../../services/phone-media";
+import { takePhoneMediaPickerRequest, usePhoneImportStore } from "../../services/phone-media";
 import { autoSaveManager } from "../../services/auto-save";
 import { captureProjectPreview } from "../../services/project-previews";
 import { useRouter } from "../../hooks/use-router";
@@ -211,14 +212,15 @@ export const PhoneEditor: React.FC = () => {
     }
   }, []);
   // Backing out of the picker on a new, still-empty project returns home.
-  const closePicker = () => {
+  const closePicker = (adding?: boolean) => {
     setPickerOpen(false);
     const empty = (useProjectStore.getState().project.timeline.duration ?? 0) === 0;
-    if (startedFromNewProject.current && empty) navigate("welcome");
+    if (startedFromNewProject.current && empty && !adding) navigate("welcome");
     startedFromNewProject.current = false;
   };
 
   const project = useProjectStore((s) => s.project);
+  const importing = usePhoneImportStore((s) => s.loading);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
   const canUndo = useProjectStore((s) => s.canUndo);
@@ -451,6 +453,12 @@ export const PhoneEditor: React.FC = () => {
         <PanelErrorBoundary name="Stage">
           <Preview />
         </PanelErrorBoundary>
+        {importing && (
+          <div role="status" className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black text-white/80">
+            <Loader2 size={28} className="animate-spin" aria-hidden />
+            <span className="text-[13px]">{importing}</span>
+          </div>
+        )}
         {selectedVisual && !isPlaying && (
           <PhoneGestures selectedId={selectedVisual.id} onTapText={(clipId) => setTextEdit({ clipId, isNew: false })} />
         )}
@@ -534,6 +542,9 @@ export const PhoneEditor: React.FC = () => {
         )}
 
         {pickerOpen && <PhoneMediaPicker onClose={closePicker} />}
+
+        {/* Nothing can be touched until picked media has loaded in. */}
+        {importing && <div aria-hidden className="fixed inset-0 z-[500]" onPointerDownCapture={(e) => e.preventDefault()} />}
 
         {textEdit && (
           <div className="absolute inset-0 z-[110]">

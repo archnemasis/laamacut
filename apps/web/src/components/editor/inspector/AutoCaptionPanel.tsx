@@ -28,8 +28,24 @@ import {
   isWhisperModelKey,
   type WhisperModelKey,
 } from "../../../workers/whisper-models";
+import { CAPTION_LOOKS, DEFAULT_CAPTION_LOOK, captionLookById, type CaptionLook } from "../../../services/caption-looks";
 
-const CAPTION_STYLE_PRESETS = ["default", "modern", "bold", "cinematic", "minimal"] as const;
+/** How a caption look's tile shows it: a small sample with its colours, outline and shadow. */
+function captionLookPreview(look: CaptionLook): React.CSSProperties {
+  const { style } = look;
+  const stroke = Math.min(3, (style.strokeWidth ?? 0) / 2.5);
+  return {
+    fontFamily: style.fontFamily,
+    fontWeight: style.fontWeight,
+    color: style.color,
+    backgroundColor: style.backgroundColor,
+    padding: style.backgroundColor ? "1px 3px" : undefined,
+    WebkitTextStroke: stroke > 0 && style.strokeColor ? `${stroke}px ${style.strokeColor}` : undefined,
+    paintOrder: "stroke fill",
+    textShadow: style.shadowColor ? `0 ${Math.min(3, style.shadowOffsetY ?? 0)}px ${Math.min(8, style.shadowBlur ?? 0)}px ${style.shadowColor}` : undefined,
+  };
+}
+
 const WHISPER_LANGUAGES = [
   { code: "en", name: "English" },
   { code: "fr", name: "French" },
@@ -59,6 +75,9 @@ interface WorkerChunk {
 
 type WorkerState = "idle" | "loading" | "ready";
 
+/** The Android app ships the fast model, so it loads instead of downloading. */
+const builtInModel = (): boolean => typeof window !== "undefined" && Boolean(window.Capacitor?.convertFileSrc);
+
 export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
   clipId,
   maxWordsPerLine = 5,
@@ -72,9 +91,10 @@ export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [selectedStyle, setSelectedStyle] = useState<string>("default");
-  const [selectedModel, setSelectedModel] = useState<WhisperModelKey>(
-    DEFAULT_WHISPER_MODEL,
+  const [selectedLook, setSelectedLook] = useState<string>(DEFAULT_CAPTION_LOOK.id);
+  // The Android app has the fast model built in; the big one is too heavy for phones.
+  const [selectedModel, setSelectedModel] = useState<WhisperModelKey>(() =>
+    builtInModel() ? "fast" : DEFAULT_WHISPER_MODEL,
   );
   const [readyModels, setReadyModels] = useState<Set<WhisperModelKey>>(
     () => new Set(),
@@ -123,7 +143,7 @@ export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
             const rawProgress = Number(event.data.progress ?? 0);
             setProgress(rawProgress > 1 ? rawProgress / 100 : rawProgress);
             const file = String(event.data.file ?? "caption model").split("/").pop();
-            setProgressMessage(`Downloading ${file || "caption model"}…`);
+            setProgressMessage(`${builtInModel() && selectedModel === "fast" ? "Loading" : "Downloading"} ${file || "caption model"}…`);
           } else if (messageType === "transcription-progress") {
             setWorkerState("ready");
             setProgress(Number(event.data.progress ?? 0));
@@ -252,7 +272,7 @@ export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
       setProgressMessage(
         workerState === "ready"
           ? `Transcribing with ${WHISPER_MODELS[selectedModel].shortLabel}…`
-          : `Downloading ${WHISPER_MODELS[selectedModel].shortLabel}, then transcribing…`,
+          : `${builtInModel() && selectedModel === "fast" ? "Loading" : "Downloading"} ${WHISPER_MODELS[selectedModel].shortLabel}, then transcribing…`,
       );
       const result = await runWorker("transcribe", samples);
       const sourceDuration = Math.max(0.1, sourceEnd - sourceStart);
@@ -302,7 +322,8 @@ export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
 
   const handleAddToTimeline = useCallback(async () => {
     if (!clip || segments.length === 0) return;
-    const style = SUBTITLE_STYLE_PRESETS[selectedStyle] ?? SUBTITLE_STYLE_PRESETS.default;
+    const style = SUBTITLE_STYLE_PRESETS.default;
+    const look = captionLookById(selectedLook);
     let addedCount = 0;
     for (const segment of segments) {
       const cues = splitCaptionIntoSingleLineCues(
@@ -326,13 +347,14 @@ export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
             captionMaxWordsPerLine: maxWordsPerLine,
             captionWhisperModel: selectedModel,
           },
+          look,
         );
         addedCount += 1;
       }
     }
     setSegments([]);
     setProgressMessage(`${addedCount} single-line caption clips added`);
-  }, [addSubtitle, clip, maxWordsPerLine, segments, selectedModel, selectedStyle]);
+  }, [addSubtitle, clip, maxWordsPerLine, segments, selectedModel, selectedLook]);
 
   const modelStatus = useMemo(() => {
     const model = WHISPER_MODELS[selectedModel];
@@ -341,6 +363,7 @@ export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
       return `Downloaded and cached${backend ? ` · ${backend === "webgpu" ? "GPU" : "CPU"}` : ""}`;
     }
     if (workerState === "loading") return progressMessage || "Downloading model…";
+    if (builtInModel() && selectedModel === "fast") return `Built into the app · ${model.description}`;
     return `${model.downloadSize} · ${model.description}`;
   }, [modelBackends, progressMessage, selectedModel, workerState]);
 
@@ -427,21 +450,26 @@ export const AutoCaptionPanel: React.FC<AutoCaptionPanelProps> = ({
             }))}
           />
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="space-y-1.5">
           <Text type="supporting" color="secondary" className="text-[10px]">Caption style</Text>
-          <Selector
-            label="Caption style"
-            isLabelHidden
-            size="sm"
-            width={132}
-            value={selectedStyle}
-            onChange={setSelectedStyle}
-            isDisabled={isTranscribing}
-            options={CAPTION_STYLE_PRESETS.map((preset) => ({
-              label: preset[0].toUpperCase() + preset.slice(1),
-              value: preset,
-            }))}
-          />
+          <div role="radiogroup" aria-label="Caption style" className="grid grid-cols-5 gap-1.5">
+            {CAPTION_LOOKS.map((look) => (
+              <button
+                key={look.id}
+                type="button"
+                role="radio"
+                aria-checked={selectedLook === look.id}
+                aria-label={look.label}
+                title={look.label}
+                disabled={isTranscribing}
+                onClick={() => setSelectedLook(look.id)}
+                className={`flex aspect-square flex-col items-center justify-center gap-0.5 overflow-hidden rounded-md bg-[#2b2b2b] ${selectedLook === look.id ? "ring-2 ring-primary" : ""}`}
+              >
+                <span className="text-[15px] leading-none" style={captionLookPreview(look)}>Aa</span>
+                <span className="text-[8px] text-white/60">{look.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
 

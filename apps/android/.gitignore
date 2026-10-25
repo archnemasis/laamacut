@@ -5,3 +5,6 @@ android/keystore.properties
 
 # Built APKs
 release/
+
+# Auto-captions model, fetched by scripts/fetch-caption-model.mjs
+android/app/src/models/

@@ -21,7 +21,7 @@ export type SubtitleSlice = Pick<
 
 export function createSubtitleSlice(_set: Set, get: Get): SubtitleSlice {
   return {
-    addSubtitle: async (subtitle, metadata) => {
+    addSubtitle: async (subtitle, metadata, look) => {
       const { project, addTrack, createTextClip } = get();
 
       let captionsTrack = project.timeline.tracks.find(
@@ -64,12 +64,17 @@ export function createSubtitleSlice(_set: Set, get: Get): SubtitleSlice {
               fontFamily: style.fontFamily,
               fontSize: style.fontSize,
               color: style.color,
-              backgroundColor: style.backgroundColor || undefined,
+              backgroundColor: look ? look.style.backgroundColor : style.backgroundColor || undefined,
             } : {}),
+          // A caption look adds its outline, shadow and font on top.
+          ...look?.style,
           textAlign: "center",
         },
         metadata,
       );
+      if (created && look && look.animation !== "none") {
+        get().applyTextAnimationPreset(created.id, look.animation, 0.4, 0);
+      }
       if (created) {
         get().updateTextTransform(created.id, { position: { x: 0.5, y: style?.position === "top" ? 0.15 : style?.position === "center" ? 0.5 : 0.85 } });
       }

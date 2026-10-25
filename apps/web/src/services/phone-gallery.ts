@@ -32,7 +32,7 @@ export function getGallery(): GalleryPlugin | undefined {
 
 const HD_KEY = "laamacut-phone-hd";
 
-/** HD off (the default) edits with 720p preview copies; exports always use the original. */
+/** HD off (the default) edits with 540p preview copies; exports always use the original. */
 export function loadHdPreference(): boolean {
   try {
     return localStorage.getItem(HD_KEY) === "1";
@@ -52,14 +52,27 @@ export function saveHdPreference(hd: boolean): void {
 /** What the phone prepares for a gallery video before it goes on the timeline. */
 export interface GalleryVideoExtras {
   filmstrip: { timestamp: number; url: string }[];
-  /** 720p copy for smooth editing playback (HD off). */
+  /** 540p copy for smooth editing playback (HD off). */
   previewCopy?: Blob;
 }
 
 /**
- * Have the phone decode filmstrip frames and, with HD off, encode a 720p
+ * Preview copies are made one at a time: phones have only a couple of hardware
+ * encoders, and copies started together fall back to the much slower software one.
+ */
+let copyQueue: Promise<unknown> = Promise.resolve();
+function queueCopy<T>(start: () => Promise<T>): Promise<T> {
+  const next = copyQueue.catch(() => undefined).then(start);
+  copyQueue = next;
+  return next;
+}
+const PREVIEW_HEIGHT = 540;
+
+/**
+ * Have the phone decode filmstrip frames and, with HD off, encode a 540p
  * preview copy. Either may fail on unusual files; the clip still imports.
  */
+
 export async function prepareGalleryVideo(uri: string, hd: boolean): Promise<GalleryVideoExtras> {
   const gallery = getGallery();
   const convert = window.Capacitor?.convertFileSrc;
@@ -70,8 +83,7 @@ export async function prepareGalleryVideo(uri: string, hd: boolean): Promise<Gal
     .catch(() => []);
   const previewCopy = hd
     ? Promise.resolve(undefined)
-    : gallery
-        .compress({ uri, height: 720 })
+    : queueCopy(() => gallery.compress({ uri, height: PREVIEW_HEIGHT }))
         .then(async ({ path }) => {
           if (!path) return undefined;
           try {

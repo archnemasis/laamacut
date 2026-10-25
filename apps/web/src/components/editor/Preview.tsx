@@ -6422,6 +6422,7 @@ export const Preview: React.FC = () => {
       centerX,
       centerY,
       displayScale,
+      rotation: transform.rotation ?? 0,
     };
   }, [
     selectedClip,
@@ -6496,6 +6497,7 @@ export const Preview: React.FC = () => {
       centerX,
       centerY,
       displayScale,
+      rotation: transform.rotation ?? 0,
       isTextClip: true,
     };
   }, [selectedTextClip, settings.width, settings.height, canvasSize, getTitleEngine]);
@@ -7869,6 +7871,8 @@ export const Preview: React.FC = () => {
                 top: clipBounds.y,
                 width: clipBounds.width,
                 height: clipBounds.height,
+                // The box turns with the picture.
+                transform: clipBounds.rotation ? `rotate(${clipBounds.rotation}deg)` : undefined,
               }}
             >
               {/* Selection border */}
@@ -7953,6 +7957,8 @@ export const Preview: React.FC = () => {
                 top: textClipBounds.y,
                 width: textClipBounds.width,
                 height: textClipBounds.height,
+                // The box turns with the text.
+                transform: textClipBounds.rotation ? `rotate(${textClipBounds.rotation}deg)` : undefined,
               }}
             >
               {/* Selection border */}

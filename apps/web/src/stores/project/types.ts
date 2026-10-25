@@ -308,6 +308,7 @@ export interface ProjectState {
   addSubtitle: (
     subtitle: Subtitle,
     metadata?: import("@openreel/core").ClipMetadata,
+    look?: import("../../services/caption-looks").CaptionLook,
   ) => Promise<void>;
   removeSubtitle: (subtitleId: string) => void;
   updateSubtitle: (subtitleId: string, updates: Partial<Subtitle>) => void;

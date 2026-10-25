@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ensureProjectFonts } from "./project-fonts";
-import { withGalleryOriginals } from "./gallery-originals";
+import { prefetchGalleryOriginals, withGalleryOriginals } from "./gallery-originals";
 import {
   getExportEngine,
   type VideoExportSettings,
@@ -452,6 +452,16 @@ export interface UseExportRunner {
   resetError: () => void;
 }
 
+/**
+ * Get the slow parts of an export going before it is started (while the
+ * phone asks for a name): the encoder, the project's fonts and its originals.
+ */
+export function warmUpExport(project: Project): void {
+  void getExportEngine().initialize().catch(() => undefined);
+  void ensureProjectFonts(project).catch(() => undefined);
+  prefetchGalleryOriginals(project);
+}
+
 export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
   const { project, onExported } = options;
   const [state, setState] = useState<ExportRunnerState>(INITIAL_STATE);
@@ -519,6 +529,8 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
     setState((prev) => ({
       ...prev,
       isExporting: false,
+      // A retry starts again from 0, not from where this one stopped.
+      progress: 0,
       error: error instanceof Error ? error.message : "Export failed",
     }));
   }, []);
@@ -550,7 +562,7 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
         checkCurrent();
         await ensureProjectFonts(project);
         checkCurrent();
-        // Phone clips are edited with a 720p copy; export renders the originals.
+        // Phone clips are edited with a small copy; export renders the originals.
         const exportProject = await withGalleryOriginals(project);
         checkCurrent();
         generator = engine.exportVideo(exportProject, videoSettings, writableStream);
@@ -583,7 +595,10 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
         throw error;
       } finally {
         // Closing a generator runs cleanup if cancellation lands at a yield.
-        try { await generator?.return({ success: false }); } catch { /* Preserve the original failure. */ }
+        // A cleanup that never settles must not block the next export forever.
+        try {
+          await Promise.race([generator?.return({ success: false }), new Promise((resolve) => setTimeout(resolve, 3000))]);
+        } catch { /* Preserve the original failure. */ }
         running.current = false;
         if (activeWritable.current === writableStream) activeWritable.current = null;
       }

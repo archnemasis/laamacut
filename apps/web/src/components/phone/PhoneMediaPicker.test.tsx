@@ -20,7 +20,10 @@ vi.mock("../../stores/project-store", () => ({
     },
   },
 }));
-vi.mock("../../services/phone-media", () => ({ addMediaFilesToTimeline }));
+vi.mock("../../services/phone-media", async () => {
+  const { create } = await import("zustand");
+  return { addMediaFilesToTimeline, usePhoneImportStore: create(() => ({ loading: null })) };
+});
 
 import { PhoneMediaPicker } from "./PhoneMediaPicker";
 
@@ -79,7 +82,8 @@ describe("PhoneMediaPicker gallery", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Select cat.jpg" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    // Straight back to the editor, which shows the loading state.
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith(true));
     const files = addMediaFilesToTimeline.mock.calls[0][0];
     expect(files.map((f) => f.name)).toEqual(["party.mp4", "beach.mp4", "cat.jpg"]);
 
@@ -90,8 +94,8 @@ describe("PhoneMediaPicker gallery", () => {
     expect(fetched.some((url) => url.endsWith("content://v/1"))).toBe(false);
     expect(fetched.some((url) => url.endsWith("cache/1.mp4"))).toBe(true);
     expect(adopt).not.toHaveBeenCalled();
-    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/2", height: 720 });
-    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/1", height: 720 });
+    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/2", height: 540 });
+    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/1", height: 540 });
     expect(gallery.discard).toHaveBeenCalledTimes(2);
     // The phone-decoded filmstrip is on the clip before it reaches the timeline.
     expect(projectState.project.mediaLibrary.items[0]).toMatchObject({ thumbnailUrl: "data:image/jpeg;base64,BBBB" });
