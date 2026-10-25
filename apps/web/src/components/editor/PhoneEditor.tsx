@@ -5,11 +5,14 @@ import {
   Copy,
   Film,
   Gauge,
+  Layers,
   LayoutTemplate,
+  Mic,
   Move,
   Palette,
   PaintBucket,
   Pause,
+  Pencil,
   Play,
   Proportions,
   Redo2,
@@ -19,6 +22,7 @@ import {
   Captions,
   Maximize,
   Music,
+  Plus,
   Scissors as EditIcon,
   Sparkles as LooksIcon,
   Sticker,
@@ -33,16 +37,19 @@ import {
 import { Toolbar } from "./Toolbar";
 import { Preview } from "./Preview";
 import { PhoneTimeline } from "./PhoneTimeline";
+import { PhoneTextEditor } from "./PhoneTextEditor";
 import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
 import { takePhoneMediaPickerRequest } from "../../services/phone-media";
 import { useRouter } from "../../hooks/use-router";
-import { AssetsPanel, type AssetsTab } from "./AssetsPanel";
+import { AssetsPanel, DEFAULT_TITLE_STYLE, type AssetsTab } from "./AssetsPanel";
 import { InspectorPanel } from "./InspectorPanel";
+import { VoiceOverPanel } from "./inspector/VoiceOverPanel";
 import { getTabIdsForClipType, type InspectorTabId } from "./inspector/clip-tabs.config";
 import { APPS_BY_RATIO, AppIcon } from "./aspect-apps";
 import { ASPECT_PRESETS, BACKGROUND_SWATCHES } from "./canvas-presets";
 import { PanelErrorBoundary } from "../ErrorBoundary";
 import { useProjectStore } from "../../stores/project-store";
+import { insertTimelineOverlay } from "../../stores/project/insert-timeline-overlay";
 import { useTimelineStore } from "../../stores/timeline-store";
 import { useUIStore } from "../../stores/ui-store";
 import {
@@ -57,7 +64,11 @@ type Sheet =
   | { kind: "assets"; tab: AssetsTab; title: string }
   | { kind: "inspector"; only?: InspectorTabId; title: string }
   | { kind: "ratio"; title: string }
-  | { kind: "background"; title: string };
+  | { kind: "background"; title: string }
+  | { kind: "voiceover"; title: string };
+
+/** CapCut's second-level tool rows, opened from Audio and Text. */
+type Menu = "audio" | "text";
 
 type Tool = { label: string; icon: LucideIcon; onClick: () => void; disabled?: boolean };
 
@@ -80,10 +91,10 @@ function ToolButton({ tool }: { tool: Tool }) {
       type="button"
       onClick={tool.onClick}
       disabled={tool.disabled}
-      className="flex h-full w-[68px] shrink-0 flex-col items-center justify-center gap-1 text-fg disabled:opacity-35"
+      className="flex h-full w-[64px] shrink-0 flex-col items-center justify-center gap-1.5 text-fg disabled:opacity-35"
     >
-      <Icon size={24} strokeWidth={1.6} aria-hidden />
-      <span className="text-[12px] leading-tight">{tool.label}</span>
+      <Icon size={22} strokeWidth={1.5} aria-hidden />
+      <span className="text-[11px] leading-tight">{tool.label}</span>
     </button>
   );
 }
@@ -157,14 +168,18 @@ function BackgroundSheet() {
 
 /**
  * Phone editor in the CapCut layout: top bar, preview, transport row,
- * timeline, and a scrolling tool bar that opens panels as bottom sheets.
- * Selecting a clip swaps the tool bar for clip tools.
+ * timeline, and a scrolling tool bar. Audio and Text open a second row of
+ * tools; selecting a clip swaps the tool bar for clip tools.
  */
 export const PhoneEditor: React.FC = () => {
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [menu, setMenu] = useState<Menu | null>(null);
+  const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean } | null>(null);
   // New projects open straight into the media picker, like CapCut.
   const [pickerOpen, setPickerOpen] = useState(false);
   const startedFromNewProject = useRef(false);
+  const soundInput = useRef<HTMLInputElement>(null);
+  const overlayInput = useRef<HTMLInputElement>(null);
   // The preview only draws a frame on play or seek; ask it to redraw when the
   // editor opens and whenever clips or media change, so a picture always shows.
   const mediaItems = useProjectStore((s) => s.project.mediaLibrary.items);
@@ -203,7 +218,7 @@ export const PhoneEditor: React.FC = () => {
   const previewRef = useRef<HTMLDivElement>(null);
 
   const selectedIds = useMemo(
-    () => selectedItems.filter((item) => item.type === "clip").map((item) => item.id),
+    () => selectedItems.filter((item) => item.type === "clip" || item.type === "text-clip" || item.type === "shape-clip").map((item) => item.id),
     [selectedItems],
   );
   const isPlaying = playbackState === "playing";
@@ -220,6 +235,8 @@ export const PhoneEditor: React.FC = () => {
     }
     return null;
   }, [selectedIds, project.timeline.tracks, project.mediaLibrary.items]);
+  const selectedText =
+    selectedIds.length === 1 && (project.textClips ?? []).some((c) => c.id === selectedIds[0]) ? selectedIds[0] : null;
 
   const canSplit = getSplittableTimelineItemIds(project, selectedIds, playheadPosition).length > 0;
 
@@ -241,20 +258,57 @@ export const PhoneEditor: React.FC = () => {
     if (only) open({ kind: "inspector", only, title });
   };
 
+  /** Add a text clip at the playhead and open the text editor, like CapCut's Add text. */
+  const addText = async () => {
+    const at = useTimelineStore.getState().playheadPosition;
+    const created = await insertTimelineOverlay(at, 3, (trackId) =>
+      useProjectStore.getState().createTextClip(trackId, at, "Enter text", 3, { ...DEFAULT_TITLE_STYLE, fontSize: 72 }),
+    );
+    if (!created) return;
+    setMenu(null);
+    select({ type: "text-clip", id: created.id, trackId: created.trackId });
+    setTextEdit({ clipId: created.id, isNew: true });
+  };
+
+  /** Sounds and Overlay: import the picked files and lay them on new tracks at the playhead. */
+  const addAtPlayhead = async (files: FileList | null) => {
+    if (!files) return;
+    const at = useTimelineStore.getState().playheadPosition;
+    const store = useProjectStore.getState;
+    for (const file of Array.from(files)) {
+      const imported = await store().importMedia(file);
+      if (imported.success && imported.actionId) await store().addClipToNewTrack(imported.actionId, at);
+    }
+    setMenu(null);
+  };
+
   const mainTools: Tool[] = [
     { label: "Edit", icon: EditIcon, onClick: () => openForMainClip(undefined, "Edit") },
-    { label: "Audio", icon: Music, onClick: () => open({ kind: "assets", tab: "media", title: "Audio" }) },
-    { label: "Text", icon: Type, onClick: () => open({ kind: "assets", tab: "text", title: "Text" }) },
+    { label: "Audio", icon: Music, onClick: () => setMenu("audio") },
+    { label: "Text", icon: Type, onClick: () => setMenu("text") },
     { label: "Effects", icon: Zap, onClick: () => open({ kind: "assets", tab: "effects", title: "Effects" }) },
-    { label: "Transitions", icon: Shuffle, onClick: () => open({ kind: "assets", tab: "transitions", title: "Transitions" }) },
+    { label: "Overlay", icon: Layers, onClick: () => overlayInput.current?.click() },
     { label: "Captions", icon: Captions, onClick: () => openForMainClip("ai", "Captions") },
-    { label: "Looks", icon: LooksIcon, onClick: () => open({ kind: "assets", tab: "recipes", title: "Looks" }) },
+    { label: "Filters", icon: LooksIcon, onClick: () => open({ kind: "assets", tab: "recipes", title: "Filters" }) },
     { label: "Adjust", icon: SlidersHorizontal, onClick: () => openForMainClip("color", "Adjust") },
-    { label: "Stickers", icon: Sticker, onClick: () => open({ kind: "assets", tab: "graphics", title: "Stickers" }) },
+    { label: "Transitions", icon: Shuffle, onClick: () => open({ kind: "assets", tab: "transitions", title: "Transitions" }) },
     { label: "Aspect ratio", icon: Proportions, onClick: () => open({ kind: "ratio", title: "Aspect ratio" }) },
     { label: "Background", icon: PaintBucket, onClick: () => open({ kind: "background", title: "Background" }) },
     { label: "Templates", icon: LayoutTemplate, onClick: () => open({ kind: "assets", tab: "templates", title: "Templates" }) },
   ];
+
+  const menuTools: Record<Menu, Tool[]> = {
+    audio: [
+      { label: "Sounds", icon: Music, onClick: () => soundInput.current?.click() },
+      { label: "Record", icon: Mic, onClick: () => open({ kind: "voiceover", title: "Record" }) },
+    ],
+    text: [
+      { label: "Add text", icon: Plus, onClick: () => void addText() },
+      { label: "Auto captions", icon: Captions, onClick: () => openForMainClip("ai", "Auto captions") },
+      { label: "Stickers", icon: Sticker, onClick: () => open({ kind: "assets", tab: "graphics", title: "Stickers" }) },
+      { label: "Text template", icon: Type, onClick: () => open({ kind: "assets", tab: "text", title: "Text template" }) },
+    ],
+  };
 
   const deleteTool: Tool = {
     label: "Delete",
@@ -274,36 +328,48 @@ export const PhoneEditor: React.FC = () => {
         if (!getTabIdsForClipType(mediaKind).includes(entry.section)) return [];
         return [{ label: entry.label, icon: entry.icon, onClick: () => open({ kind: "inspector", only: entry.section, title: entry.label }) }];
       })
-    : [{ label: "Edit", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) }, deleteTool];
+    : [{ label: "Adjust", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) }, deleteTool];
 
-  const clipTools: Tool[] = [
-    {
-      label: "Split",
-      icon: Scissors,
-      disabled: !canSplit,
-      onClick: () => {
-        const store = useProjectStore.getState();
-        void (async () => {
-          for (const id of getSplittableTimelineItemIds(store.project, selectedIds, playheadPosition)) {
-            await splitTimelineItem(store, id, playheadPosition);
-          }
-        })();
-      },
+  const splitTool: Tool = {
+    label: "Split",
+    icon: Scissors,
+    disabled: !canSplit,
+    onClick: () => {
+      const store = useProjectStore.getState();
+      void (async () => {
+        for (const id of getSplittableTimelineItemIds(store.project, selectedIds, playheadPosition)) {
+          await splitTimelineItem(store, id, playheadPosition);
+        }
+      })();
     },
-    ...sectionTools,
-    {
-      label: "Duplicate",
-      icon: Copy,
-      onClick: () => {
-        const store = useProjectStore.getState();
-        void (async () => {
-          for (const id of selectedIds) await duplicateTimelineItem(store, id);
-        })();
-      },
+  };
+  const duplicateTool: Tool = {
+    label: "Duplicate",
+    icon: Copy,
+    onClick: () => {
+      const store = useProjectStore.getState();
+      void (async () => {
+        for (const id of selectedIds) await duplicateTimelineItem(store, id);
+      })();
     },
-  ];
+  };
+
+  const clipTools: Tool[] = selectedText
+    ? [
+        { label: "Edit", icon: Pencil, onClick: () => setTextEdit({ clipId: selectedText, isNew: false }) },
+        splitTool,
+        deleteTool,
+        duplicateTool,
+      ]
+    : [splitTool, ...sectionTools, duplicateTool];
 
   const hasSelection = selectedIds.length > 0;
+  const tools = hasSelection ? clipTools : menu ? menuTools[menu] : mainTools;
+  const back = hasSelection
+    ? { label: "Back to editor tools", onClick: clearSelection }
+    : menu
+      ? { label: "Back to all tools", onClick: () => setMenu(null) }
+      : null;
 
   return (
     <div className="phone-editor flex h-full w-full flex-col overflow-hidden bg-bg text-fg">
@@ -315,14 +381,14 @@ export const PhoneEditor: React.FC = () => {
         </PanelErrorBoundary>
       </div>
 
-      <div className="grid h-14 shrink-0 grid-cols-3 items-center px-3">
+      <div className="grid h-12 shrink-0 grid-cols-3 items-center px-3">
         <button
           type="button"
           aria-label="Full screen preview"
           onClick={() => void previewRef.current?.requestFullscreen?.()}
           className="grid h-10 w-10 place-items-center text-fg"
         >
-          <Maximize size={22} aria-hidden />
+          <Maximize size={20} aria-hidden />
         </button>
         <button
           type="button"
@@ -330,14 +396,14 @@ export const PhoneEditor: React.FC = () => {
           onClick={() => togglePlayback()}
           className="mx-auto grid h-11 w-11 place-items-center rounded-full text-fg"
         >
-          {isPlaying ? <Pause size={26} fill="currentColor" aria-hidden /> : <Play size={26} aria-hidden />}
+          {isPlaying ? <Pause size={24} fill="currentColor" aria-hidden /> : <Play size={24} aria-hidden />}
         </button>
         <div className="flex justify-end gap-1">
           <button type="button" aria-label="Undo" disabled={!canUndo()} onClick={() => void undo()} className="grid h-10 w-10 place-items-center text-fg disabled:opacity-35">
-            <Undo2 size={22} aria-hidden />
+            <Undo2 size={20} aria-hidden />
           </button>
           <button type="button" aria-label="Redo" disabled={!canRedo()} onClick={() => void redo()} className="grid h-10 w-10 place-items-center text-fg disabled:opacity-35">
-            <Redo2 size={22} aria-hidden />
+            <Redo2 size={20} aria-hidden />
           </button>
         </div>
       </div>
@@ -347,31 +413,43 @@ export const PhoneEditor: React.FC = () => {
           <PanelErrorBoundary name="Timeline">
             <PhoneTimeline
               onAddMedia={() => setPickerOpen(true)}
-              onAddAudio={() => open({ kind: "assets", tab: "media", title: "Audio" })}
-              onAddText={() => open({ kind: "assets", tab: "text", title: "Text" })}
+              onAddAudio={() => setMenu("audio")}
+              onAddText={() => void addText()}
+              onEditText={(clipId) => setTextEdit({ clipId, isNew: false })}
             />
           </PanelErrorBoundary>
         </div>
 
-        <nav aria-label={hasSelection ? "Clip tools" : "Editor tools"} className="flex h-[84px] shrink-0 items-stretch bg-bg pb-1">
-          {hasSelection && (
+        <nav aria-label={hasSelection ? "Clip tools" : menu ? `${menu === "audio" ? "Audio" : "Text"} tools` : "Editor tools"} className="flex h-[76px] shrink-0 items-stretch border-t border-border/60 bg-bg pb-1">
+          {back && (
             <button
               type="button"
-              aria-label="Back to editor tools"
-              onClick={clearSelection}
-              className="my-2 ml-2 grid w-11 shrink-0 place-items-center rounded-lg bg-bg-2 text-fg"
+              aria-label={back.label}
+              onClick={back.onClick}
+              className="my-2 ml-2 grid w-10 shrink-0 place-items-center rounded-lg bg-bg-2 text-fg"
             >
-              <ChevronLeft size={24} aria-hidden />
+              <ChevronLeft size={22} aria-hidden />
             </button>
           )}
-          <div className="flex min-w-0 flex-1 overflow-x-auto scrollbar-none">
-            {(hasSelection ? clipTools : mainTools).map((tool) => (
+          <div className="scrollbar-none flex min-w-0 flex-1 overflow-x-auto">
+            {tools.map((tool) => (
               <ToolButton key={tool.label} tool={tool} />
             ))}
           </div>
         </nav>
 
+        <input ref={soundInput} type="file" accept="audio/*" multiple hidden onChange={(e) => void addAtPlayhead(e.target.files).finally(() => (e.target.value = ""))} />
+        <input ref={overlayInput} type="file" accept="video/*,image/*" multiple hidden onChange={(e) => void addAtPlayhead(e.target.files).finally(() => (e.target.value = ""))} />
+
         {pickerOpen && <PhoneMediaPicker onClose={closePicker} />}
+
+        {textEdit && (
+          <div className="absolute inset-0 z-[110]">
+            <PanelErrorBoundary name="Text">
+              <PhoneTextEditor clipId={textEdit.clipId} isNew={textEdit.isNew} onDone={() => setTextEdit(null)} />
+            </PanelErrorBoundary>
+          </div>
+        )}
 
         {sheet && (
           <section
@@ -381,7 +459,7 @@ export const PhoneEditor: React.FC = () => {
           >
             <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
               <span className="text-[15px] font-semibold">{sheet.title}</span>
-              <button type="button" aria-label="Done" onClick={() => setSheet(null)} className="grid h-10 w-10 place-items-center rounded-full text-accent">
+              <button type="button" aria-label="Done" onClick={() => setSheet(null)} className="grid h-10 w-10 place-items-center rounded-full text-fg">
                 <Check size={24} aria-hidden />
               </button>
             </header>
@@ -394,6 +472,11 @@ export const PhoneEditor: React.FC = () => {
               {sheet.kind === "inspector" && (
                 <PanelErrorBoundary name={sheet.title}>
                   <InspectorPanel only={sheet.only} />
+                </PanelErrorBoundary>
+              )}
+              {sheet.kind === "voiceover" && (
+                <PanelErrorBoundary name={sheet.title}>
+                  <VoiceOverPanel />
                 </PanelErrorBoundary>
               )}
               {sheet.kind === "ratio" && <RatioSheet />}

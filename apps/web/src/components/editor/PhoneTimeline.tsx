@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Plus, Volume2, VolumeX } from "@/icons/lucide-compat";
+import { Music, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
 import type { Clip, MediaItem } from "@openreel/core";
 import { useProjectStore } from "../../stores/project-store";
 import { useTimelineStore } from "../../stores/timeline-store";
@@ -12,7 +12,7 @@ const MAIN_LANE_H = 56;
 const LANE_H = 36;
 const MIN_TRIM = 0.1;
 
-type LaneItem = { id: string; start: number; duration: number; label: string };
+type LaneItem = { id: string; start: number; duration: number; label: string; kind?: "text-clip" | "shape-clip" };
 type TrimDraft = { id: string; side: "start" | "end"; delta: number };
 
 export const formatPhoneTime = (seconds: number): string => {
@@ -45,10 +45,13 @@ export function PhoneTimeline({
   onAddMedia,
   onAddAudio,
   onAddText,
+  onEditText,
 }: {
   onAddMedia: () => void;
   onAddAudio: () => void;
   onAddText: () => void;
+  /** Tapping a selected text clip opens the text editor, like CapCut. */
+  onEditText?: (clipId: string) => void;
 }) {
   const project = useProjectStore((s) => s.project);
   const trimClip = useProjectStore((s) => s.trimClip);
@@ -107,10 +110,10 @@ export function PhoneTimeline({
       }
     }
     const text: LaneItem[] = [
-      ...(project.textClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: c.text || "Text" })),
-      ...(project.shapeClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Shape" })),
-      ...(project.svgClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Graphic" })),
-      ...(project.stickerClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Sticker" })),
+      ...(project.textClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: c.text || "Text", kind: "text-clip" as const })),
+      ...(project.shapeClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Shape", kind: "shape-clip" as const })),
+      ...(project.svgClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Graphic", kind: "shape-clip" as const })),
+      ...(project.stickerClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Sticker", kind: "shape-clip" as const })),
     ];
     const main = (mainTrack?.clips ?? []).filter((c) => kindOf(c) !== "audio");
     return { mainTrack, main, overlay, audio, text };
@@ -232,7 +235,9 @@ export function PhoneTimeline({
         aria-pressed={selected}
         onClick={(e) => {
           e.stopPropagation();
-          selectClip(item.id);
+          if (selected && item.kind === "text-clip" && onEditText) onEditText(item.id);
+          else if (item.kind) select({ type: item.kind, id: item.id });
+          else selectClip(item.id);
         }}
         className={`absolute top-1 bottom-1 truncate rounded-md px-2 text-left text-[11px] font-medium text-white ${tone} ${
           selected ? "ring-2 ring-white" : ""
@@ -310,10 +315,11 @@ export function PhoneTimeline({
                     e.stopPropagation();
                     void muteTrack(lanes.mainTrack!.id, !mainMuted);
                   }}
-                  className="absolute top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-xl bg-bg-2 text-fg-2"
-                  style={{ left: -64 }}
+                  className="absolute top-1/2 flex w-12 -translate-y-1/2 flex-col items-center gap-0.5 text-fg-2"
+                  style={{ left: -60 }}
                 >
                   {mainMuted ? <VolumeX size={20} aria-hidden /> : <Volume2 size={20} aria-hidden />}
+                  <span className="text-[10px] leading-tight">{mainMuted ? "Unmute" : "Mute clip"}</span>
                 </button>
               )}
               {lanes.main.length === 0 && (
@@ -408,14 +414,16 @@ export function PhoneTimeline({
             )}
 
             <div className="relative" style={{ height: LANE_H }}>
+              <Music aria-hidden size={16} className="absolute top-1/2 -translate-y-1/2 text-fg-3" style={{ left: -34 }} />
               {lanes.audio.length > 0
                 ? lanes.audio.map((item) => renderBar(item, "bg-[#1f7a5a]"))
                 : addLane("Add audio", onAddAudio)}
             </div>
 
             <div className="relative" style={{ height: LANE_H }}>
+              <Type aria-hidden size={16} className="absolute top-1/2 -translate-y-1/2 text-fg-3" style={{ left: -34 }} />
               {lanes.text.length > 0
-                ? lanes.text.map((item) => renderBar(item, "bg-[#b06a1e]"))
+                ? lanes.text.map((item) => renderBar(item, "bg-[#e8890c]"))
                 : addLane("Add text", onAddText)}
             </div>
           </div>

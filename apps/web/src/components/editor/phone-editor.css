@@ -21,6 +21,51 @@
   display: none;
 }
 
+/* CapCut's teal accent for selections, tabs and sliders on the phone. */
+.phone-editor {
+  --accent: #00c2c7;
+  --accent-strong: #00a5aa;
+  --accent-soft: rgba(0, 194, 199, 0.18);
+  --accent-fg: #000000;
+  --accent-glow: rgba(0, 194, 199, 0.4);
+}
+
+.phone-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+}
+.phone-slider::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: var(--border-strong, rgba(255, 255, 255, 0.25));
+}
+.phone-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.phone-slider::-moz-range-track {
+  height: 2px;
+  background: var(--border-strong, rgba(255, 255, 255, 0.25));
+}
+.phone-slider::-moz-range-progress {
+  height: 2px;
+  background: var(--accent);
+}
+.phone-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
 .phone-editor .phone-preview {
   --stage-bg: #000000;
 }

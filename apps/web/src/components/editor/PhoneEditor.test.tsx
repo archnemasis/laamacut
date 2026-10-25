@@ -34,6 +34,8 @@ vi.mock("../../stores/project-store", () => {
 });
 
 vi.mock("./Toolbar", () => ({ Toolbar: () => <header>Top bar</header> }));
+vi.mock("./PhoneTextEditor", () => ({ PhoneTextEditor: () => <div>Text editor</div> }));
+vi.mock("./inspector/VoiceOverPanel", () => ({ VoiceOverPanel: () => <div>Record</div> }));
 vi.mock("../phone/PhoneMediaPicker", () => ({ PhoneMediaPicker: () => <div>Media picker</div> }));
 vi.mock("./Preview", () => ({ Preview: () => <div>Preview</div> }));
 vi.mock("./Timeline", () => ({ Timeline: () => <div>Timeline</div> }));
@@ -58,12 +60,20 @@ describe("PhoneEditor", () => {
     const tools = screen.getByRole("navigation", { name: "Editor tools" });
     expect(within(tools).queryByText(/AI/)).toBeNull();
 
+    // Like CapCut, Text opens a second row of text tools.
     fireEvent.click(within(tools).getByRole("button", { name: "Text" }));
-    expect(screen.getByRole("dialog", { name: "Text" })).toBeInTheDocument();
+    const textTools = screen.getByRole("navigation", { name: "Text tools" });
+    expect(within(textTools).getByRole("button", { name: "Add text" })).toBeInTheDocument();
+
+    fireEvent.click(within(textTools).getByRole("button", { name: "Text template" }));
+    expect(screen.getByRole("dialog", { name: "Text template" })).toBeInTheDocument();
     expect(screen.getByTestId("assets-panel")).toHaveTextContent("text");
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to all tools" }));
+    expect(screen.getByRole("navigation", { name: "Editor tools" })).toBeInTheDocument();
   });
 
   it("swaps to clip tools when a clip is selected", () => {

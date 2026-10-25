@@ -18,6 +18,14 @@ import {
   type TimeEstimate,
 } from "@openreel/core";
 import { ExportDialog } from "./ExportDialog";
+import {
+  PhoneExportPanel,
+  RESOLUTIONS,
+  loadPhoneExportChoice,
+  phoneExportSettings,
+  savePhoneExportChoice,
+  type PhoneExportChoice,
+} from "./PhoneExportPanel";
 import { CompressDialog } from "./CompressDialog";
 import { deriveSourceExportMatch } from "../../services/export-source-match";
 import { useExportRunner, extForFormat, exportFilename, type ExportDeliveryMode } from "../../services/export-runner";
@@ -270,6 +278,13 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
     [project, hasTimelineContent, closeModal, track, runExport, showSavePicker, beginExport, finishExportSoon, failExport],
   );
 
+  // Phone: CapCut exports straight away with the quality chip's settings.
+  const [phoneSettingsOpen, setPhoneSettingsOpen] = useState(false);
+  const [phoneChoice, setPhoneChoice] = useState<PhoneExportChoice>(loadPhoneExportChoice);
+  const exportFromPhone = useCallback(() => {
+    setPhoneSettingsOpen(false);
+    void handleCustomExport(phoneExportSettings(phoneChoice, project.settings));
+  }, [handleCustomExport, phoneChoice, project.settings]);
 
   const handleRecordingComplete = useCallback(
     async (screenBlob: Blob, webcamBlob?: Blob) => {
@@ -429,15 +444,25 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
           <button
             type="button"
             aria-label="Export quality"
-            onClick={openExportDialog}
-            disabled={!hasTimelineContent}
-            className="flex items-center gap-1 rounded-xl bg-bg-2 px-3 py-2.5 text-[14px] font-semibold text-fg disabled:opacity-50"
+            aria-expanded={phoneSettingsOpen}
+            onClick={() => setPhoneSettingsOpen((open) => !open)}
+            className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-[14px] font-semibold text-fg"
           >
-            {Math.min(project.settings.width, project.settings.height)}P
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            {RESOLUTIONS.find((r) => r.value === phoneChoice.resolution)?.label.toUpperCase() ??`${phoneChoice.resolution}P`}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden className={phoneSettingsOpen ? "rotate-180" : ""}>
               <path d="M5 8h14l-7 9z" />
             </svg>
           </button>
+        )}
+        {phone && phoneSettingsOpen && !exportState.isExporting && (
+          <PhoneExportPanel
+            choice={phoneChoice}
+            duration={project.timeline?.duration ?? 0}
+            onChange={(choice) => {
+              setPhoneChoice(choice);
+              savePhoneExportChoice(choice);
+            }}
+          />
         )}
         {/* Export */}
         {exportState.isExporting ? (
@@ -472,10 +497,10 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
           <div className="flex items-stretch">
             <button
               type="button"
-              onClick={openExportDialog}
+              onClick={phone ? exportFromPhone : openExportDialog}
               disabled={!hasTimelineContent}
               title={hasTimelineContent ? "Choose export settings" : "Add media or text to the timeline to export"}
-              className={`bg-accent font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed ${phone ? "rounded-xl px-5 py-2.5 text-[15px]" : "rounded-l-[8px] rounded-r-none px-[18px] py-[9px] text-[13px]"}`}
+              className={`font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${phone ? "rounded-lg bg-[#e8fbfb] px-4 py-2 text-[15px] text-black" : "bg-accent text-white rounded-l-[8px] rounded-r-none px-[18px] py-[9px] text-[13px]"}`}
             >
               Export
             </button>
