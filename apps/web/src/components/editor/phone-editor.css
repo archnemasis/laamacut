@@ -21,6 +21,17 @@
   display: none;
 }
 
+/* CapCut marks the selected clip on the preview with a thin teal frame.
+   The centre move button stays draggable but is invisible. */
+.phone-editor [data-selection-outline] {
+  border-width: 1.5px !important;
+  border-color: var(--accent) !important;
+  border-radius: 0 !important;
+}
+.phone-editor [data-move-handle] {
+  opacity: 0;
+}
+
 /* CapCut's teal accent for selections, tabs and sliders on the phone. */
 .phone-editor {
   --accent: #00c2c7;

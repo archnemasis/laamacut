@@ -316,7 +316,7 @@ export function PhoneTimeline({
                     void muteTrack(lanes.mainTrack!.id, !mainMuted);
                   }}
                   className="absolute top-1/2 flex w-12 -translate-y-1/2 flex-col items-center gap-0.5 text-fg-2"
-                  style={{ left: -60 }}
+                  style={{ left: -78 }}
                 >
                   {mainMuted ? <VolumeX size={20} aria-hidden /> : <Volume2 size={20} aria-hidden />}
                   <span className="text-[10px] leading-tight">{mainMuted ? "Unmute" : "Mute clip"}</span>

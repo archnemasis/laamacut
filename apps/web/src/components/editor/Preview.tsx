@@ -7809,11 +7809,11 @@ export const Preview: React.FC = () => {
               }}
             >
               {/* Selection border */}
-              <div className="absolute inset-0 border-2 border-white pointer-events-none" />
+              <div data-selection-outline className="absolute inset-0 border-2 border-white pointer-events-none" />
 
               {/* Move handle (center) */}
               <div
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-primary/80 rounded-full flex items-center justify-center cursor-move pointer-events-auto hover:bg-primary transition-colors"
+                data-move-handle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-primary/80 rounded-full flex items-center justify-center cursor-move pointer-events-auto hover:bg-primary transition-colors"
                 onMouseDown={handleClipMouseDown}
                 title="Drag to move"
               >
@@ -7893,11 +7893,11 @@ export const Preview: React.FC = () => {
               }}
             >
               {/* Selection border */}
-              <div className="absolute inset-0 border-2 border-white pointer-events-none" />
+              <div data-selection-outline className="absolute inset-0 border-2 border-white pointer-events-none" />
 
               {/* Move handle (center) */}
               <div
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-cyan-500/80 rounded-full flex items-center justify-center cursor-move pointer-events-auto hover:bg-cyan-500 transition-colors"
+                data-move-handle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-cyan-500/80 rounded-full flex items-center justify-center cursor-move pointer-events-auto hover:bg-cyan-500 transition-colors"
                 onMouseDown={handleTextClipMouseDown}
                 title="Drag to move text"
               >
@@ -7977,12 +7977,12 @@ export const Preview: React.FC = () => {
               }}
             >
               {selectedShapeClip.type !== "svg" && (
-                <div className="absolute inset-0 border-2 border-white pointer-events-none" />
+                <div data-selection-outline className="absolute inset-0 border-2 border-white pointer-events-none" />
               )}
 
               {/* Move handle (center) */}
               <div
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-green-500/80 rounded-full flex items-center justify-center cursor-move pointer-events-auto hover:bg-green-500 transition-colors"
+                data-move-handle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-green-500/80 rounded-full flex items-center justify-center cursor-move pointer-events-auto hover:bg-green-500 transition-colors"
                 onMouseDown={handleShapeClipMouseDown}
                 title="Drag to move shape"
               >
@@ -8062,7 +8062,7 @@ export const Preview: React.FC = () => {
               }}
             >
               {/* Selection border */}
-              <div className="absolute inset-0 border-2 border-white rounded-lg pointer-events-none" />
+              <div data-selection-outline className="absolute inset-0 border-2 border-white rounded-lg pointer-events-none" />
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-yellow-500 rounded text-[10px] font-medium text-black whitespace-nowrap">
                 Subtitle Selected - Edit in Inspector
               </div>
