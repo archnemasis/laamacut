@@ -83,8 +83,13 @@ describe("PhoneMediaPicker gallery", () => {
     const files = addMediaFilesToTimeline.mock.calls[0][0];
     expect(files.map((f) => f.name)).toEqual(["party.mp4", "beach.mp4", "cat.jpg"]);
 
-    // HD is off by default: each video (not the photo) gets a 720p preview copy.
-    await waitFor(() => expect(adopt).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    // HD is off by default: each video (not the photo) is edited from its 720p
+    // copy, so the full-size original is never fetched.
+    expect(files.map((f) => f.type)).toEqual(["video/mp4", "video/mp4", "image/jpeg"]);
+    const fetched = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
+    expect(fetched.some((url) => url.endsWith("content://v/1"))).toBe(false);
+    expect(fetched.some((url) => url.endsWith("cache/1.mp4"))).toBe(true);
+    expect(adopt).not.toHaveBeenCalled();
     expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/2", height: 720 });
     expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/1", height: 720 });
     expect(gallery.discard).toHaveBeenCalledTimes(2);

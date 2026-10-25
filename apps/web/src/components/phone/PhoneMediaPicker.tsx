@@ -8,7 +8,6 @@ import {
   loadHdPreference,
   saveHdPreference,
   prepareGalleryVideo,
-  type GalleryVideoExtras,
   type GalleryAccess,
   type GalleryItem,
   type GalleryKind,
@@ -157,23 +156,28 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
     const picked = order.map((key) => tileByKey.get(key)).filter((t): t is Tile => Boolean(t));
     if (picked.length === 0) return;
     try {
+      // Gallery videos get phone-decoded filmstrip frames so the timeline shows
+      // pictures from the start. With HD off the phone's 720p copy becomes the
+      // clip itself: the full-size original never loads into memory, which is
+      // what keeps lower-end phones smooth.
+      setProgress(hd ? "Preparing videos" : "Preparing videos for smooth editing");
+      const extras = await Promise.all(
+        picked.map((tile) =>
+          tile.galleryItem && tile.kind === "video" ? prepareGalleryVideo(tile.galleryItem.uri, hd) : undefined,
+        ),
+      );
       const files: File[] = [];
-      const extras: (Promise<GalleryVideoExtras> | undefined)[] = [];
       for (const [i, tile] of picked.entries()) {
         setProgress(`Loading ${i + 1} of ${picked.length}`);
+        const copy = extras[i]?.previewCopy;
         if (tile.file) files.push(tile.file);
+        else if (copy && tile.galleryItem) files.push(new File([copy], tile.galleryItem.name, { type: "video/mp4" }));
         else if (tile.galleryItem) files.push(await galleryItemToFile(tile.galleryItem));
-        // Gallery videos get phone-decoded filmstrip frames and, with HD off, a
-        // 720p copy for smooth playback, so they show a picture from the start.
-        // Exports always use the full-quality original.
-        extras.push(tile.galleryItem && tile.kind === "video" ? prepareGalleryVideo(tile.galleryItem.uri, hd) : undefined);
       }
-      setProgress(hd ? "Preparing videos" : "Preparing videos for smooth editing");
-      const ready = await Promise.all(extras);
       setProgress("Adding to timeline");
       await addMediaFilesToTimeline(files, (index, mediaId) => {
-        const prepared = ready[index];
-        if (prepared) applyGalleryVideoExtras(mediaId, prepared);
+        const prepared = extras[index];
+        if (prepared) applyGalleryVideoExtras(mediaId, { filmstrip: prepared.filmstrip });
       });
     } finally {
       setProgress(null);
@@ -315,7 +319,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
             role="switch"
             aria-checked={hd}
             aria-label="HD"
-            title={hd ? "Full resolution: best quality, may lag on slower phones" : "Smooth editing with a 720p preview copy. Exports stay full quality"}
+            title={hd ? "Full resolution: best quality, may lag on slower phones" : "Smooth editing: videos are compressed to 720p. Turn on HD for full resolution"}
             onClick={() => {
               saveHdPreference(!hd);
               setHd(!hd);

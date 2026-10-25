@@ -1,3 +1,4 @@
+import { usePhoneEditor } from "../../hooks/useCompactEditor";
 import React, {
   useRef,
   useEffect,
@@ -78,7 +79,6 @@ import {
   type InteractionMode,
   type ClipTransform,
   DEFAULT_TRANSFORM,
-  formatTime,
   renderTextClipToCanvas,
   getActiveTextClips,
   getActiveShapeClips,
@@ -828,6 +828,8 @@ interface ClipWithPlaceholder {
   isPlaceholder?: boolean;
 }
 
+const PHONE_PREVIEW_MAX_DIMENSION = 960;
+
 export const Preview: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -836,6 +838,7 @@ export const Preview: React.FC = () => {
   const animationRef = useRef<number | null>(null);
   const renderBridgeInitialized = useRef<boolean>(false);
   const lastGoodFrameRef = useRef<ImageBitmap | null>(null);
+  const stillImagesRef = useRef(new Map<string, HTMLImageElement>());
   const offscreenCanvasRef = useRef<OffscreenCanvas | null>(null);
   const decodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decodeDebounceResolveRef = useRef<((value: ImageBitmap | null) => void) | null>(
@@ -1346,15 +1349,20 @@ export const Preview: React.FC = () => {
 
   const playbackQuality = useUIStore((state) => state.playbackQuality);
   const setPlaybackQuality = useUIStore((state) => state.setPlaybackQuality);
+  // Phones show the preview at roughly 400 CSS px; drawing a 1920 px canvas
+  // every frame is what made playback stutter, so "auto" caps it at 960.
+  const isPhone = usePhoneEditor();
   const previewRes = useMemo(
     () =>
       computePreviewResolution(
         settings.width,
         settings.height,
-        PREVIEW_MAX_DIMENSION *
-          previewQualityScale(playbackQuality, settings.width, settings.height),
+        isPhone && playbackQuality === "auto"
+          ? PHONE_PREVIEW_MAX_DIMENSION
+          : PREVIEW_MAX_DIMENSION *
+              previewQualityScale(playbackQuality, settings.width, settings.height),
       ),
-    [settings.width, settings.height, playbackQuality],
+    [settings.width, settings.height, playbackQuality, isPhone],
   );
 
   const previewFrameSize = useMemo(() => {
@@ -3258,7 +3266,6 @@ export const Preview: React.FC = () => {
 
       const emptyBg = isDark ? "#0f0f11" : "#ffffff";
       const emptyText = isDark ? "#52525b" : "#a1a1aa";
-      const textPrimary = isDark ? "#ffffff" : "#18181b";
       const textSecondary = isDark ? "#a1a1aa" : "#71717a";
 
       const activeShapeClips = getActiveShapeClips(allShapeClips, time);
@@ -3278,12 +3285,12 @@ export const Preview: React.FC = () => {
         ),
       );
 
-      ctx.fillStyle = hasVideoContent
-        ? isDark
-          ? "#18181b"
-          : "#f4f4f5"
-        : emptyBg;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (hasVideoContent) {
+        fillPreviewBackground(ctx, time, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = emptyBg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       let hasRenderedContent = false;
 
@@ -3299,22 +3306,18 @@ export const Preview: React.FC = () => {
             if (time >= clipStart && time < clipEnd) {
               const mediaItem = getMediaItem(clip.mediaId);
               if (mediaItem) {
+                // The real frame is still decoding: show the nearest timeline
+                // thumbnail rather than a blank card, and redraw once the
+                // decoder catches up.
                 hasRenderedContent = true;
-                ctx.fillStyle = textPrimary;
-                ctx.font = "bold 24px Inter, sans-serif";
-                ctx.textAlign = "center";
-                ctx.fillText(
-                  mediaItem.name,
-                  canvas.width / 2,
-                  canvas.height / 2,
-                );
-                ctx.font = "16px Inter, sans-serif";
-                ctx.fillStyle = textSecondary;
-                ctx.fillText(
-                  `${formatTime(time)} / ${formatTime(clip.duration)}`,
-                  canvas.width / 2,
-                  canvas.height / 2 + 30,
-                );
+                const sourceTime = (clip.inPoint ?? 0) + time - clipStart;
+                const still = getStillImage(stillImagesRef.current, mediaItem, sourceTime);
+                if (still) {
+                  const fit = Math.min(canvas.width / still.naturalWidth, canvas.height / still.naturalHeight);
+                  const w = still.naturalWidth * fit;
+                  const h = still.naturalHeight * fit;
+                  ctx.drawImage(still, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+                }
               } else if ((clip as ClipWithPlaceholder).isPlaceholder) {
                 hasRenderedContent = true;
                 ctx.fillStyle = textSecondary;
@@ -3417,6 +3420,7 @@ export const Preview: React.FC = () => {
       isPlaying,
       mediaClipHasAudio,
       mediaClipHasVisual,
+      fillPreviewBackground,
     ],
   );
 
@@ -8418,3 +8422,28 @@ export const Preview: React.FC = () => {
 };
 
 export default Preview;
+
+/** Nearest loaded filmstrip (or cover) image for a source time; starts loading it if needed. */
+function getStillImage(
+  cache: Map<string, HTMLImageElement>,
+  item: { thumbnailUrl: string | null; filmstripThumbnails?: readonly { timestamp: number; url: string }[] },
+  sourceTime: number,
+): HTMLImageElement | null {
+  const strip = item.filmstripThumbnails ?? [];
+  const nearest = strip.reduce<{ timestamp: number; url: string } | null>(
+    (best, thumb) =>
+      !best || Math.abs(thumb.timestamp - sourceTime) < Math.abs(best.timestamp - sourceTime) ? thumb : best,
+    null,
+  );
+  const url = nearest?.url ?? item.thumbnailUrl;
+  if (!url) return null;
+  let image = cache.get(url);
+  if (!image) {
+    image = new Image();
+    image.onload = () => window.dispatchEvent(new Event("openreel:preview-invalidate"));
+    image.src = url;
+    cache.set(url, image);
+    if (cache.size > 200) cache.delete(cache.keys().next().value as string);
+  }
+  return image.complete && image.naturalWidth > 0 ? image : null;
+}
