@@ -13,11 +13,20 @@ interface Gesture {
   perPixel: Point;
   origin: Map<number, Point>;
   moved: boolean;
+  /** Twist to ignore in this stretch of the gesture: the dead zone, until rotation has started. */
+  twistOffset: number | null;
 }
 
 const TAP_SLOP = 6;
 /** How close (screen px) the centre has to come to the frame's centre lines to snap. */
 const SNAP_DISTANCE = 10;
+/** A pinch only starts rotating once the fingers twist this far (degrees), so zooming doesn't tilt. */
+const ROTATE_START = 12;
+/** Rotation clicks onto 0°, 90°, 180° and 270° within this many degrees. */
+const ROTATE_SNAP = 5;
+
+/** Degrees between -180 and 180. */
+const wrap = (deg: number) => ((((deg + 180) % 360) + 360) % 360) - 180;
 
 type Guides = { x: boolean; y: boolean };
 type Box = { left: number; top: number; width: number; height: number };
@@ -39,6 +48,7 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
   const pointers = useRef(new Map<number, Point>());
   const frame = useRef<number | null>(null);
   const pending = useRef<FlatTransform | null>(null);
+  const snappedAngle = useRef<number | null>(null);
   const [guides, setGuides] = useState<Guides>({ x: false, y: false });
   /** The video frame inside this overlay, where the guide lines are drawn. */
   const [frameBox, setFrameBox] = useState<Box | null>(null);
@@ -77,6 +87,8 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
           : { x: 1 / screen.width, y: 1 / screen.height },
       origin: new Map(pointers.current),
       moved: gesture.current?.moved ?? false,
+      // Once rotation has started it carries on from the new fingers with no dead zone.
+      twistOffset: previous && gesture.current?.twistOffset !== null && gesture.current?.twistOffset !== undefined ? 0 : null,
     };
   };
 
@@ -106,7 +118,17 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
       const zoom = spread(is[0], is[1]) / Math.max(1, spread(was[0], was[1]));
       next["scale.x"] = Math.max(0.05, g.start["scale.x"] * zoom);
       next["scale.y"] = Math.max(0.05, g.start["scale.y"] * zoom);
-      next.rotation = g.start.rotation + (angle(is[0], is[1]) - angle(was[0], was[1]));
+      const twist = wrap(angle(is[0], is[1]) - angle(was[0], was[1]));
+      if (g.twistOffset === null && Math.abs(twist) >= ROTATE_START) g.twistOffset = Math.sign(twist) * ROTATE_START;
+      if (g.twistOffset !== null) {
+        let rotation = g.start.rotation + twist - g.twistOffset;
+        const square = Math.round(rotation / 90) * 90;
+        const snapped = Math.abs(rotation - square) <= ROTATE_SNAP;
+        if (snapped) rotation = square;
+        if (snapped && snappedAngle.current !== square) navigator.vibrate?.(8);
+        snappedAngle.current = snapped ? square : null;
+        next.rotation = rotation;
+      }
     }
     pending.current = next;
     if (frame.current === null) frame.current = requestAnimationFrame(flush);

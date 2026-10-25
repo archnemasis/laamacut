@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Ban, Check, Search, Upload, X } from "@/icons/lucide-compat";
 import type { TextAnimationPreset, TextStyle } from "@openreel/core";
 import { useProjectStore } from "../../stores/project-store";
+import { useTimelineStore } from "../../stores/timeline-store";
 import { ensureFontFamily } from "../../services/project-fonts";
-import { addUserFont, loadUserFonts, USER_FONT_ACCEPT } from "../../services/user-fonts";
-import { FONT_CATEGORIES } from "./inspector/font-options";
+import { FONT_CATEGORIES, FONT_FILE_ACCEPT, registerCustomFont, useCustomFonts } from "./inspector/font-options";
 import { TEXT_STYLE_PRESETS } from "./AssetsPanel";
 
 type Tab = "templates" | "fonts" | "styles" | "animations";
+/** The tab to open on; "keyboard" opens Fonts with the text box focused. */
+export type TextEditorTab = Tab | "keyboard";
 type StylePart = "text" | "stroke" | "background" | "shadow";
 type AnimationPart = "in" | "out";
 
@@ -157,9 +159,9 @@ function useKeyboardHeight(): number {
  * CapCut's text editor: a text box with a tick, then Templates, Fonts,
  * Styles and Animations tabs. Edits apply live to the selected text clip.
  */
-export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isNew: boolean; onDone: () => void }) {
+export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId: string; isNew: boolean; initialTab?: TextEditorTab; onDone: () => void }) {
   const clip = useProjectStore((s) => s.project.textClips?.find((c) => c.id === clipId));
-  const [tab, setTab] = useState<Tab>("fonts");
+  const [tab, setTab] = useState<Tab>(initialTab && initialTab !== "keyboard" ? initialTab : "fonts");
   const [stylePart, setStylePart] = useState<StylePart>("text");
   const [animationPart, setAnimationPart] = useState<AnimationPart>("in");
   // A new clip starts with an empty box; "Enter text" shows on the preview until you type.
@@ -173,8 +175,8 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
   const liftSearch = keyboardHeight > 0 && typing === "search";
 
   useEffect(() => {
-    if (isNew) inputRef.current?.focus();
-  }, [isNew]);
+    if (isNew || initialTab === "keyboard") inputRef.current?.focus();
+  }, [isNew, initialTab]);
 
   // Load the fonts shown on the tiles so each name previews in its own face.
   useEffect(() => {
@@ -183,15 +185,23 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
   }, [tab]);
 
   const fontInputRef = useRef<HTMLInputElement>(null);
-  const [uploadedFonts, setUploadedFonts] = useState<string[]>([]);
-  const [fontError, setFontError] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    void loadUserFonts().then((families) => live && setUploadedFonts(families));
-    return () => {
-      live = false;
-    };
+  // Picking an animation plays it once on the preview, like CapCut. Leaving
+  // the Animations tab (or the editor) mid-demo stops it right where it is.
+  const demoTimer = useRef(0);
+  const stopDemo = useCallback(() => {
+    if (!demoTimer.current) return;
+    window.clearTimeout(demoTimer.current);
+    demoTimer.current = 0;
+    useTimelineStore.getState().pause();
   }, []);
+  useEffect(() => {
+    if (tab !== "animations") stopDemo();
+  }, [tab, animationPart, stopDemo]);
+  useEffect(() => stopDemo, [stopDemo]);
+
+  // Uploaded fonts are shared with the desktop editor's font picker.
+  const uploadedFonts = useCustomFonts();
+  const [fontError, setFontError] = useState<string | null>(null);
 
   if (!clip) return null;
   const store = useProjectStore.getState;
@@ -205,7 +215,9 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
   };
 
   const finish = () => {
-    if (isNew && !draft.trim()) {
+    // A new box nobody typed in goes away. Judge by the clip, not the draft,
+    // so a remounted editor can't throw away text that's there.
+    if (isNew && !draft.trim() && (!clip.text.trim() || clip.text === "Enter text")) {
       void import("../../utils/timeline-item-actions").then(({ deleteTimelineItem }) => deleteTimelineItem(store(), clipId));
     }
     onDone();
@@ -217,6 +229,20 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
     const outDuration = animationPart === "out" ? (preset === "none" ? 0 : 0.5) : current.preset === "none" ? 0 : current.outDuration;
     const nextPreset = preset === "none" && (animationPart === "in" ? outDuration : inDuration) > 0 ? current.preset : preset;
     store().updateTextAnimation(clipId, { ...current, preset: inDuration || outDuration ? nextPreset : "none", inDuration, outDuration });
+    if (preset !== "none") playDemo(animationPart === "in" ? inDuration : outDuration);
+  };
+  /** Plays the In animation from the clip's start, or the Out one up to its end, then pauses. */
+  const playDemo = (seconds: number) => {
+    if (!clip || seconds <= 0) return;
+    stopDemo();
+    const timeline = useTimelineStore.getState();
+    timeline.pause();
+    timeline.seekTo(animationPart === "in" ? clip.startTime : clip.startTime + clip.duration - seconds);
+    timeline.play();
+    demoTimer.current = window.setTimeout(() => {
+      demoTimer.current = 0;
+      useTimelineStore.getState().pause();
+    }, seconds * 1000 + 150);
   };
   const activeAnimation = animation && animation.preset !== "none" && (animationPart === "in" ? animation.inDuration : animation.outDuration) > 0
     ? animation.preset
@@ -259,14 +285,10 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
     if (fontInputRef.current) fontInputRef.current.value = "";
     if (!file) return;
     setFontError(null);
-    try {
-      const family = await addUserFont(file);
-      setUploadedFonts(await loadUserFonts());
-      setFontQuery("");
-      setStyle({ fontFamily: family });
-    } catch (error) {
-      setFontError(error instanceof Error ? error.message : "That font couldn't be added.");
-    }
+    const result = await registerCustomFont(file);
+    if (!result.success) return setFontError(result.error);
+    setFontQuery("");
+    setStyle({ fontFamily: result.fontFamily });
   };
 
   const chip = (active: boolean) =>
@@ -362,7 +384,7 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
           >
             <Upload size={18} aria-hidden />
           </button>
-          <input ref={fontInputRef} type="file" accept={USER_FONT_ACCEPT} hidden onChange={(e) => void uploadFont(e.target.files?.[0])} />
+          <input ref={fontInputRef} type="file" accept={FONT_FILE_ACCEPT} hidden onChange={(e) => void uploadFont(e.target.files?.[0])} />
           </div>
           {fontError && <p role="alert" className="px-4 pt-2 text-[12px] text-red-400">{fontError}</p>}
           {matchingUploaded.length > 0 && (
@@ -396,11 +418,14 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
                   type="button"
                   aria-label={`${preset.label} style`}
                   onClick={() => setStyle(preset.style)}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-bg-3 text-[17px] font-extrabold"
+                  // A fixed dark tile in both themes, so white and outlined styles read the same.
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#2b2b2b] text-[17px] font-extrabold"
                   style={{
                     color: preset.style.color,
                     backgroundColor: preset.style.backgroundColor,
-                    WebkitTextStroke: preset.style.strokeWidth ? `1.5px ${preset.style.strokeColor}` : undefined,
+                    // Stroke behind the fill, like the renderer, so the outline doesn't eat the letters.
+                    WebkitTextStroke: preset.style.strokeWidth ? `3px ${preset.style.strokeColor}` : undefined,
+                    paintOrder: "stroke fill",
                     textShadow: preset.style.shadowBlur ? "0 2px 6px rgba(0,0,0,0.9)" : undefined,
                   }}
                 >
@@ -415,7 +440,7 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
                 </button>
               ))}
             </div>
-            <div className="scrollbar-none flex items-center gap-3 overflow-x-auto px-3 pt-3">
+            <div className="scrollbar-none flex items-center gap-3 overflow-x-auto px-4 py-2">
               {stylePart !== "text" && (
                 <button
                   type="button"

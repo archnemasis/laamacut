@@ -990,7 +990,22 @@ function AnimationsPanel({ clipId, onDone }: { clipId: string; onDone: () => voi
   const [duration, setDuration] = useState(appliedDuration);
   useEffect(() => setDuration(appliedDuration), [appliedDuration, tab]);
   const previewTimer = useRef(0);
-  useEffect(() => () => window.clearTimeout(previewTimer.current), []);
+  // Switching tab mid-demo stops it right where it is.
+  useEffect(() => {
+    if (!previewTimer.current) return;
+    window.clearTimeout(previewTimer.current);
+    previewTimer.current = 0;
+    useTimelineStore.getState().pause();
+  }, [tab]);
+  // So does leaving the panel.
+  useEffect(
+    () => () => {
+      if (!previewTimer.current) return;
+      window.clearTimeout(previewTimer.current);
+      useTimelineStore.getState().pause();
+    },
+    [],
+  );
 
   const write = (next: Keyframe[]) => {
     const store = useProjectStore.getState();
@@ -1021,7 +1036,10 @@ function AnimationsPanel({ clipId, onDone }: { clipId: string; onDone: () => voi
     timeline.pause();
     timeline.seekTo(start);
     timeline.play();
-    previewTimer.current = window.setTimeout(() => useTimelineStore.getState().pause(), length * 1000 + 150);
+    previewTimer.current = window.setTimeout(() => {
+      previewTimer.current = 0;
+      useTimelineStore.getState().pause();
+    }, length * 1000 + 150);
   };
 
   return (

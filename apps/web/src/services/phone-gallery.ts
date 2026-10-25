@@ -19,8 +19,8 @@ export interface GalleryPlugin {
   requestAccess(): Promise<{ access: GalleryAccess }>;
   list(options: { kind: GalleryKind; offset: number; limit: number }): Promise<{ items: GalleryItem[] }>;
   thumbnail(options: { uri: string; size: number }): Promise<{ data: string }>;
-  /** Hardware-encode a smaller H.264 copy; resolves to its file:// path. */
-  compress(options: { uri: string; height: number }): Promise<{ path: string }>;
+  /** Hardware-encode a smaller H.264 copy; resolves to its file:// path, or none when the video is already small. */
+  compress(options: { uri: string; height: number }): Promise<{ path?: string }>;
   discard(options: { path: string }): Promise<void>;
   /** Filmstrip frames decoded by the phone, as JPEG data URLs. */
   frames(options: { uri: string; count: number; height: number }): Promise<{ frames: { timestamp: number; data: string }[] }>;
@@ -73,6 +73,7 @@ export async function prepareGalleryVideo(uri: string, hd: boolean): Promise<Gal
     : gallery
         .compress({ uri, height: 720 })
         .then(async ({ path }) => {
+          if (!path) return undefined;
           try {
             const blob = await (await fetch(convert(path))).blob();
             return new Blob([blob], { type: "video/mp4" });

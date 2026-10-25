@@ -609,6 +609,17 @@ function VisualEffectPreview({
   onSelect: (def: EditorEffectPreviewDef) => void;
 }): React.ReactElement {
   const effectedStyle = def.previewStyle(0.82);
+  const effectRef = React.useRef<HTMLSpanElement>(null);
+  // The before/after line sweeps across on a loop, so the effect can be seen before it's added.
+  React.useEffect(() => {
+    const el = effectRef.current;
+    if (!el?.animate) return;
+    const anim = el.animate(
+      [{ clipPath: "inset(0 0 0 100%)" }, { clipPath: "inset(0 0 0 0%)" }, { clipPath: "inset(0 0 0 0%)" }, { clipPath: "inset(0 0 0 100%)" }],
+      { duration: 3200, iterations: Infinity, easing: "ease-in-out" },
+    );
+    return () => anim.cancel();
+  }, []);
   return (
     <button
       type="button"
@@ -621,6 +632,7 @@ function VisualEffectPreview({
           Aa
         </span>
         <span
+          ref={effectRef}
           className="absolute inset-0 grid place-items-center overflow-hidden border-l border-white/45 bg-[linear-gradient(135deg,#22d3ee,#8b5cf6_52%,#fb7185)] text-lg font-black tracking-tight text-white/95"
           style={{
             ...effectedStyle,

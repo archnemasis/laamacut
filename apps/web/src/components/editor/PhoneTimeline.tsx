@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Music, Pencil, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
 import { getProjectPreview, setProjectCover } from "../../services/project-previews";
+import { PhoneCoverScreen } from "./PhoneCoverScreen";
 import { reorderTrackClips } from "../../services/phone-media";
 import { toast } from "../../stores/notification-store";
 import type { Clip, MediaItem } from "@openreel/core";
@@ -48,13 +49,10 @@ export function PhoneTimeline({
   onAddMedia,
   onAddAudio,
   onAddText,
-  onEditText,
 }: {
   onAddMedia: () => void;
   onAddAudio: () => void;
   onAddText: () => void;
-  /** Tapping a selected text clip opens the text editor, like CapCut. */
-  onEditText?: (clipId: string) => void;
 }) {
   const project = useProjectStore((s) => s.project);
   const trimClip = useProjectStore((s) => s.trimClip);
@@ -293,15 +291,18 @@ export function PhoneTimeline({
     }, 380);
   };
 
-  /** CapCut's Cover: the frame on the preview becomes the project's picture on the home screen. */
-  const setCoverFromPreview = () => {
-    const canvases = [...document.querySelectorAll<HTMLCanvasElement>("[data-preview-screen] canvas")];
-    const canvas = canvases.sort((a, b) => b.width * b.height - a.width * a.height)[0];
-    if (!canvas) return;
-    const image = setProjectCover(project, canvas);
+  /** CapCut's Cover: a frame of the video, or a picture from the device, shown on the home screen. */
+  const [coverOpen, setCoverOpen] = useState(false);
+  const saveCover = (picture: HTMLCanvasElement) => {
+    const image = setProjectCover(project, picture);
+    setCoverOpen(false);
     if (!image) return;
     setCover(image);
-    toast.success("Cover set", "This frame now shows on your home screen.");
+    toast.success("Cover set", "It now shows on your home screen.");
+  };
+  const mainThumbAt = (time: number) => {
+    const clip = lanes.main.find((c) => time >= c.startTime && time < c.startTime + c.duration) ?? lanes.main.at(-1);
+    return clip ? thumbnailAt(mediaById.get(clip.mediaId), (clip.inPoint ?? 0) + Math.max(0, time - clip.startTime)) : undefined;
   };
   const coverImage = cover ?? thumbnailAt(mediaById.get(lanes.main[0]?.mediaId ?? ""), 0);
 
@@ -323,8 +324,7 @@ export function PhoneTimeline({
         aria-pressed={selected}
         onClick={(e) => {
           e.stopPropagation();
-          if (selected && item.kind === "text-clip" && onEditText) onEditText(item.id);
-          else if (item.kind) select({ type: item.kind, id: item.id });
+          if (item.kind) select({ type: item.kind, id: item.id });
           else selectClip(item.id);
         }}
         className={`absolute top-1 bottom-1 truncate rounded-md px-2 text-left text-[11px] font-medium text-white ${tone} ${
@@ -416,7 +416,7 @@ export function PhoneTimeline({
                   aria-label="Set cover"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setCoverFromPreview();
+                    setCoverOpen(true);
                   }}
                   className="absolute top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg bg-bg-3 bg-cover bg-center text-white"
                   style={{ left: -76, backgroundImage: coverImage ? `url("${coverImage}")` : undefined }}
@@ -556,6 +556,15 @@ export function PhoneTimeline({
       >
         <Plus size={24} aria-hidden />
       </button>
+      {coverOpen && (
+        <PhoneCoverScreen
+          duration={duration}
+          aspect={(project.settings.width || 16) / (project.settings.height || 9)}
+          thumbAt={mainThumbAt}
+          onSave={saveCover}
+          onClose={() => setCoverOpen(false)}
+        />
+      )}
     </div>
   );
 }

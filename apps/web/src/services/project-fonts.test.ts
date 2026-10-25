@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ensureFontFamily, ensureProjectFonts, collectProjectFonts } from "./project-fonts";
 import { createEmptyProject } from "../stores/project/project-helpers";
 
-vi.mock("./user-fonts", () => ({ loadUserFonts: async () => [] }));
+vi.mock("../components/editor/inspector/font-options", () => ({ initCustomFonts: async () => undefined }));
 
 const load = vi.fn(async () => []);
 beforeEach(() => { load.mockClear(); Object.defineProperty(document, "fonts", { value: { load }, configurable: true }); });

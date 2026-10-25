@@ -854,6 +854,17 @@ export const Preview: React.FC = () => {
   const lastGoodFrameRef = useRef<ImageBitmap | null>(null);
   /** The canvas shows a complete frame, so an incomplete render can leave it be. */
   const canvasHasPictureRef = useRef(false);
+  /** The last picture decoded for each video, so a repaint at the same moment needn't seek. */
+  const lastDecodedFrameRef = useRef(new Map<string, { time: number; blob: Blob; bitmap: ImageBitmap }>());
+  useEffect(() => {
+    const frames = lastDecodedFrameRef.current;
+    return () => {
+      for (const { bitmap } of frames.values()) bitmap.close();
+      frames.clear();
+    };
+  }, []);
+  const missingFrameRetryRef = useRef({ timer: 0, count: 0 });
+  useEffect(() => () => window.clearTimeout(missingFrameRetryRef.current.timer), []);
   const stillImagesRef = useRef(new Map<string, HTMLImageElement>());
   const offscreenCanvasRef = useRef<OffscreenCanvas | null>(null);
   const decodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2430,6 +2441,17 @@ export const Preview: React.FC = () => {
       decodeDebounceResolveRef.current?.(null);
       decodeDebounceResolveRef.current = null;
 
+      // Same clip, same moment (typing, styling, moving things on a still
+      // frame): reuse the picture already decoded instead of seeking again.
+      const frameKey = vidstab.hasStabilized(clip.id) ? `${clip.mediaId}:stabilized` : clip.mediaId;
+      const wantedTime =
+        (vidstab.hasStabilized(clip.id) ? 0 : clip.inPoint || 0) +
+        getSpeedEngine().getSourceTimeAtPlaybackTime(clip.id, time - clip.startTime);
+      const reusable = lastDecodedFrameRef.current.get(frameKey);
+      if (reusable && reusable.blob === mediaBlob && Math.abs(reusable.time - wantedTime) < 0.0005) {
+        return createImageBitmap(reusable.bitmap).catch(() => null);
+      }
+
       return new Promise<ImageBitmap | null>((resolve) => {
         decodeDebounceResolveRef.current = resolve;
         decodeDebounceRef.current = setTimeout(async () => {
@@ -2588,6 +2610,13 @@ export const Preview: React.FC = () => {
               return;
             }
             scheduleScrubVideoRelease();
+            try {
+              const copy = await createImageBitmap(frame);
+              lastDecodedFrameRef.current.get(frameKey)?.bitmap.close();
+              lastDecodedFrameRef.current.set(frameKey, { time: wantedTime, blob: mediaBlob, bitmap: copy });
+            } catch {
+              // Only a shortcut for the next repaint.
+            }
             resolve(frame);
           } catch {
             if (!isStaleRequest()) failProxyPlayback(clip.mediaId, mediaBlob);
@@ -3205,6 +3234,18 @@ export const Preview: React.FC = () => {
           time,
         );
         hasRenderedFrame = hasRenderedFrame || adjusted;
+      }
+
+      // A frame that wasn't ready (still decoding, or superseded by a newer
+      // request) is tried again shortly, so a still preview never stays black.
+      const retry = missingFrameRetryRef.current;
+      window.clearTimeout(retry.timer);
+      if (!missingClipFrame) retry.count = 0;
+      else if (!isPlaying && retry.count < 20) {
+        retry.count += 1;
+        retry.timer = window.setTimeout(() => {
+          if (!isPlayingRef.current) void renderFrameDirectlyRef.current(useTimelineStore.getState().playheadPosition);
+        }, 120);
       }
 
       if (missingClipFrame && canvasHasPictureRef.current) return true;
@@ -6126,10 +6167,15 @@ export const Preview: React.FC = () => {
 
   const lastProjectForRenderRef = useRef(project);
   const lastProxyRevisionForRenderRef = useRef(proxySourceRevision);
-  const lastPlayheadForRenderRef = useRef<number>(playheadPosition);
+  // NaN, so the first pass counts as a playhead change and opening a project draws its frame.
+  const lastPlayheadForRenderRef = useRef<number>(Number.NaN);
   const modifiedRenderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderInFlightRef = useRef<boolean>(false);
   const pendingRenderTimeRef = useRef<number | null>(null);
+  const latestDoRenderRef = useRef<(time: number) => void>(() => undefined);
+  useEffect(() => () => {
+    if (modifiedRenderTimerRef.current) clearTimeout(modifiedRenderTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (isPlaying) return;
@@ -6185,24 +6231,18 @@ export const Preview: React.FC = () => {
       }
     };
 
+    latestDoRenderRef.current = doRender;
     if (playheadChanged || sourceChanged) {
       doRender(playheadPosition);
-    } else if (projectChanged) {
-      if (modifiedRenderTimerRef.current) {
-        clearTimeout(modifiedRenderTimerRef.current);
-      }
+    } else if (projectChanged && !modifiedRenderTimerRef.current) {
+      // Throttled, not debounced: a pinch or typing changes the project
+      // continuously, and the preview should follow along rather than wait
+      // for it to stop. The timer draws the newest project when it fires.
       modifiedRenderTimerRef.current = setTimeout(() => {
         modifiedRenderTimerRef.current = null;
-        doRender(playheadPosition);
-      }, 150);
+        if (useTimelineStore.getState().playbackState !== "playing") latestDoRenderRef.current(useTimelineStore.getState().playheadPosition);
+      }, 40);
     }
-
-    return () => {
-      if (modifiedRenderTimerRef.current) {
-        clearTimeout(modifiedRenderTimerRef.current);
-        modifiedRenderTimerRef.current = null;
-      }
-    };
   }, [
     playheadPosition,
     isPlaying,

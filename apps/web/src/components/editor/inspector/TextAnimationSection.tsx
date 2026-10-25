@@ -89,15 +89,13 @@ const TextAnimationPresetCard: React.FC<{
   const [hovered, setHovered] = React.useState(false);
   const [progress, setProgress] = React.useState(0.62);
 
+  // Every card plays its animation on a loop; hovering one plays it faster.
   React.useEffect(() => {
-    if (!hovered) {
-      setProgress(0.62);
-      return;
-    }
+    const loop = hovered ? 1200 : 2000;
     let frame = 0;
     const startedAt = performance.now();
     const animate = (now: number) => {
-      setProgress(((now - startedAt) % 1200) / 1200);
+      setProgress(Math.min(1, (((now - startedAt) % loop) / loop) / 0.7));
       frame = requestAnimationFrame(animate);
     };
     frame = requestAnimationFrame(animate);

@@ -153,7 +153,7 @@ export function PhoneExportScreen({ status, progress, label, still, videoUrl, lo
   // Portalled to <body> so no editor layer can stack on top of it. The class
   // keeps the phone's teal accent outside the editor tree.
   return createPortal(
-    <div role="dialog" aria-label={status === "saved" ? "Saved to device" : "Exporting"} className="phone-editor fixed inset-0 z-[400] flex flex-col overflow-hidden bg-black text-fg">
+    <div role="dialog" aria-label={status === "saved" ? "Saved to device" : "Exporting"} className="phone-editor dark fixed inset-0 z-[400] flex flex-col overflow-hidden bg-black text-fg">
       {status === "saved" && still && (
         <img src={still} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-40 blur-3xl" />
       )}

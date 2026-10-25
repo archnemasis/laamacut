@@ -28,11 +28,13 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.effect.Presentation;
 import androidx.media3.transformer.Composition;
+import androidx.media3.transformer.DefaultEncoderFactory;
 import androidx.media3.transformer.EditedMediaItem;
 import androidx.media3.transformer.Effects;
 import androidx.media3.transformer.ExportException;
 import androidx.media3.transformer.ExportResult;
 import androidx.media3.transformer.Transformer;
+import androidx.media3.transformer.VideoEncoderSettings;
 
 import com.google.common.collect.ImmutableList;
 
@@ -173,10 +175,14 @@ public class GalleryPlugin extends Plugin {
         });
     }
 
+    /** A preview copy only needs to look right on a phone screen, so it's encoded lighter. */
+    private static final int PREVIEW_BITRATE = 3_000_000;
+
     /**
      * Make a small preview copy of a video with the phone's hardware encoder
      * (H.264, `height` lines tall, default 720) for smooth editing on slower
-     * phones. Exports keep using the original. Resolves to the copy's file:// path.
+     * phones. Exports keep using the original. Resolves to the copy's file://
+     * path, or to no path when the video is already that small and needs no copy.
      */
     @OptIn(markerClass = UnstableApi.class)
     @PluginMethod
@@ -194,31 +200,64 @@ public class GalleryPlugin extends Plugin {
         }
         File output = new File(dir, UUID.randomUUID() + ".mp4");
         call.setKeepAlive(true);
-        getActivity().runOnUiThread(() -> {
-            Transformer transformer = new Transformer.Builder(getContext())
-                .setVideoMimeType(MimeTypes.VIDEO_H264)
-                .addListener(new Transformer.Listener() {
-                    @Override
-                    public void onCompleted(Composition composition, ExportResult result) {
-                        JSObject out = new JSObject();
-                        out.put("path", Uri.fromFile(output).toString());
-                        call.resolve(out);
-                        call.setKeepAlive(false);
-                    }
-
-                    @Override
-                    public void onError(Composition composition, ExportResult result, ExportException error) {
-                        output.delete();
-                        call.reject(error.getMessage(), error);
-                        call.setKeepAlive(false);
-                    }
-                })
-                .build();
-            EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(uri)))
-                .setEffects(new Effects(ImmutableList.of(), ImmutableList.of(Presentation.createForHeight(height))))
-                .build();
-            transformer.start(item, output.getAbsolutePath());
+        getBridge().execute(() -> {
+            if (displayedHeight(uri) <= height) {
+                call.resolve(new JSObject());
+                call.setKeepAlive(false);
+                return;
+            }
+            getActivity().runOnUiThread(() -> startPreviewCopy(call, uri, height, output));
         });
+    }
+
+    /** The video's height as shown (rotation applied), or MAX_VALUE if it can't be read. */
+    private int displayedHeight(String uri) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(getContext(), Uri.parse(uri));
+            int width = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            int height = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+            String rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+            boolean sideways = rotation != null && (rotation.equals("90") || rotation.equals("270"));
+            return sideways ? width : height;
+        } catch (Exception e) {
+            return Integer.MAX_VALUE;
+        } finally {
+            try {
+                retriever.release();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @OptIn(markerClass = UnstableApi.class)
+    private void startPreviewCopy(PluginCall call, String uri, int height, File output) {
+        Transformer transformer = new Transformer.Builder(getContext())
+            .setVideoMimeType(MimeTypes.VIDEO_H264)
+            .setEncoderFactory(new DefaultEncoderFactory.Builder(getContext())
+                .setRequestedVideoEncoderSettings(new VideoEncoderSettings.Builder().setBitrate(PREVIEW_BITRATE).build())
+                .build())
+            .addListener(new Transformer.Listener() {
+                @Override
+                public void onCompleted(Composition composition, ExportResult result) {
+                    JSObject out = new JSObject();
+                    out.put("path", Uri.fromFile(output).toString());
+                    call.resolve(out);
+                    call.setKeepAlive(false);
+                }
+
+                @Override
+                public void onError(Composition composition, ExportResult result, ExportException error) {
+                    output.delete();
+                    call.reject(error.getMessage(), error);
+                    call.setKeepAlive(false);
+                }
+            })
+            .build();
+        EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(uri)))
+            .setEffects(new Effects(ImmutableList.of(), ImmutableList.of(Presentation.createForHeight(height))))
+            .build();
+        transformer.start(item, output.getAbsolutePath());
     }
 
     /** Delete a preview copy once the editor has loaded it. */

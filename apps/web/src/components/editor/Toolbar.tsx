@@ -33,7 +33,8 @@ import { startNewProject } from "../../desktop/start/desktop-project-actions";
 import { requestPhoneMediaPicker } from "../../services/phone-media";
 import { CompressDialog } from "./CompressDialog";
 import { deriveSourceExportMatch } from "../../services/export-source-match";
-import { useExportRunner, extForFormat, exportFilename, type ExportDeliveryMode, type ExportFileHandler } from "../../services/export-runner";
+import { useExportRunner, extForFormat, exportFilename, mimeForExt, type ExportDeliveryMode, type ExportFileHandler } from "../../services/export-runner";
+import { ExportSavedDialog } from "./ExportSavedDialog";
 import { ScreenRecorder } from "./ScreenRecorder";
 import { HistoryPanel } from "./inspector/HistoryPanel";
 import { ProjectSwitcher } from "./ProjectSwitcher";
@@ -128,6 +129,48 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
     cancel: handleCancelExport,
     resetError,
   } = useExportRunner({ project, onExported: handleExported });
+
+  // Desktop: after an export, a "Video saved" window with a small player, like the phone's Saved screen.
+  const [desktopSaved, setDesktopSaved] = useState<{ fileName: string; path?: string; still?: string; videoUrl?: string } | null>(null);
+  const savedVideoUrl = React.useRef<string | null>(null);
+  const closeDesktopSaved = useCallback(() => {
+    if (savedVideoUrl.current) URL.revokeObjectURL(savedVideoUrl.current);
+    savedVideoUrl.current = null;
+    setDesktopSaved(null);
+  }, []);
+  useEffect(() => () => {
+    if (savedVideoUrl.current) URL.revokeObjectURL(savedVideoUrl.current);
+  }, []);
+  const showDesktopSaved = useCallback(
+    (settings: Partial<VideoExportSettings>, ext: string) => {
+      const bridge = window.openreel;
+      if (bridge?.platform !== "desktop") return;
+      const current = useProjectStore.getState().project;
+      const path = (window as { __openreelExportPath?: string }).__openreelExportPath;
+      if (savedVideoUrl.current) URL.revokeObjectURL(savedVideoUrl.current);
+      savedVideoUrl.current = null;
+      setDesktopSaved({
+        fileName: path?.split(/[\\/]/).pop() ?? exportFilename(current.name, ext),
+        path,
+        still: getProjectPreview(current.id)?.image ?? capturePreviewStill(),
+      });
+      // Save the project now, not only when you go back home.
+      void useProjectStore.getState().forceSave();
+      void captureProjectPreview(current);
+      // Read the file back for the player, unless it's too big to hold in memory.
+      const estimatedBytes = ((settings.bitrate ?? 12000) * 1000 / 8) * (current.timeline?.duration ?? 0);
+      if (!path || estimatedBytes > 250_000_000) return;
+      void bridge.fs
+        .readFileBytes(path)
+        .then((bytes) => {
+          const url = URL.createObjectURL(new Blob([bytes], { type: mimeForExt(ext) }));
+          savedVideoUrl.current = url;
+          setDesktopSaved((saved) => (saved?.path === path ? { ...saved, videoUrl: url } : saved));
+        })
+        .catch(() => undefined);
+    },
+    [],
+  );
 
   const [deviceProfile, setDeviceProfile] = useState<DeviceProfile | null>(null);
   const [exportEstimates, setExportEstimates] = useState<Map<string, TimeEstimate>>(new Map());
@@ -228,6 +271,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
           beginExport(writable);
 
           await runExport(preset.settings, preset.ext, writable);
+          showDesktopSaved(preset.settings, preset.ext);
         }
 
         finishExportSoon();
@@ -235,7 +279,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
         failExport(error);
       }
     },
-    [project, hasTimelineContent, track, runExport, runAudioExport, showSavePicker, beginExport, markComplete, finishExportSoon, failExport],
+    [project, hasTimelineContent, track, runExport, runAudioExport, showSavePicker, beginExport, markComplete, finishExportSoon, failExport, showDesktopSaved],
   );
 
   const handleCustomExport = useCallback(
@@ -263,6 +307,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
         };
 
         await runExport(exportSettings, ext, writable);
+        if (!onFile && delivery === "file") showDesktopSaved(exportSettings, ext);
 
         track(AnalyticsEvents.PROJECT_EXPORTED, {
           format: settings.format,
@@ -280,7 +325,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
         failExport(error);
       }
     },
-    [project, hasTimelineContent, closeModal, track, runExport, showSavePicker, beginExport, finishExportSoon, failExport],
+    [project, hasTimelineContent, closeModal, track, runExport, showSavePicker, beginExport, finishExportSoon, failExport, showDesktopSaved],
   );
 
   // Phone: CapCut exports straight away with the quality chip's settings.
@@ -702,6 +747,17 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
       />
 
       <SettingsDialog />
+
+      {desktopSaved && (
+        <ExportSavedDialog
+          fileName={desktopSaved.fileName}
+          still={desktopSaved.still}
+          videoUrl={desktopSaved.videoUrl}
+          aspect={(project.settings.width || 16) / (project.settings.height || 9)}
+          onReveal={desktopSaved.path ? () => void window.openreel?.fs.revealInFolder(desktopSaved.path!) : undefined}
+          onClose={closeDesktopSaved}
+        />
+      )}
 
       {phone && phoneRun && (
         <PhoneExportScreen

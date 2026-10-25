@@ -78,17 +78,24 @@
   background: #ffffff;
 }
 
+/* Like CapCut, the phone preview fills its area edge to edge on black. In
+   the light theme the area around the video follows the page instead. */
 .phone-editor .phone-preview {
   --stage-bg: #000000;
+  --screen-bg: #000000;
+}
+[data-theme="light"] .phone-editor .phone-preview {
+  --stage-bg: var(--bg);
+  --screen-bg: var(--bg);
 }
 
-/* Like CapCut, the phone preview fills its area edge to edge on black. */
 .phone-editor [data-preview-area] {
   padding: 0 !important;
-  background: #000000;
+  background: var(--stage-bg) !important;
 }
 
-.phone-editor [data-preview-screen] {
+.phone-editor [data-preview-screen],
+.phone-editor [data-preview-screen] canvas {
   border-radius: 0 !important;
   box-shadow: none !important;
   --tw-ring-shadow: 0 0 #0000 !important;

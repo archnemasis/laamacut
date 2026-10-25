@@ -44,7 +44,7 @@ import {
 import { Toolbar } from "./Toolbar";
 import { Preview } from "./Preview";
 import { PhoneTimeline } from "./PhoneTimeline";
-import { PhoneTextEditor } from "./PhoneTextEditor";
+import { PhoneTextEditor, type TextEditorTab } from "./PhoneTextEditor";
 import { PhoneGestures } from "./PhoneGestures";
 import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
@@ -182,7 +182,7 @@ export const PhoneEditor: React.FC = () => {
   const [clipMenu, setClipMenu] = useState<ClipMenu | null>(null);
   const [panel, setPanel] = useState<ClipPanel | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
-  const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean } | null>(null);
+  const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean; tab?: TextEditorTab } | null>(null);
   // New projects open straight into the media picker, like CapCut.
   const [pickerOpen, setPickerOpen] = useState(false);
   const startedFromNewProject = useRef(false);
@@ -413,7 +413,11 @@ export const PhoneEditor: React.FC = () => {
 
   const clipTools: Tool[] = selectedText
     ? [
-        { label: "Edit", icon: Pencil, onClick: () => setTextEdit({ clipId: selectedText, isNew: false }) },
+        // Like CapCut, selected text gets its own tools; only Edit brings up the keyboard.
+        { label: "Edit", icon: Pencil, onClick: () => setTextEdit({ clipId: selectedText, isNew: false, tab: "keyboard" }) },
+        { label: "Font", icon: Type, onClick: () => setTextEdit({ clipId: selectedText, isNew: false, tab: "fonts" }) },
+        { label: "Style", icon: Palette, onClick: () => setTextEdit({ clipId: selectedText, isNew: false, tab: "styles" }) },
+        { label: "Animation", icon: Film, onClick: () => setTextEdit({ clipId: selectedText, isNew: false, tab: "animations" }) },
         splitTool,
         deleteTool,
         duplicateTool,
@@ -443,7 +447,7 @@ export const PhoneEditor: React.FC = () => {
     <div className="phone-editor flex h-full w-full flex-col overflow-hidden bg-bg text-fg">
       <Toolbar phone />
 
-      <div ref={previewRef} className="phone-preview relative min-h-0 shrink-0 basis-[48%] bg-black">
+      <div ref={previewRef} className="phone-preview relative min-h-0 shrink-0 basis-[48%] bg-[var(--stage-bg)]">
         <PanelErrorBoundary name="Stage">
           <Preview />
         </PanelErrorBoundary>
@@ -497,7 +501,6 @@ export const PhoneEditor: React.FC = () => {
               onAddMedia={() => setPickerOpen(true)}
               onAddAudio={() => setMenu("audio")}
               onAddText={() => void addText()}
-              onEditText={(clipId) => setTextEdit({ clipId, isNew: false })}
             />
           </PanelErrorBoundary>
         </div>
@@ -535,7 +538,7 @@ export const PhoneEditor: React.FC = () => {
         {textEdit && (
           <div className="absolute inset-0 z-[110]">
             <PanelErrorBoundary name="Text">
-              <PhoneTextEditor clipId={textEdit.clipId} isNew={textEdit.isNew} onDone={() => setTextEdit(null)} />
+              <PhoneTextEditor clipId={textEdit.clipId} isNew={textEdit.isNew} initialTab={textEdit.tab} onDone={() => setTextEdit(null)} />
             </PanelErrorBoundary>
           </div>
         )}

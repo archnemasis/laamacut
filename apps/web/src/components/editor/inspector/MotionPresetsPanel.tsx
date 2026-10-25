@@ -237,8 +237,9 @@ const PresetCard: React.FC<PresetCardProps> = ({
   const previewRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<Animation | null>(null);
 
+  // Every card plays its preset on a loop, so it can be seen before it's applied.
   useEffect(() => {
-    if (!isHovered || !previewRef.current) {
+    if (!previewRef.current?.animate) {
       if (animationRef.current) {
         animationRef.current.cancel();
         animationRef.current = null;
@@ -258,7 +259,7 @@ const PresetCard: React.FC<PresetCardProps> = ({
     return () => {
       animationRef.current?.cancel();
     };
-  }, [duration, isHovered, preset]);
+  }, [duration, preset]);
 
   return (
     <ClickableCard
