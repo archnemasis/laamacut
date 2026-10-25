@@ -213,6 +213,8 @@ export class MediaBridge {
         waveformSamplesPerSecond: 100,
         useFallback: true,
         quickMode,
+        // Quick imports keep the original file instead of re-encoding it.
+        transcodeUnsupported: !quickMode,
       });
 
       if (!result.success || !result.media) {

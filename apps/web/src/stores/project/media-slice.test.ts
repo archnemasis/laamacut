@@ -201,9 +201,12 @@ describe("Media slice asynchronous imports", () => {
 
     expect(result.success).toBe(true);
     expect(store.getState().project.mediaLibrary.items).toHaveLength(1);
-    expect(warning).toHaveBeenCalledWith(
-      "Media could not be saved in browser storage",
-      expect.stringContaining("clip.wav"),
+    // Saving runs in the background, so the warning arrives after the import.
+    await vi.waitFor(() =>
+      expect(warning).toHaveBeenCalledWith(
+        "Media could not be saved in browser storage",
+        expect.stringContaining("clip.wav"),
+      ),
     );
     consoleError.mockRestore();
   });

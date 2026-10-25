@@ -16,7 +16,9 @@ import { createExportJobRunner } from "../services/agent/export-job-runner";
 import { useSettingsStore } from "../stores/settings-store";
 import { useThemeStore } from "../stores/theme-store";
 import { SettingsDialog } from "../components/editor/settings/SettingsDialog";
-import { MoreHorizontal } from "@/icons/lucide-compat";
+import { PageBar } from "./shell/PageBar";
+import { useTimelineStore } from "../stores/timeline-store";
+import { useUIStore } from "../stores/ui-store";
 import { captureProjectPreview } from "../services/project-previews";
 import "./theme/desktop-theme.css";
 
@@ -29,6 +31,16 @@ function detectPlatform(): string {
 export function DesktopApp(): JSX.Element {
   const platform = detectPlatform();
   const hasProject = useProjectStore((state) => state.hasOpenProject);
+
+  // Home, like Resolve's project manager: save the open project, then show
+  // the project list. The project reopens from Recent projects.
+  const goHome = async () => {
+    if (!useProjectStore.getState().hasOpenProject) return;
+    useTimelineStore.getState().pause();
+    await useProjectStore.getState().forceSave();
+    useUIStore.getState().clearSelection();
+    useProjectStore.setState({ hasOpenProject: false });
+  };
 
   // Drive native-menu actions into the app: undo/redo hit the project store
   // directly; new/open/export are broadcast as events for the relevant UI to
@@ -131,15 +143,12 @@ export function DesktopApp(): JSX.Element {
         </ErrorBoundary>
       </div>
       <UpdateBanner />
-      <button
-        type="button"
-        aria-label="Settings"
-        title="Settings"
-        onClick={() => useSettingsStore.getState().openSettings()}
-        className="fixed bottom-4 right-4 z-40 grid h-10 w-10 place-items-center rounded-full border border-border bg-bg-1 text-fg-2 shadow-md transition-colors hover:border-accent hover:text-fg focus-visible:border-accent focus-visible:outline-none"
-      >
-        <MoreHorizontal size={20} aria-hidden />
-      </button>
+      <PageBar
+        hasProject={hasProject}
+        onHome={() => void goHome()}
+        onDeliver={() => window.dispatchEvent(new CustomEvent("openreel:menu:export"))}
+        onSettings={() => useSettingsStore.getState().openSettings()}
+      />
       <SettingsDialog />
     </div>
   );

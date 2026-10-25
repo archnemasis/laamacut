@@ -13,3 +13,14 @@
 .phone-editor .phone-sheet-body > * {
   min-height: 100%;
 }
+
+/* Like CapCut, a selected item gets just a white outline on the phone:
+   no resize squares or aspect-lock tag. Size is set with the Transform tool. */
+.phone-editor [data-resize-handle],
+.phone-editor [data-aspect-lock] {
+  display: none;
+}
+
+.phone-editor .phone-preview {
+  --stage-bg: #000000;
+}

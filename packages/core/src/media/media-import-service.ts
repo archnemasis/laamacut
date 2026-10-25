@@ -59,6 +59,8 @@ export interface MediaImportOptions {
   waveformSamplesPerSecond?: number;
   useFallback?: boolean;
   quickMode?: boolean;
+  /** Re-encode files the browser cannot decode. Off keeps the original file. */
+  transcodeUnsupported?: boolean;
 }
 
 const DEFAULT_OPTIONS: Required<MediaImportOptions> = {
@@ -69,6 +71,7 @@ const DEFAULT_OPTIONS: Required<MediaImportOptions> = {
   waveformSamplesPerSecond: 100,
   useFallback: true,
   quickMode: false,
+  transcodeUnsupported: true,
 };
 
 export class MediaImportService {
@@ -139,6 +142,7 @@ export class MediaImportService {
       }
 
       if (
+        !opts.quickMode &&
         metadata.hasAudio &&
         (metadata.audioTrackCount === undefined || metadata.audioTrackCount <= 1)
       ) {
@@ -164,7 +168,7 @@ export class MediaImportService {
           );
         }
 
-        if (opts.useFallback) {
+        if (opts.useFallback && opts.transcodeUnsupported) {
           try {
             return await this.importWithFallback(file, opts, {
               format: "mp4",

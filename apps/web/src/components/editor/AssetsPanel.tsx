@@ -612,13 +612,6 @@ const EmptyState: React.FC<{ onImport: () => void }> = ({ onImport }) => (
   </div>
 );
 
-const LoadingIndicator: React.FC<{ message: string }> = ({ message }) => (
-  <div className="absolute inset-0 bg-bg-1/90 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-    <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3" />
-    <Text type="body" color="secondary" display="block" className="text-sm text-fg-2">{message}</Text>
-  </div>
-);
-
 /** `tab` opens a section directly; `hideRail` drops the section rail (phone sheets). */
 export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({ tab, hideRail = false }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -630,8 +623,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
   const selectedIds = useUIStore((state) => state.selectedItems);
 
   const [isDragOver, setIsDragOver] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState("");
   const [showOnlyMissing, setShowOnlyMissing] = useState(false);
   const [showAspectRatioDialog, setShowAspectRatioDialog] = useState(false);
   const [aspectRatioDialogData, setAspectRatioDialogData] = useState<{
@@ -689,30 +680,14 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
     async (files: FileList | null) => {
       if (!files || files.length === 0) return;
 
-      setIsImporting(true);
-      const fileArray = Array.from(files);
-
-      try {
-        for (let i = 0; i < fileArray.length; i++) {
-          const file = fileArray[i];
-          setImportProgress(
-            `Importing ${file.name} (${i + 1}/${fileArray.length})...`,
-          );
-
-          const result = await importMedia(file);
-
-          // If it's a video with audio, extract audio to separate track
-          if (result.success && file.type.startsWith("video/")) {
-            setImportProgress(`Extracting audio from ${file.name}...`);
-            // Audio extraction is handled by the importMedia function
-            // The audio track is created automatically when adding to timeline
-          }
+      // Files appear as soon as their metadata is read; thumbnails and
+      // waveforms fill in afterwards, so there is no blocking progress screen.
+      for (const file of Array.from(files)) {
+        try {
+          await importMedia(file);
+        } catch (error) {
+          console.error("Import failed:", error);
         }
-      } catch (error) {
-        console.error("Import failed:", error);
-      } finally {
-        setIsImporting(false);
-        setImportProgress("");
       }
     },
     [importMedia],
@@ -784,15 +759,10 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
       input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-          setIsImporting(true);
-          setImportProgress(`Replacing asset...`);
           try {
             await replaceMediaAsset(itemId, file);
           } catch (error) {
             console.error("Asset replacement failed:", error);
-          } finally {
-            setIsImporting(false);
-            setImportProgress("");
           }
         }
       };
@@ -831,7 +801,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
       }
     }
 
-    setIsImporting(true);
     let linked = 0;
     for (const item of placeholders) {
       // Match on original source file name + size (same strategy as auto-restore)
@@ -840,7 +809,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
         : null;
       const entry = key ? fileMap.get(key) : null;
       if (entry) {
-        setImportProgress(`Relinking ${item.name}…`);
         try {
           // Save individual file handle for future auto-restore
           try { await saveFileHandle(entry.file.name, entry.file.size, entry.handle); } catch { /* best-effort */ }
@@ -851,9 +819,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
         }
       }
     }
-    setIsImporting(false);
-    setImportProgress("");
-
     if (linked > 0) {
       toast.success(`Relinked ${linked} of ${placeholders.length} asset${placeholders.length !== 1 ? "s" : ""}`);
     } else {
@@ -1539,10 +1504,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
 
       {/* ── Body: section content fills the remaining space ──── */}
       <div className="flex-1 flex flex-col min-w-0 h-full bg-bg-1 relative">
-        {isImporting && (
-          <LoadingIndicator message={importProgress || "Importing media..."} />
-        )}
-
         <input
           ref={fileInputRef}
           type="file"

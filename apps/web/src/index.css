@@ -78,6 +78,7 @@
   [data-theme="dark"],
   .dark {
     --bg: oklch(0.12 0.005 240);
+    --playhead: oklch(0.97 0.003 240);
     --bg-1: oklch(0.16 0.006 240);
     --bg-2: oklch(0.2 0.007 240);
     --bg-3: oklch(0.24 0.008 240);

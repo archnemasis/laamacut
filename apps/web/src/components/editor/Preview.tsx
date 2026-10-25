@@ -7803,7 +7803,7 @@ export const Preview: React.FC = () => {
               }}
             >
               {/* Selection border */}
-              <div className="absolute inset-0 border-2 border-primary pointer-events-none" />
+              <div className="absolute inset-0 border-2 border-white pointer-events-none" />
 
               {/* Move handle (center) */}
               <div
@@ -7816,6 +7816,7 @@ export const Preview: React.FC = () => {
 
               {/* Aspect ratio lock toggle */}
               <Button
+                data-aspect-lock
                 label={lockAspectRatio ? "Unlock aspect ratio" : "Lock aspect ratio"}
                 variant="ghost"
                 className={`absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded pointer-events-auto transition-colors ${
@@ -7830,36 +7831,44 @@ export const Preview: React.FC = () => {
 
               {/* Corner resize handles */}
               <div
+                data-resize-handle
                 className="absolute -left-2 -top-2 w-4 h-4 bg-white border-2 border-primary rounded-sm cursor-nw-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "nw")}
               />
               <div
+                data-resize-handle
                 className="absolute -right-2 -top-2 w-4 h-4 bg-white border-2 border-primary rounded-sm cursor-ne-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "ne")}
               />
               <div
+                data-resize-handle
                 className="absolute -left-2 -bottom-2 w-4 h-4 bg-white border-2 border-primary rounded-sm cursor-sw-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "sw")}
               />
               <div
+                data-resize-handle
                 className="absolute -right-2 -bottom-2 w-4 h-4 bg-white border-2 border-primary rounded-sm cursor-se-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "se")}
               />
 
               {/* Edge resize handles */}
               <div
+                data-resize-handle
                 className="absolute left-1/2 -translate-x-1/2 -top-2 w-6 h-4 bg-white border-2 border-primary rounded-sm cursor-n-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "n")}
               />
               <div
+                data-resize-handle
                 className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-6 h-4 bg-white border-2 border-primary rounded-sm cursor-s-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "s")}
               />
               <div
+                data-resize-handle
                 className="absolute top-1/2 -translate-y-1/2 -left-2 w-4 h-6 bg-white border-2 border-primary rounded-sm cursor-w-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "w")}
               />
               <div
+                data-resize-handle
                 className="absolute top-1/2 -translate-y-1/2 -right-2 w-4 h-6 bg-white border-2 border-primary rounded-sm cursor-e-resize pointer-events-auto hover:bg-primary hover:border-white transition-colors"
                 onMouseDown={(e) => handleHandleMouseDown(e, "e")}
               />
@@ -7877,8 +7886,8 @@ export const Preview: React.FC = () => {
                 height: textClipBounds.height,
               }}
             >
-              {/* Selection border - cyan for text clips */}
-              <div className="absolute inset-0 border-2 border-cyan-500 pointer-events-none" />
+              {/* Selection border */}
+              <div className="absolute inset-0 border-2 border-white pointer-events-none" />
 
               {/* Move handle (center) */}
               <div
@@ -7891,6 +7900,7 @@ export const Preview: React.FC = () => {
 
               {/* Aspect ratio lock toggle */}
               <Button
+                data-aspect-lock
                 label={lockAspectRatio ? "Unlock aspect ratio" : "Lock aspect ratio"}
                 variant="ghost"
                 className={`absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded pointer-events-auto transition-colors ${
@@ -7905,36 +7915,44 @@ export const Preview: React.FC = () => {
 
               {/* Corner resize handles */}
               <div
+                data-resize-handle
                 className="absolute -left-2 -top-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-sm cursor-nw-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "nw")}
               />
               <div
+                data-resize-handle
                 className="absolute -right-2 -top-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-sm cursor-ne-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "ne")}
               />
               <div
+                data-resize-handle
                 className="absolute -left-2 -bottom-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-sm cursor-sw-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "sw")}
               />
               <div
+                data-resize-handle
                 className="absolute -right-2 -bottom-2 w-4 h-4 bg-white border-2 border-cyan-500 rounded-sm cursor-se-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "se")}
               />
 
               {/* Edge resize handles */}
               <div
+                data-resize-handle
                 className="absolute left-1/2 -translate-x-1/2 -top-2 w-6 h-4 bg-white border-2 border-cyan-500 rounded-sm cursor-n-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "n")}
               />
               <div
+                data-resize-handle
                 className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-6 h-4 bg-white border-2 border-cyan-500 rounded-sm cursor-s-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "s")}
               />
               <div
+                data-resize-handle
                 className="absolute top-1/2 -translate-y-1/2 -left-2 w-4 h-6 bg-white border-2 border-cyan-500 rounded-sm cursor-w-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "w")}
               />
               <div
+                data-resize-handle
                 className="absolute top-1/2 -translate-y-1/2 -right-2 w-4 h-6 bg-white border-2 border-cyan-500 rounded-sm cursor-e-resize pointer-events-auto hover:bg-cyan-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleTextHandleMouseDown(e, "e")}
               />
@@ -7953,7 +7971,7 @@ export const Preview: React.FC = () => {
               }}
             >
               {selectedShapeClip.type !== "svg" && (
-                <div className="absolute inset-0 border-2 border-green-500 pointer-events-none" />
+                <div className="absolute inset-0 border-2 border-white pointer-events-none" />
               )}
 
               {/* Move handle (center) */}
@@ -7967,6 +7985,7 @@ export const Preview: React.FC = () => {
 
               {/* Aspect ratio lock toggle */}
               <Button
+                data-aspect-lock
                 label={lockAspectRatio ? "Unlock aspect ratio" : "Lock aspect ratio"}
                 variant="ghost"
                 className={`absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded pointer-events-auto transition-colors ${
@@ -7981,36 +8000,44 @@ export const Preview: React.FC = () => {
 
               {/* Corner resize handles */}
               <div
+                data-resize-handle
                 className="absolute -left-2 -top-2 w-4 h-4 bg-white border-2 border-green-500 rounded-sm cursor-nw-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "nw")}
               />
               <div
+                data-resize-handle
                 className="absolute -right-2 -top-2 w-4 h-4 bg-white border-2 border-green-500 rounded-sm cursor-ne-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "ne")}
               />
               <div
+                data-resize-handle
                 className="absolute -left-2 -bottom-2 w-4 h-4 bg-white border-2 border-green-500 rounded-sm cursor-sw-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "sw")}
               />
               <div
+                data-resize-handle
                 className="absolute -right-2 -bottom-2 w-4 h-4 bg-white border-2 border-green-500 rounded-sm cursor-se-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "se")}
               />
 
               {/* Edge resize handles */}
               <div
+                data-resize-handle
                 className="absolute left-1/2 -translate-x-1/2 -top-2 w-6 h-4 bg-white border-2 border-green-500 rounded-sm cursor-n-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "n")}
               />
               <div
+                data-resize-handle
                 className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-6 h-4 bg-white border-2 border-green-500 rounded-sm cursor-s-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "s")}
               />
               <div
+                data-resize-handle
                 className="absolute top-1/2 -translate-y-1/2 -left-2 w-4 h-6 bg-white border-2 border-green-500 rounded-sm cursor-w-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "w")}
               />
               <div
+                data-resize-handle
                 className="absolute top-1/2 -translate-y-1/2 -right-2 w-4 h-6 bg-white border-2 border-green-500 rounded-sm cursor-e-resize pointer-events-auto hover:bg-green-500 hover:border-white transition-colors"
                 onMouseDown={(e) => handleShapeHandleMouseDown(e, "e")}
               />
@@ -8028,8 +8055,8 @@ export const Preview: React.FC = () => {
                 height: subtitleBounds.height,
               }}
             >
-              {/* Selection border - yellow/orange for subtitles */}
-              <div className="absolute inset-0 border-2 border-yellow-500 rounded-lg pointer-events-none animate-pulse" />
+              {/* Selection border */}
+              <div className="absolute inset-0 border-2 border-white rounded-lg pointer-events-none" />
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-yellow-500 rounded text-[10px] font-medium text-black whitespace-nowrap">
                 Subtitle Selected - Edit in Inspector
               </div>

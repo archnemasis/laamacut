@@ -2,6 +2,8 @@ import { useEffect, useCallback, useRef, useState, lazy, Suspense } from "react"
 import { ToastContainer } from "./components/Toast";
 import { MobileBlocker } from "./components/MobileBlocker";
 import { WelcomeScreen } from "./components/welcome";
+import { PhoneHome } from "./components/phone/PhoneHome";
+import { usePhoneEditor } from "./hooks/useCompactEditor";
 import { RecoveryDialog } from "./components/welcome/RecoveryDialog";
 import { useUIStore } from "./stores/ui-store";
 import { useProjectStore } from "./stores/project-store";
@@ -49,6 +51,7 @@ function App() {
   const [isRecovering, setIsRecovering] = useState(false);
   const createNewProject = useProjectStore((state) => state.createNewProject);
   const hasOpenProject = useProjectStore((state) => state.hasOpenProject);
+  const phone = usePhoneEditor();
   const { isChecking, showDialog, availableSaves, recover, dismiss, clearAll } = useProjectRecovery();
 
   const { route, params, navigate, parsedDimensions, fps } = useRouter();
@@ -61,6 +64,11 @@ function App() {
   useEffect(() => {
     if (activeModal === "scriptView") setHasOpenedScriptView(true);
   }, [activeModal]);
+
+  // The phone home lists every saved project, so phones skip the recovery prompt.
+  useEffect(() => {
+    if (phone && showDialog) dismiss();
+  }, [phone, showDialog, dismiss]);
 
   useEffect(() => {
     if (hasHandledInitialRoute.current || isChecking || showDialog || isRecovering) return;
@@ -163,7 +171,7 @@ function App() {
           <SharePage shareId={params.shareId!} />
         </Suspense>
       ) : showWelcome ? (
-        <WelcomeScreen initialTab={initialTab} />
+        phone ? <PhoneHome /> : <WelcomeScreen initialTab={initialTab} />
       ) : !hasOpenProject || route === "new" ? (
         <LoadingSpinner message={isChecking ? "Checking for saved projects..." : showDialog ? "Choose a saved project or start fresh..." : "Opening project..."} />
       ) : (
@@ -176,7 +184,7 @@ function App() {
         {(hasOpenedScriptView || activeModal === "scriptView") && <ScriptViewDialog isOpen={activeModal === "scriptView"} onClose={closeModal} />}
         {activeModal === "search" && <SearchModal isOpen onClose={closeModal} />}
       </Suspense>
-      {showDialog && availableSaves.length > 0 && (
+      {showDialog && availableSaves.length > 0 && !phone && (
         <RecoveryDialog
           saves={availableSaves}
           onRecover={async (saveId) => {

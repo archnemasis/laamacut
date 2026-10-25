@@ -389,7 +389,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
 
       {phone && (
         <div className="flex flex-1 items-center gap-1">
-          <button type="button" aria-label="Close project" onClick={() => navigate("welcome")} className="grid h-11 w-11 place-items-center rounded-full text-fg hover:bg-hover">
+          <button type="button" aria-label="Close project" onClick={() => void useProjectStore.getState().forceSave().finally(() => navigate("welcome"))} className="grid h-11 w-11 place-items-center rounded-full text-fg hover:bg-hover">
             <X size={24} aria-hidden />
           </button>
           <button type="button" aria-label="Settings" onClick={() => openSettings()} className="grid h-11 w-11 place-items-center rounded-full text-fg hover:bg-hover">
@@ -423,7 +423,22 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
       </div>}
 
       {/* ─── Right: export only ───────────────────────────────── */}
-      <div className="flex items-center justify-end shrink-0">
+      <div className="flex items-center justify-end shrink-0 gap-2">
+        {/* Phone: CapCut's quality chip, which opens the export settings */}
+        {phone && !exportState.isExporting && (
+          <button
+            type="button"
+            aria-label="Export quality"
+            onClick={openExportDialog}
+            disabled={!hasTimelineContent}
+            className="flex items-center gap-1 rounded-xl bg-bg-2 px-3 py-2.5 text-[14px] font-semibold text-fg disabled:opacity-50"
+          >
+            {Math.min(project.settings.width, project.settings.height)}P
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M5 8h14l-7 9z" />
+            </svg>
+          </button>
+        )}
         {/* Export */}
         {exportState.isExporting ? (
           <button

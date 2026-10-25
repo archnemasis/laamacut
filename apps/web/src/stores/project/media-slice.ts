@@ -31,8 +31,10 @@ export function createMediaSlice(set: Set, get: Get): MediaSlice {
           await initializeMediaBridge();
         }
 
-        const isLargeFile = file.size > 50 * 1024 * 1024;
-        const importResult = await mediaBridge.importFile(file, true, isLargeFile);
+        // Quick import: read the metadata only, keep the original file (no
+        // re-encoding), and build thumbnails and the waveform in the background
+        // so the clip shows up straight away.
+        const importResult = await mediaBridge.importFile(file, false, true);
 
         if (!importResult.success || !importResult.media) {
           return {
@@ -92,24 +94,8 @@ export function createMediaSlice(set: Set, get: Get): MediaSlice {
           mediaType = "image";
         }
 
-        if (mediaType === "video" && !thumbnailUrl) {
-          try {
-            const thumbs = await mediaBridge.generateThumbnailsForMedia(
-              processedMedia.blob ?? file,
-              mediaType,
-            );
-            if (thumbs.length > 0) {
-              thumbnailUrl = thumbs[0].dataUrl;
-              filmstripThumbnails.push(
-                ...thumbs.map((thumb) => ({
-                  timestamp: thumb.timestamp,
-                  url: thumb.dataUrl,
-                })),
-              );
-            }
-          } catch {
-            // Background retry below is best-effort.
-          }
+        if (mediaType === "image" && !thumbnailUrl) {
+          thumbnailUrl = URL.createObjectURL(file);
         }
 
         const newMediaItem: MediaItem = {
@@ -164,19 +150,39 @@ export function createMediaSlice(set: Set, get: Get): MediaSlice {
 
         set({ project: updatedProject });
 
-        try {
-          await saveMediaBlob(
-            updatedProject.id,
-            newMediaItem.id,
-            file,
-            newMediaItem.metadata,
-          );
-        } catch (err) {
+        // Copying the file into storage can take a while for big files, so it
+        // runs in the background instead of holding up the import.
+        void saveMediaBlob(
+          updatedProject.id,
+          newMediaItem.id,
+          file,
+          newMediaItem.metadata,
+        ).catch((err: unknown) => {
           console.error("[ProjectStore] Failed to persist media blob:", err);
           toast.warning(
             "Media could not be saved in browser storage",
             `Keep the original ${file.name} so you can relink it after reloading.`,
           );
+        });
+
+        if (newMediaItem.metadata.hasAudio && !newMediaItem.waveformData) {
+          setTimeout(async () => {
+            const waveform = await mediaBridge.generateWaveform(file, newMediaItem.id);
+            if (!waveform?.peaks) return;
+            const current = get().project;
+            if (current.id !== updatedProject.id) return;
+            set({
+              project: {
+                ...current,
+                mediaLibrary: {
+                  ...current.mediaLibrary,
+                  items: current.mediaLibrary.items.map((item) =>
+                    item.id === newMediaItem.id ? { ...item, waveformData: waveform.peaks } : item,
+                  ),
+                },
+              },
+            });
+          }, 200);
         }
 
         if (mediaType === "video" && !thumbnailUrl) {

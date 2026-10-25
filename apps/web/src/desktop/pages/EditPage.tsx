@@ -1,13 +1,25 @@
 import type { JSX } from "react";
 import type React from "react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { ToolcraftText as Text } from "@openreel/ui";
 
-import { AssetsPanel } from "../../components/editor/AssetsPanel";
+import { AssetsPanel, type AssetsTab } from "../../components/editor/AssetsPanel";
 import { InspectorPanel } from "../../components/editor/InspectorPanel";
 import { PanelErrorBoundary } from "../../components/ErrorBoundary";
 import { Icon } from "@/icons/Icon";
 import { useResizable } from "../editor/useResizable";
+import { useProjectStore } from "../../stores/project-store";
+import {
+  Clapperboard,
+  LayoutTemplate,
+  Shapes,
+  Shuffle,
+  SlidersHorizontal,
+  Sparkles,
+  Type,
+  Zap,
+  type LucideIcon,
+} from "@/icons/lucide-compat";
 
 const Preview = lazy(() =>
   import("../../components/editor/Preview").then((m) => ({ default: m.Preview })),
@@ -23,6 +35,43 @@ function PanelLoading(): JSX.Element {
         Loading…
       </Text>
     </div>
+  );
+}
+
+/** Panels the left half of Resolve's interface toolbar opens, as media panel tabs. */
+const MEDIA_PANELS: { tab: AssetsTab; label: string; icon: LucideIcon }[] = [
+  { tab: "media", label: "Media Pool", icon: Clapperboard },
+  { tab: "effects", label: "Effects", icon: Zap },
+  { tab: "transitions", label: "Transitions", icon: Shuffle },
+  { tab: "text", label: "Titles", icon: Type },
+  { tab: "graphics", label: "Graphics", icon: Shapes },
+  { tab: "recipes", label: "Looks", icon: Sparkles },
+  { tab: "templates", label: "Templates", icon: LayoutTemplate },
+];
+
+function ToolbarToggle({
+  label,
+  icon: IconComponent,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: LucideIcon;
+  active: boolean;
+  onClick(): void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex h-7 items-center gap-1.5 rounded px-2.5 text-[12px] transition-colors ${
+        active ? "bg-bg-3 text-fg" : "text-fg-3 hover:bg-hover hover:text-fg-2"
+      }`}
+    >
+      <IconComponent size={14} strokeWidth={1.7} aria-hidden />
+      {label}
+    </button>
   );
 }
 
@@ -46,9 +95,9 @@ function DockRegion({
       className={`relative flex min-h-0 min-w-0 flex-col overflow-hidden ${className ?? "bg-bg-1"}`}
       style={{ gridArea: area }}
     >
-      <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border bg-bg-1 px-3 text-[11px] font-medium uppercase tracking-wide text-fg-2">
+      <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border bg-bg-1 px-3 text-[12px] font-semibold text-fg-2">
         <Icon name={icon} size={12} className="text-fg-muted" />
-        <Text type="supporting" color="secondary" weight="medium" className="text-[11px] uppercase tracking-wide">
+        <Text type="supporting" color="secondary" weight="semibold" className="text-[12px]">
           {label}
         </Text>
       </div>
@@ -93,6 +142,10 @@ function RowHandle({
 }
 
 export function EditPage(): JSX.Element {
+  const projectName = useProjectStore((s) => s.project.name);
+  // Like Resolve, each toolbar button shows or hides its panel.
+  const [mediaPanel, setMediaPanel] = useState<AssetsTab | null>("media");
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const mediaW = useResizable({
     initial: 320,
     min: 220,
@@ -118,40 +171,67 @@ export function EditPage(): JSX.Element {
     storageKey: "openreel-desktop-timeline-h",
   });
 
+  const columns = [mediaPanel && `${mediaW.value}px`, "1fr", inspectorOpen && `${inspectorW.value}px`].filter(Boolean);
+  const topAreas = [mediaPanel && "media", "stage", inspectorOpen && "inspector"].filter(Boolean);
   const gridStyle: React.CSSProperties = {
-    gridTemplateColumns: `${mediaW.value}px 1fr ${inspectorW.value}px`,
+    gridTemplateColumns: columns.join(" "),
     gridTemplateRows: `1fr ${timelineH.value}px`,
-    gridTemplateAreas: "'media stage inspector' 'timeline timeline timeline'",
+    gridTemplateAreas: `'${topAreas.join(" ")}' '${topAreas.map(() => "timeline").join(" ")}'`,
   };
+  const activePanel = MEDIA_PANELS.find((panel) => panel.tab === mediaPanel);
 
   return (
-    <div
-      className="grid h-full min-h-0 w-full gap-px overflow-hidden bg-border"
-      style={gridStyle}
-      data-testid="desktop-edit-page"
-    >
-      <DockRegion label="Media" name="Media" area="media" icon="photo.on.rectangle">
-        <AssetsPanel />
-        <ColumnHandle edge="right" onPointerDown={mediaW.onHandlePointerDown} />
-      </DockRegion>
+    <div className="flex h-full min-h-0 w-full flex-col bg-border">
+      <div role="toolbar" aria-label="Interface" className="flex h-10 shrink-0 items-center gap-1 border-b border-border bg-bg-1 px-2">
+        {MEDIA_PANELS.map((panel) => (
+          <ToolbarToggle
+            key={panel.tab}
+            label={panel.label}
+            icon={panel.icon}
+            active={mediaPanel === panel.tab}
+            onClick={() => setMediaPanel(mediaPanel === panel.tab ? null : panel.tab)}
+          />
+        ))}
+        <span className="mx-auto truncate px-4 text-[12px] font-medium text-fg-2">{projectName}</span>
+        <ToolbarToggle
+          label="Inspector"
+          icon={SlidersHorizontal}
+          active={inspectorOpen}
+          onClick={() => setInspectorOpen(!inspectorOpen)}
+        />
+      </div>
+      <div
+        className="grid min-h-0 w-full flex-1 gap-px overflow-hidden bg-border"
+        style={gridStyle}
+        data-testid="desktop-edit-page"
+      >
+        {activePanel && (
+          <DockRegion label={activePanel.label} name="Media" area="media" icon="photo.on.rectangle">
+            <AssetsPanel tab={activePanel.tab} hideRail />
+            <ColumnHandle edge="right" onPointerDown={mediaW.onHandlePointerDown} />
+          </DockRegion>
+        )}
 
-      <DockRegion label="Viewer" name="Viewer" area="stage" icon="play.fill" className="bg-stage-bg">
-        <Suspense fallback={<PanelLoading />}>
-          <Preview />
-        </Suspense>
-      </DockRegion>
+        <DockRegion label="Viewer" name="Viewer" area="stage" icon="play.fill" className="bg-stage-bg">
+          <Suspense fallback={<PanelLoading />}>
+            <Preview />
+          </Suspense>
+        </DockRegion>
 
-      <DockRegion label="Inspector" name="Inspector" area="inspector" icon="slider.horizontal.3">
-        <InspectorPanel />
-        <ColumnHandle edge="left" onPointerDown={inspectorW.onHandlePointerDown} />
-      </DockRegion>
+        {inspectorOpen && (
+          <DockRegion label="Inspector" name="Inspector" area="inspector" icon="slider.horizontal.3">
+            <InspectorPanel />
+            <ColumnHandle edge="left" onPointerDown={inspectorW.onHandlePointerDown} />
+          </DockRegion>
+        )}
 
-      <DockRegion label="Timeline" name="Timeline" area="timeline" icon="rectangle.split.3x1" className="bg-tl-bg">
-        <Suspense fallback={<PanelLoading />}>
-          <Timeline />
-        </Suspense>
-        <RowHandle onPointerDown={timelineH.onHandlePointerDown} />
-      </DockRegion>
+        <DockRegion label="Timeline" name="Timeline" area="timeline" icon="rectangle.split.3x1" className="bg-tl-bg">
+          <Suspense fallback={<PanelLoading />}>
+            <Timeline />
+          </Suspense>
+          <RowHandle onPointerDown={timelineH.onHandlePointerDown} />
+        </DockRegion>
+      </div>
     </div>
   );
 }

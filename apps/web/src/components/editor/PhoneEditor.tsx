@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronLeft,
-  Clapperboard,
   Copy,
   Film,
   Gauge,
@@ -15,10 +14,14 @@ import {
   Proportions,
   Redo2,
   Scissors,
-  Shapes,
   Shuffle,
   SlidersHorizontal,
   Captions,
+  Maximize,
+  Music,
+  Scissors as EditIcon,
+  Sparkles as LooksIcon,
+  Sticker,
   Trash2,
   Type,
   Undo2,
@@ -29,7 +32,10 @@ import {
 } from "@/icons/lucide-compat";
 import { Toolbar } from "./Toolbar";
 import { Preview } from "./Preview";
-import { Timeline } from "./Timeline";
+import { PhoneTimeline } from "./PhoneTimeline";
+import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
+import { takePhoneMediaPickerRequest } from "../../services/phone-media";
+import { useRouter } from "../../hooks/use-router";
 import { AssetsPanel, type AssetsTab } from "./AssetsPanel";
 import { InspectorPanel } from "./InspectorPanel";
 import { getTabIdsForClipType, type InspectorTabId } from "./inspector/clip-tabs.config";
@@ -55,18 +61,14 @@ type Sheet =
 
 type Tool = { label: string; icon: LucideIcon; onClick: () => void; disabled?: boolean };
 
-const formatTime = (seconds: number): string => {
-  const total = Math.max(0, Math.floor(seconds));
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-};
-
-/** The clip-level tools, each opening one inspector section, by clip kind. */
-const CLIP_SECTIONS: { label: string; icon: LucideIcon; section: InspectorTabId }[] = [
+/** Clip tools, in CapCut order; each opens one inspector section. "delete" marks where Delete goes. */
+const CLIP_SECTIONS: ({ label: string; icon: LucideIcon; section: InspectorTabId } | "delete")[] = [
   { label: "Volume", icon: Volume2, section: "audio" },
-  { label: "Speed", icon: Gauge, section: "speed" },
   { label: "Animations", icon: Film, section: "animate" },
-  { label: "Adjust", icon: Palette, section: "color" },
   { label: "Effects", icon: Wand2, section: "effects" },
+  "delete",
+  { label: "Speed", icon: Gauge, section: "speed" },
+  { label: "Adjust", icon: Palette, section: "color" },
   { label: "Transform", icon: Move, section: "transform" },
   { label: "Captions", icon: Captions, section: "ai" },
 ];
@@ -160,6 +162,23 @@ function BackgroundSheet() {
  */
 export const PhoneEditor: React.FC = () => {
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  // New projects open straight into the media picker, like CapCut.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const startedFromNewProject = useRef(false);
+  const { navigate } = useRouter();
+  useEffect(() => {
+    if (takePhoneMediaPickerRequest()) {
+      startedFromNewProject.current = true;
+      setPickerOpen(true);
+    }
+  }, []);
+  // Backing out of the picker on a new, still-empty project returns home.
+  const closePicker = () => {
+    setPickerOpen(false);
+    const empty = (useProjectStore.getState().project.timeline.duration ?? 0) === 0;
+    if (startedFromNewProject.current && empty) navigate("welcome");
+    startedFromNewProject.current = false;
+  };
 
   const project = useProjectStore((s) => s.project);
   const undo = useProjectStore((s) => s.undo);
@@ -171,6 +190,8 @@ export const PhoneEditor: React.FC = () => {
   const togglePlayback = useTimelineStore((s) => s.togglePlayback);
   const selectedItems = useUIStore((s) => s.selectedItems);
   const clearSelection = useUIStore((s) => s.clearSelection);
+  const select = useUIStore((s) => s.select);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const selectedIds = useMemo(
     () => selectedItems.filter((item) => item.type === "clip").map((item) => item.id),
@@ -195,26 +216,56 @@ export const PhoneEditor: React.FC = () => {
 
   const open = (next: Sheet) => setSheet(next);
 
+  // Like CapCut, Edit, Adjust and Captions act on the picture clip under the playhead.
+  const openForMainClip = (only: InspectorTabId | undefined, title: string) => {
+    const pictures = project.timeline.tracks.flatMap((track) =>
+      track.clips.filter((c) => project.mediaLibrary.items.find((m) => m.id === c.mediaId)?.type !== "audio"),
+    );
+    const clip =
+      pictures.find((c) => playheadPosition >= c.startTime && playheadPosition < c.startTime + c.duration) ??
+      pictures[0];
+    if (!clip) {
+      setPickerOpen(true);
+      return;
+    }
+    select({ type: "clip", id: clip.id, trackId: clip.trackId });
+    if (only) open({ kind: "inspector", only, title });
+  };
+
   const mainTools: Tool[] = [
-    { label: "Media", icon: Clapperboard, onClick: () => open({ kind: "assets", tab: "media", title: "Media" }) },
+    { label: "Edit", icon: EditIcon, onClick: () => openForMainClip(undefined, "Edit") },
+    { label: "Audio", icon: Music, onClick: () => open({ kind: "assets", tab: "media", title: "Audio" }) },
     { label: "Text", icon: Type, onClick: () => open({ kind: "assets", tab: "text", title: "Text" }) },
-    { label: "Graphics", icon: Shapes, onClick: () => open({ kind: "assets", tab: "graphics", title: "Graphics" }) },
     { label: "Effects", icon: Zap, onClick: () => open({ kind: "assets", tab: "effects", title: "Effects" }) },
     { label: "Transitions", icon: Shuffle, onClick: () => open({ kind: "assets", tab: "transitions", title: "Transitions" }) },
-    { label: "Ratio", icon: Proportions, onClick: () => open({ kind: "ratio", title: "Aspect ratio" }) },
+    { label: "Captions", icon: Captions, onClick: () => openForMainClip("ai", "Captions") },
+    { label: "Looks", icon: LooksIcon, onClick: () => open({ kind: "assets", tab: "recipes", title: "Looks" }) },
+    { label: "Adjust", icon: SlidersHorizontal, onClick: () => openForMainClip("color", "Adjust") },
+    { label: "Stickers", icon: Sticker, onClick: () => open({ kind: "assets", tab: "graphics", title: "Stickers" }) },
+    { label: "Aspect ratio", icon: Proportions, onClick: () => open({ kind: "ratio", title: "Aspect ratio" }) },
     { label: "Background", icon: PaintBucket, onClick: () => open({ kind: "background", title: "Background" }) },
     { label: "Templates", icon: LayoutTemplate, onClick: () => open({ kind: "assets", tab: "templates", title: "Templates" }) },
   ];
 
+  const deleteTool: Tool = {
+    label: "Delete",
+    icon: Trash2,
+    onClick: () => {
+      const store = useProjectStore.getState();
+      void (async () => {
+        for (const id of selectedIds) await deleteTimelineItem(store, id);
+        clearSelection();
+      })();
+    },
+  };
+
   const sectionTools: Tool[] = mediaKind
-    ? CLIP_SECTIONS.filter(({ section }) => getTabIdsForClipType(mediaKind).includes(section)).map(
-        ({ label, icon, section }) => ({
-          label,
-          icon,
-          onClick: () => open({ kind: "inspector", only: section, title: label }),
-        }),
-      )
-    : [{ label: "Edit", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) }];
+    ? CLIP_SECTIONS.flatMap((entry): Tool[] => {
+        if (entry === "delete") return [deleteTool];
+        if (!getTabIdsForClipType(mediaKind).includes(entry.section)) return [];
+        return [{ label: entry.label, icon: entry.icon, onClick: () => open({ kind: "inspector", only: entry.section, title: entry.label }) }];
+      })
+    : [{ label: "Edit", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) }, deleteTool];
 
   const clipTools: Tool[] = [
     {
@@ -241,17 +292,6 @@ export const PhoneEditor: React.FC = () => {
         })();
       },
     },
-    {
-      label: "Delete",
-      icon: Trash2,
-      onClick: () => {
-        const store = useProjectStore.getState();
-        void (async () => {
-          for (const id of selectedIds) await deleteTimelineItem(store, id);
-          clearSelection();
-        })();
-      },
-    },
   ];
 
   const hasSelection = selectedIds.length > 0;
@@ -260,16 +300,21 @@ export const PhoneEditor: React.FC = () => {
     <div className="phone-editor flex h-full w-full flex-col overflow-hidden bg-bg text-fg">
       <Toolbar phone />
 
-      <div className="phone-preview min-h-0 shrink-0 basis-[36%]">
+      <div ref={previewRef} className="phone-preview min-h-0 shrink-0 basis-[38%] bg-black">
         <PanelErrorBoundary name="Stage">
           <Preview />
         </PanelErrorBoundary>
       </div>
 
-      <div className="grid h-14 shrink-0 grid-cols-3 items-center px-4">
-        <span className="font-mono text-[13px] text-fg-2">
-          <span className="text-fg">{formatTime(playheadPosition)}</span> / {formatTime(project.timeline.duration ?? 0)}
-        </span>
+      <div className="grid h-14 shrink-0 grid-cols-3 items-center px-3">
+        <button
+          type="button"
+          aria-label="Full screen preview"
+          onClick={() => void previewRef.current?.requestFullscreen?.()}
+          className="grid h-10 w-10 place-items-center text-fg"
+        >
+          <Maximize size={22} aria-hidden />
+        </button>
         <button
           type="button"
           aria-label={isPlaying ? "Pause" : "Play"}
@@ -289,13 +334,17 @@ export const PhoneEditor: React.FC = () => {
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="phone-timeline min-h-0 flex-1">
+        <div className="min-h-0 flex-1">
           <PanelErrorBoundary name="Timeline">
-            <Timeline />
+            <PhoneTimeline
+              onAddMedia={() => setPickerOpen(true)}
+              onAddAudio={() => open({ kind: "assets", tab: "media", title: "Audio" })}
+              onAddText={() => open({ kind: "assets", tab: "text", title: "Text" })}
+            />
           </PanelErrorBoundary>
         </div>
 
-        <nav aria-label={hasSelection ? "Clip tools" : "Editor tools"} className="flex h-[76px] shrink-0 items-stretch border-t border-border bg-bg">
+        <nav aria-label={hasSelection ? "Clip tools" : "Editor tools"} className="flex h-[84px] shrink-0 items-stretch bg-bg pb-1">
           {hasSelection && (
             <button
               type="button"
@@ -312,6 +361,8 @@ export const PhoneEditor: React.FC = () => {
             ))}
           </div>
         </nav>
+
+        {pickerOpen && <PhoneMediaPicker onClose={closePicker} />}
 
         {sheet && (
           <section
