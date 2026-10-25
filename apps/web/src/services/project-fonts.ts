@@ -1,5 +1,6 @@
 import type { Project, MotionComposition } from "@openreel/core";
 import { GOOGLE_FONT_SPECS } from "./font-catalog";
+import { loadUserFonts } from "./user-fonts";
 
 const initialFamilies = new Set(["Geist", "Geist Mono", "Inter"]);
 const pendingStylesheets = new Map<string, Promise<void>>();
@@ -32,6 +33,8 @@ function loadStylesheet(family: string): Promise<void> {
 
 export async function ensureFontFamily(family: string, weight: string | number = 400, sample = "OpenReel"): Promise<void> {
   if (typeof document === "undefined" || !document.fonts || !family) return;
+  // Not a catalogue font: it may be one the user uploaded.
+  if (!GOOGLE_FONT_SPECS[family] && !initialFamilies.has(family)) await loadUserFonts();
   await loadStylesheet(family);
   const fontWeight = typeof weight === "number" || /^\d+$/.test(weight) ? String(weight) : weight === "bold" ? "700" : "400";
   await document.fonts.load(`${fontWeight} 48px ${JSON.stringify(family)}`, sample || "OpenReel");

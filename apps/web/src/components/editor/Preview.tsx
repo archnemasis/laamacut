@@ -852,6 +852,8 @@ export const Preview: React.FC = () => {
   const animationRef = useRef<number | null>(null);
   const renderBridgeInitialized = useRef<boolean>(false);
   const lastGoodFrameRef = useRef<ImageBitmap | null>(null);
+  /** The canvas shows a complete frame, so an incomplete render can leave it be. */
+  const canvasHasPictureRef = useRef(false);
   const stillImagesRef = useRef(new Map<string, HTMLImageElement>());
   const offscreenCanvasRef = useRef<OffscreenCanvas | null>(null);
   const decodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2691,6 +2693,9 @@ export const Preview: React.FC = () => {
 
       let hasRenderedFrame = false;
       let shouldClearCanvas = true;
+      // A newer render (typing, scrubbing) cancels this one's video decode.
+      // Painting without the picture would flash black, so keep the last frame.
+      let missingClipFrame = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const activeShapeClips = getActiveShapeClips(allShapeClips, time);
@@ -2979,6 +2984,7 @@ export const Preview: React.FC = () => {
 
               if (time >= clipStart && time < clipEnd) {
                 const frame = await decodeClipFrame(clip, time);
+                if (!frame) missingClipFrame = true;
 
                 if (frame) {
                   // The decoder returns native, un-letterboxed frames for both
@@ -3201,9 +3207,12 @@ export const Preview: React.FC = () => {
         hasRenderedFrame = hasRenderedFrame || adjusted;
       }
 
+      if (missingClipFrame && canvasHasPictureRef.current) return true;
+
       if (hasRenderedFrame && offscreenCanvasRef.current) {
         mainCtx.clearRect(0, 0, canvas.width, canvas.height);
         mainCtx.drawImage(offscreenCanvasRef.current, 0, 0);
+        canvasHasPictureRef.current = !missingClipFrame;
         try {
           lastGoodFrameRef.current?.close();
           lastGoodFrameRef.current = await createImageBitmap(

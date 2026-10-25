@@ -27,11 +27,13 @@ import {
   type PhoneExportChoice,
 } from "./PhoneExportPanel";
 import { PhoneExportScreen, capturePreviewStill, type PhoneExportStatus } from "./PhoneExportScreen";
+import { captureProjectPreview, getProjectPreview } from "../../services/project-previews";
+import { getAndroidSaver, saveBlobOnAndroid } from "../../services/android-downloads";
 import { startNewProject } from "../../desktop/start/desktop-project-actions";
 import { requestPhoneMediaPicker } from "../../services/phone-media";
 import { CompressDialog } from "./CompressDialog";
 import { deriveSourceExportMatch } from "../../services/export-source-match";
-import { useExportRunner, extForFormat, exportFilename, type ExportDeliveryMode } from "../../services/export-runner";
+import { useExportRunner, extForFormat, exportFilename, type ExportDeliveryMode, type ExportFileHandler } from "../../services/export-runner";
 import { ScreenRecorder } from "./ScreenRecorder";
 import { HistoryPanel } from "./inspector/HistoryPanel";
 import { ProjectSwitcher } from "./ProjectSwitcher";
@@ -237,14 +239,14 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
   );
 
   const handleCustomExport = useCallback(
-    async (settings: VideoExportSettings, delivery: ExportDeliveryMode = window.openreel?.platform === "desktop" ? "file" : "download") => {
+    async (settings: VideoExportSettings, delivery: ExportDeliveryMode = window.openreel?.platform === "desktop" ? "file" : "download", onFile?: ExportFileHandler) => {
       closeModal();
       if (!hasTimelineContent) return;
 
       try {
         const ext = extForFormat(settings.format);
         // Read the name now: the export dialog may have just renamed the project.
-        const writable = await showSavePicker(exportFilename(useProjectStore.getState().project.name, ext), ext, { delivery });
+        const writable = await showSavePicker(exportFilename(useProjectStore.getState().project.name, ext), ext, { delivery, onFile });
 
         beginExport(writable);
 
@@ -285,21 +287,71 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
   const [phoneSettingsOpen, setPhoneSettingsOpen] = useState(false);
   const [phoneChoice, setPhoneChoice] = useState<PhoneExportChoice>(loadPhoneExportChoice);
   // CapCut's full-screen export: progress, then "Saved to device".
-  const [phoneRun, setPhoneRun] = useState<{ status: PhoneExportStatus; label: string; still?: string; error?: string } | null>(null);
+  const [phoneRun, setPhoneRun] = useState<{
+    status: PhoneExportStatus;
+    label: string;
+    still?: string;
+    error?: string;
+    videoUrl?: string;
+    location?: string;
+  } | null>(null);
+  // The finished video plays on the Saved screen; let it go when the screen closes.
+  const exportedUrl = React.useRef<string | null>(null);
+  const releaseExportedVideo = useCallback(() => {
+    if (exportedUrl.current) URL.revokeObjectURL(exportedUrl.current);
+    exportedUrl.current = null;
+  }, []);
+  useEffect(() => releaseExportedVideo, [releaseExportedVideo]);
+  /** Export: first CapCut's naming prompt over the export screen, with the cover behind it. */
   const exportFromPhone = useCallback(() => {
     setPhoneSettingsOpen(false);
+    releaseExportedVideo();
+    const current = useProjectStore.getState().project;
     setPhoneRun({
-      status: "exporting",
+      status: "naming",
       label: RESOLUTIONS.find((r) => r.value === phoneChoice.resolution)?.label ?? `${phoneChoice.resolution}p`,
-      still: capturePreviewStill(),
+      still: getProjectPreview(current.id)?.image ?? capturePreviewStill(),
     });
-    void handleCustomExport(phoneExportSettings(phoneChoice, project.settings));
-  }, [handleCustomExport, phoneChoice, project.settings]);
+    // Make sure the cover is the project's first picture (or the chosen cover).
+    void captureProjectPreview(current).then(() => {
+      const image = getProjectPreview(current.id)?.image;
+      if (image) setPhoneRun((run) => (run ? { ...run, still: image } : run));
+    });
+  }, [phoneChoice, releaseExportedVideo]);
+  const startPhoneExport = useCallback(
+    async (name: string) => {
+      setPhoneRun((run) => (run ? { ...run, status: "exporting" } : run));
+      if (name !== useProjectStore.getState().project.name) await renameProject(name);
+      // Hand the finished file to the gallery before the screen says Saved.
+      const onFile: ExportFileHandler = async (file) => {
+        const filename = exportFilename(useProjectStore.getState().project.name, extForFormat(phoneExportSettings(phoneChoice, project.settings).format));
+        const saver = getAndroidSaver();
+        let location: string | undefined;
+        if (saver) location = await saveBlobOnAndroid(saver, file, filename);
+        else {
+          const anchor = document.createElement("a");
+          anchor.href = URL.createObjectURL(file);
+          anchor.download = filename;
+          anchor.click();
+          setTimeout(() => URL.revokeObjectURL(anchor.href), 60_000);
+        }
+        releaseExportedVideo();
+        exportedUrl.current = URL.createObjectURL(file);
+        const videoUrl = exportedUrl.current;
+        setPhoneRun((run) => (run ? { ...run, videoUrl, location } : run));
+      };
+      void handleCustomExport(phoneExportSettings(phoneChoice, project.settings), "download", onFile);
+    },
+    [handleCustomExport, phoneChoice, project.settings, renameProject, releaseExportedVideo],
+  );
   // The runner clears "complete" after a moment; the phone screen keeps it until you leave.
   useEffect(() => {
     if (phoneRun?.status !== "exporting") return;
-    if (exportState.complete) setPhoneRun({ ...phoneRun, status: "saved" });
-    else if (exportState.error) {
+    if (exportState.complete) {
+      setPhoneRun({ ...phoneRun, status: "saved" });
+      // Saved with the export, not only when you leave the editor.
+      void useProjectStore.getState().forceSave();
+    } else if (exportState.error) {
       setPhoneRun({ ...phoneRun, status: "error", error: exportState.error });
       resetError();
     }
@@ -657,11 +709,16 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
           progress={exportState.progress}
           label={phoneRun.label}
           still={phoneRun.still}
+          videoUrl={phoneRun.videoUrl}
+          location={phoneRun.location}
+          name={project.name}
+          onName={(name) => void startPhoneExport(name)}
           aspect={(project.settings.width || 16) / (project.settings.height || 9)}
           error={phoneRun.error}
           onBack={() => {
             if (phoneRun.status === "exporting") handleCancelExport();
             setPhoneRun(null);
+            releaseExportedVideo();
           }}
           onDone={() => {
             setPhoneRun(null);

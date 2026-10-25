@@ -345,13 +345,25 @@ function RoundItem({ icon: Icon, label, active, changed, onClick }: { icon: Luci
 }
 
 /** A picture tile with its name under it; the still is styled to hint at the look. */
-function Tile({ label, still, style, active, onClick, children }: { label: string; still?: string; style?: React.CSSProperties; active: boolean; onClick: () => void; children?: React.ReactNode }) {
+function Tile({ label, still, style, active, onClick, children, autoplay }: { label: string; still?: string; style?: React.CSSProperties; active: boolean; onClick: () => void; children?: React.ReactNode; autoplay?: boolean }) {
+  const img = useRef<HTMLImageElement>(null);
+  const look = style?.filter;
+  // Effect tiles play their look on a loop: the plain frame, then the effect.
+  useEffect(() => {
+    if (!autoplay || !look || !img.current?.animate) return;
+    const anim = img.current.animate([{ filter: "none" }, { filter: look }, { filter: look }, { filter: "none" }], {
+      duration: 2400,
+      iterations: Infinity,
+      easing: "ease-in-out",
+    });
+    return () => anim.cancel();
+  }, [autoplay, look]);
   return (
     <button type="button" aria-pressed={active} onClick={onClick} className="flex min-w-0 flex-col items-center gap-1">
       <span
         className={`relative grid aspect-square w-full place-items-center overflow-hidden rounded-lg bg-white/10 ${active ? "ring-2 ring-[var(--accent)]" : ""}`}
       >
-        {still && <img src={still} alt="" className="h-full w-full object-cover" style={style} />}
+        {still && <img ref={img} src={still} alt="" className="h-full w-full object-cover" style={style} />}
         {children}
       </span>
       <span className={`w-full truncate text-center text-[11px] ${active ? "text-fg" : "text-fg-3"}`}>{label}</span>
@@ -908,7 +920,7 @@ function EffectsPanel({ clipId, onDone }: { clipId: string; onDone: () => void }
       <div className="grid grid-cols-4 gap-3 px-3 py-3">
         <NoneTile active={!appliedKey} onClick={() => void apply(null, 0)} />
         {EFFECT_ITEMS.map((e) => (
-          <Tile key={e.key} label={e.label} still={still} style={{ filter: e.css }} active={e.key === appliedKey} onClick={() => void apply(e, e.key === appliedKey ? strength : 100)}>
+          <Tile key={e.key} label={e.label} still={still} style={{ filter: e.css }} autoplay active={e.key === appliedKey} onClick={() => void apply(e, e.key === appliedKey ? strength : 100)}>
             {!still && <CircleDot size={22} className="text-fg-3" aria-hidden />}
           </Tile>
         ))}
@@ -937,16 +949,21 @@ const durationOf = (kfs: readonly Keyframe[], prefix: string) => {
 
 function AnimationTile({ preset, still, active, onClick }: { preset: MotionPreset; still?: string; active: boolean; onClick: () => void }) {
   const box = useRef<HTMLSpanElement>(null);
-  // The picked animation plays on its tile, like CapCut.
+  // Every tile plays its animation on a loop, so it can be seen before it's picked.
   useEffect(() => {
-    if (!active || !box.current?.animate) return;
-    const anim = box.current.animate(buildPreviewCSSKeyframes({ ...preset, duration: 1 }).map((k) => ({ ...k, transform: String(k.transform).replace(/translate\(([-\d.]+)px, ([-\d.]+)px\)/, (_, x, y) => `translate(${Number(x) / 6}px, ${Number(y) / 6}px)`) })), {
-      duration: 1000,
+    if (!box.current?.animate) return;
+    const frames = buildPreviewCSSKeyframes({ ...preset, duration: 1 }).map((k, i, all) => ({
+      ...k,
+      // The motion takes the first 60%, then the end frame holds before it loops.
+      offset: (i / (all.length - 1)) * 0.6,
+      transform: String(k.transform).replace(/translate\(([-\d.]+)px, ([-\d.]+)px\)/, (_, x, y) => `translate(${Number(x) / 6}px, ${Number(y) / 6}px)`),
+    }));
+    const anim = box.current.animate([...frames, { ...frames[frames.length - 1], offset: 1 }], {
+      duration: 1700,
       iterations: Infinity,
-      easing: "ease-out",
     });
     return () => anim.cancel();
-  }, [active, preset]);
+  }, [preset]);
   return (
     <Tile label={preset.name} active={active} onClick={onClick}>
       <span ref={box} className="block h-3/5 w-3/5 overflow-hidden rounded bg-white/25">

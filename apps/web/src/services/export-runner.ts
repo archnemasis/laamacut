@@ -20,6 +20,12 @@ export interface ExportRunnerState {
 export type ExportContainer = "mp4" | "webm" | "mov" | "wav";
 export type ExportDeliveryMode = "download" | "file";
 
+/**
+ * Receives the finished file instead of a browser download (the phone app
+ * saves it to the gallery). The export only completes once this resolves.
+ */
+export type ExportFileHandler = (file: Blob) => Promise<void>;
+
 const MIME_BY_EXT: Record<string, string> = {
   mp4: "video/mp4",
   webm: "video/webm",
@@ -193,6 +199,8 @@ async function sweepStaleOpfsTemps(root: OpfsDirHandle, now: number): Promise<vo
 
 async function createOpfsDownloadWritable(
   filename: string,
+  mime: string,
+  onFile?: ExportFileHandler,
 ): Promise<FileSystemWritableFileStream | null> {
   const root = await getOpfsRoot();
   if (!root) return null;
@@ -233,7 +241,14 @@ async function createOpfsDownloadWritable(
         await root.removeEntry(tmpName).catch(() => undefined);
         throw new Error("Export produced an empty file");
       }
-      triggerAnchorDownload(file, filename, () => {
+      // The temp file is named .tmp, so give the download its real type.
+      const typed = new Blob([file], { type: mime });
+      if (onFile) {
+        // Left for the stale-temp sweep: the handler may keep playing it.
+        await onFile(typed);
+        return;
+      }
+      triggerAnchorDownload(typed, filename, () => {
         root.removeEntry(tmpName).catch(() => undefined);
       });
     },
@@ -251,6 +266,7 @@ async function createOpfsDownloadWritable(
 function createBufferedDownloadWritable(
   filename: string,
   mime: string,
+  onFile?: ExportFileHandler,
 ): FileSystemWritableFileStream {
   let buffer = new Uint8Array(1024 * 1024);
   let length = 0;
@@ -291,8 +307,10 @@ function createBufferedDownloadWritable(
     async close() {
       checkOpen();
       if (!length) throw new Error("Export produced an empty file");
-      triggerAnchorDownload(new Blob([buffer.slice(0, length)], { type: mime }), filename);
+      const file = new Blob([buffer.slice(0, length)], { type: mime });
       finished = true;
+      if (onFile) await onFile(file);
+      else triggerAnchorDownload(file, filename);
       buffer = new Uint8Array(0);
     },
     async abort() { finished = true; buffer = new Uint8Array(0); length = 0; cursor = 0; },
@@ -309,16 +327,18 @@ function createBufferedDownloadWritable(
 async function createFallbackWritable(
   filename: string,
   mime: string,
+  onFile?: ExportFileHandler,
 ): Promise<FileSystemWritableFileStream> {
-  return (await createOpfsDownloadWritable(filename)) ?? createBufferedDownloadWritable(filename, mime);
+  return (await createOpfsDownloadWritable(filename, mime, onFile)) ?? createBufferedDownloadWritable(filename, mime, onFile);
 }
 
 export async function createDownloadWritable(
   filename: string,
   mime: string,
-  options?: { delivery?: ExportDeliveryMode },
+  options?: { delivery?: ExportDeliveryMode; onFile?: ExportFileHandler },
 ): Promise<FileSystemWritableFileStream> {
   const ext = filename.split(".").pop() || "mp4";
+  if (options?.onFile) return createFallbackWritable(filename, mime, options.onFile);
   if (options?.delivery === "download") return createFallbackWritable(filename, mime);
 
   if (typeof window.openreel?.fs?.showSaveDialog === "function") {
@@ -421,7 +441,7 @@ export interface UseExportRunner {
     writableStream: FileSystemWritableFileStream,
   ) => Promise<void>;
   runAudioExport: (settings: Partial<AudioExportSettings>, writable: FileSystemWritableFileStream) => Promise<void>;
-  showSavePicker: (filename: string, ext: string, opts?: { streamToFile?: boolean; delivery?: ExportDeliveryMode }) => Promise<FileSystemWritableFileStream>;
+  showSavePicker: (filename: string, ext: string, opts?: { streamToFile?: boolean; delivery?: ExportDeliveryMode; onFile?: ExportFileHandler }) => Promise<FileSystemWritableFileStream>;
   reportProgress: (progress01: number, phase: string) => void;
   markComplete: () => void;
   beginExport: (writable?: FileSystemWritableFileStream) => () => void;
@@ -599,9 +619,10 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
     async (
       filename: string,
       ext: string,
-      opts?: { streamToFile?: boolean; delivery?: ExportDeliveryMode },
+      opts?: { streamToFile?: boolean; delivery?: ExportDeliveryMode; onFile?: ExportFileHandler },
     ): Promise<FileSystemWritableFileStream> => {
       const mime = mimeForExt(ext);
+      if (opts?.onFile) return createDownloadWritable(filename, mime, { onFile: opts.onFile });
 
       if (typeof window.openreel?.fs?.showSaveDialog === "function") {
         const chosen = await window.openreel.fs.showSaveDialog({
@@ -656,7 +677,7 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
         } as unknown as FileSystemWritableFileStream;
       }
 
-      return createDownloadWritable(filename, mime, { delivery: opts?.delivery });
+      return createDownloadWritable(filename, mime, { delivery: opts?.delivery, onFile: opts?.onFile });
     },
     [],
   );

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ensureFontFamily, ensureProjectFonts, collectProjectFonts } from "./project-fonts";
 import { createEmptyProject } from "../stores/project/project-helpers";
 
+vi.mock("./user-fonts", () => ({ loadUserFonts: async () => [] }));
+
 const load = vi.fn(async () => []);
 beforeEach(() => { load.mockClear(); Object.defineProperty(document, "fonts", { value: { load }, configurable: true }); });
 afterEach(() => { delete (document as unknown as { fonts?: unknown }).fonts; document.querySelectorAll('link[data-openreel-font]').forEach((link) => link.remove()); vi.restoreAllMocks(); });

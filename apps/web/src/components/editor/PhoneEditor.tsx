@@ -50,6 +50,8 @@ import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, to
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
 import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
 import { takePhoneMediaPickerRequest } from "../../services/phone-media";
+import { autoSaveManager } from "../../services/auto-save";
+import { captureProjectPreview } from "../../services/project-previews";
 import { useRouter } from "../../hooks/use-router";
 import { AssetsPanel, DEFAULT_TITLE_STYLE, type AssetsTab } from "./AssetsPanel";
 import { InspectorPanel } from "./InspectorPanel";
@@ -196,6 +198,12 @@ export const PhoneEditor: React.FC = () => {
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [mediaItems, tracks]);
   const { navigate } = useRouter();
+  // Keep the home screen's cover for this project fresh whenever it saves.
+  useEffect(() => {
+    const onSaved = () => void captureProjectPreview(useProjectStore.getState().project);
+    autoSaveManager.on("saved", onSaved);
+    return () => autoSaveManager.off("saved", onSaved);
+  }, []);
   useEffect(() => {
     if (takePhoneMediaPickerRequest()) {
       startedFromNewProject.current = true;

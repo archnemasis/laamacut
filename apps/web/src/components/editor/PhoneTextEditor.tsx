@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Ban, Check, Search, X } from "@/icons/lucide-compat";
+import { Ban, Check, Search, Upload, X } from "@/icons/lucide-compat";
 import type { TextAnimationPreset, TextStyle } from "@openreel/core";
 import { useProjectStore } from "../../stores/project-store";
 import { ensureFontFamily } from "../../services/project-fonts";
+import { addUserFont, loadUserFonts, USER_FONT_ACCEPT } from "../../services/user-fonts";
 import { FONT_CATEGORIES } from "./inspector/font-options";
 import { TEXT_STYLE_PRESETS } from "./AssetsPanel";
 
@@ -36,6 +37,45 @@ const STYLE_PRESETS: { label: string; style: Partial<TextStyle> }[] = [
   { label: "Red", style: { color: "#ffffff", strokeColor: "#e5262a", strokeWidth: 8, backgroundColor: undefined } },
   { label: "Shadow", style: { color: "#ffffff", shadowColor: "rgba(0,0,0,0.85)", shadowBlur: 12, shadowOffsetX: 0, shadowOffsetY: 4, strokeWidth: 0 } },
 ];
+
+/** How each animation comes in, for the looping sample on its tile. Out plays it backwards. */
+const SAMPLE_FRAMES: Partial<Record<TextAnimationPreset, Keyframe[]>> = {
+  fade: [{ opacity: 0 }, { opacity: 1 }],
+  pop: [{ transform: "scale(0)" }, { transform: "scale(1.2)", offset: 0.7 }, { transform: "scale(1)" }],
+  typewriter: [{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)" }],
+  "slide-up": [{ transform: "translateY(14px)", opacity: 0 }, { transform: "none", opacity: 1 }],
+  "slide-down": [{ transform: "translateY(-14px)", opacity: 0 }, { transform: "none", opacity: 1 }],
+  "slide-left": [{ transform: "translateX(24px)", opacity: 0 }, { transform: "none", opacity: 1 }],
+  "slide-right": [{ transform: "translateX(-24px)", opacity: 0 }, { transform: "none", opacity: 1 }],
+  scale: [{ transform: "scale(2)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }],
+  blur: [{ filter: "blur(6px)", opacity: 0 }, { filter: "blur(0)", opacity: 1 }],
+  bounce: [{ transform: "translateY(-14px)" }, { transform: "translateY(0)", offset: 0.5 }, { transform: "translateY(-5px)", offset: 0.75 }, { transform: "translateY(0)" }],
+  rotate: [{ transform: "rotate(-180deg) scale(0)" }, { transform: "rotate(0) scale(1)" }],
+  elastic: [{ transform: "scaleX(0.3)" }, { transform: "scaleX(1.25)", offset: 0.5 }, { transform: "scaleX(0.9)", offset: 0.75 }, { transform: "scaleX(1)" }],
+  glitch: [{ transform: "translateX(-3px)", filter: "hue-rotate(90deg)" }, { transform: "translateX(3px)", offset: 0.3 }, { transform: "translateX(-2px)", offset: 0.6 }, { transform: "none", filter: "none" }],
+  "word-by-word": [{ clipPath: "inset(0 66% 0 0)" }, { clipPath: "inset(0 66% 0 0)", offset: 0.33 }, { clipPath: "inset(0 33% 0 0)", offset: 0.34 }, { clipPath: "inset(0 33% 0 0)", offset: 0.66 }, { clipPath: "inset(0 0 0 0)", offset: 0.67 }, { clipPath: "inset(0 0 0 0)" }],
+  cascade: [{ transform: "translateY(10px) skewX(-10deg)", opacity: 0 }, { transform: "none", opacity: 1 }],
+  "zoom-blur": [{ transform: "scale(1.8)", filter: "blur(5px)", opacity: 0 }, { transform: "scale(1)", filter: "blur(0)", opacity: 1 }],
+};
+
+/** "ABC123" playing its animation on a loop, so it can be seen before it's picked. */
+function AnimationSample({ preset, out }: { preset: TextAnimationPreset; out: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const frames = SAMPLE_FRAMES[preset];
+    if (!frames || !ref.current?.animate) return;
+    // The motion takes 60% of the loop and the text holds still for the rest.
+    const timed = frames.map((f, i) => ({ ...f, offset: (typeof f.offset === "number" ? f.offset : i / (frames.length - 1)) * 0.6 }));
+    const loop = [...timed, { ...timed[timed.length - 1], offset: 1 }];
+    const anim = ref.current.animate(loop, { duration: 1600, iterations: Infinity, easing: "ease-out", direction: out ? "reverse" : "normal" });
+    return () => anim.cancel();
+  }, [preset, out]);
+  return (
+    <span ref={ref} className="inline-block">
+      ABC123
+    </span>
+  );
+}
 
 const SWATCHES = ["#ffffff", "#bdbdbd", "#7a7a7a", "#000000", "#ffd60a", "#ff9f0a", "#e5262a", "#ff3b9a", "#a259ff", "#2f80ed", "#00c2c7", "#34c759"];
 
@@ -142,6 +182,17 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
     for (const family of FONTS) void ensureFontFamily(family, 400, family).catch(() => undefined);
   }, [tab]);
 
+  const fontInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFonts, setUploadedFonts] = useState<string[]>([]);
+  const [fontError, setFontError] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadUserFonts().then((families) => live && setUploadedFonts(families));
+    return () => {
+      live = false;
+    };
+  }, []);
+
   if (!clip) return null;
   const store = useProjectStore.getState;
   const style = clip.style;
@@ -185,6 +236,38 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
     if (stylePart === "shadow") setStyle({ shadowColor: hex, shadowBlur: hex ? style.shadowBlur || 12 : 0, shadowOffsetY: hex ? 4 : 0 });
   };
   const currentColor = style[swatchTarget[stylePart]] as string | undefined;
+
+  const fontMatches = (family: string) => family.toLowerCase().includes(fontQuery.trim().toLowerCase());
+  const matchingFonts = FONTS.filter(fontMatches);
+  const matchingUploaded = uploadedFonts.filter(fontMatches);
+  const fontTile = (family: string) => {
+    const active = style.fontFamily === family;
+    return (
+      <button
+        key={family}
+        type="button"
+        aria-pressed={active}
+        onClick={() => setStyle({ fontFamily: family })}
+        className={`h-11 truncate rounded-lg bg-bg-3 px-2 text-[15px] ${active ? "ring-2 ring-fg" : ""}`}
+        style={{ fontFamily: `"${family}", sans-serif` }}
+      >
+        {family}
+      </button>
+    );
+  };
+  const uploadFont = async (file: File | undefined) => {
+    if (fontInputRef.current) fontInputRef.current.value = "";
+    if (!file) return;
+    setFontError(null);
+    try {
+      const family = await addUserFont(file);
+      setUploadedFonts(await loadUserFonts());
+      setFontQuery("");
+      setStyle({ fontFamily: family });
+    } catch (error) {
+      setFontError(error instanceof Error ? error.message : "That font couldn't be added.");
+    }
+  };
 
   const chip = (active: boolean) =>
     `shrink-0 text-[14px] ${active ? "font-semibold text-fg" : "text-fg-3"}`;
@@ -252,7 +335,8 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
             className={liftSearch ? "fixed inset-x-0 z-[300] max-h-[45vh] overflow-y-auto bg-bg-1 pb-2" : undefined}
             style={liftSearch ? { bottom: keyboardHeight } : undefined}
           >
-          <label className="mx-3 mt-3 flex h-10 items-center gap-2 rounded-lg bg-bg-3 px-3 text-fg-3">
+          <div className="mx-3 mt-3 flex items-center gap-2">
+          <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg bg-bg-3 px-3 text-fg-3">
             <Search size={16} aria-hidden />
             <input
               type="search"
@@ -270,24 +354,26 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
               </button>
             )}
           </label>
-          <div className="grid grid-cols-3 gap-2 p-3">
-            {FONTS.filter((family) => family.toLowerCase().includes(fontQuery.trim().toLowerCase())).map((family) => {
-              const active = style.fontFamily === family;
-              return (
-                <button
-                  key={family}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setStyle({ fontFamily: family })}
-                  className={`h-11 truncate rounded-lg bg-bg-3 px-2 text-[15px] ${active ? "ring-2 ring-fg" : ""}`}
-                  style={{ fontFamily: `"${family}", sans-serif` }}
-                >
-                  {family}
-                </button>
-              );
-            })}
+          <button
+            type="button"
+            aria-label="Upload a font"
+            onClick={() => fontInputRef.current?.click()}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-bg-3 text-fg"
+          >
+            <Upload size={18} aria-hidden />
+          </button>
+          <input ref={fontInputRef} type="file" accept={USER_FONT_ACCEPT} hidden onChange={(e) => void uploadFont(e.target.files?.[0])} />
           </div>
-          {!FONTS.some((family) => family.toLowerCase().includes(fontQuery.trim().toLowerCase())) && (
+          {fontError && <p role="alert" className="px-4 pt-2 text-[12px] text-red-400">{fontError}</p>}
+          {matchingUploaded.length > 0 && (
+            <>
+              <h3 className="px-4 pt-3 text-[12px] font-semibold text-fg-3">Uploaded</h3>
+              <div className="grid grid-cols-3 gap-2 px-3 pt-2">{matchingUploaded.map(fontTile)}</div>
+              <h3 className="px-4 pt-3 text-[12px] font-semibold text-fg-3">All fonts</h3>
+            </>
+          )}
+          <div className="grid grid-cols-3 gap-2 p-3">{matchingFonts.map(fontTile)}</div>
+          {matchingFonts.length === 0 && matchingUploaded.length === 0 && (
             <p className="px-4 py-6 text-center text-[13px] text-fg-3">No fonts match "{fontQuery}"</p>
           )}
           </div>
@@ -388,8 +474,8 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
                     onClick={() => setAnimation(item.preset)}
                     className="flex flex-col items-center gap-1"
                   >
-                    <span className={`grid h-14 w-full place-items-center rounded-lg bg-bg-3 text-[13px] font-semibold ${active ? "ring-2 ring-fg" : ""}`}>
-                      {item.preset === "none" ? <Ban size={20} aria-hidden /> : "ABC123"}
+                    <span className={`grid h-14 w-full place-items-center overflow-hidden rounded-lg bg-bg-3 text-[13px] font-semibold ${active ? "ring-2 ring-fg" : ""}`}>
+                      {item.preset === "none" ? <Ban size={20} aria-hidden /> : <AnimationSample preset={item.preset} out={animationPart === "out"} />}
                     </span>
                     <span className="w-full truncate text-center text-[11px] text-fg-3">{item.label}</span>
                   </button>
