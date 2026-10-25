@@ -29,6 +29,40 @@ const FONTS: readonly string[] = [
     .filter((family) => family !== "Inter"),
 ];
 
+/** What's popular right now: the font tab always opens here, like CapCut. */
+const TRENDING: readonly string[] = [
+  "Modern",
+  "Boblox Classic",
+  "Super Mario 256",
+  "Finger Paint",
+  "Bebas Neue",
+  "Montserrat",
+  "Anton",
+  "Poppins",
+  "Pacifico",
+  "Bangers",
+  "Permanent Marker",
+  "Lobster",
+  "Oswald",
+  "Dancing Script",
+  "Bungee",
+  "Playfair Display",
+  "Creepster",
+  "Press Start 2P",
+];
+
+/** The chips across the top of the Fonts tab. */
+const FONT_GROUPS: { id: string; fonts: readonly string[] }[] = [
+  { id: "Trending", fonts: TRENDING },
+  { id: "All", fonts: FONTS },
+  { id: "Display", fonts: FONT_CATEGORIES["Display & Headlines"] },
+  { id: "Handwritten", fonts: FONT_CATEGORIES["Handwritten & Script"] },
+  { id: "Fun", fonts: FONT_CATEGORIES["Fun & Creative"] },
+  { id: "Serif", fonts: FONT_CATEGORIES["Elegant & Serif"] },
+  { id: "Clean", fonts: FONT_CATEGORIES["Modern & Clean"] },
+  { id: "Mono", fonts: FONT_CATEGORIES.Monospace },
+];
+
 /** The "Aa" presets across the top of the Styles tab. */
 const STYLE_PRESETS: { label: string; style: Partial<TextStyle> }[] = [
   { label: "White", style: { color: "#ffffff", strokeWidth: 0, backgroundColor: undefined, shadowBlur: 0 } },
@@ -168,6 +202,8 @@ export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId:
   const [draft, setDraft] = useState(isNew ? "" : clip?.text ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
   const [fontQuery, setFontQuery] = useState("");
+  const [fontGroup, setFontGroup] = useState("Trending");
+  const [searching, setSearching] = useState(false);
   const keyboardHeight = useKeyboardHeight();
   // Which box the keyboard is typing into, so that box is the one lifted above it.
   const [typing, setTyping] = useState<"text" | "search" | null>(null);
@@ -264,8 +300,15 @@ export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId:
   const currentColor = style[swatchTarget[stylePart]] as string | undefined;
 
   const fontMatches = (family: string) => family.toLowerCase().includes(fontQuery.trim().toLowerCase());
-  const matchingFonts = FONTS.filter(fontMatches);
-  const matchingUploaded = uploadedFonts.filter(fontMatches);
+  // A search looks through every font; otherwise the picked chip's fonts show.
+  const query = searching && fontQuery.trim() !== "";
+  const groupFonts = fontGroup === "Uploaded" ? [] : FONT_GROUPS.find((g) => g.id === fontGroup)?.fonts ?? TRENDING;
+  const matchingFonts = query ? FONTS.filter(fontMatches) : groupFonts;
+  const matchingUploaded = query ? uploadedFonts.filter(fontMatches) : fontGroup === "Uploaded" ? uploadedFonts : [];
+  const closeSearch = () => {
+    setSearching(false);
+    setFontQuery("");
+  };
   const fontTile = (family: string) => {
     const active = style.fontFamily === family;
     return (
@@ -274,7 +317,7 @@ export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId:
         type="button"
         aria-pressed={active}
         onClick={() => setStyle({ fontFamily: family })}
-        className={`h-11 truncate rounded-lg bg-bg-3 px-2 text-[15px] ${active ? "ring-2 ring-fg" : ""}`}
+        className={`h-11 truncate rounded-lg bg-bg-3 px-1.5 ${family.length > 11 ? "text-[11px]" : "text-[15px]"} ${active ? "ring-2 ring-fg" : ""}`}
         style={{ fontFamily: `"${family}", sans-serif` }}
       >
         {family}
@@ -287,7 +330,8 @@ export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId:
     setFontError(null);
     const result = await registerCustomFont(file);
     if (!result.success) return setFontError(result.error);
-    setFontQuery("");
+    closeSearch();
+    setFontGroup("Uploaded");
     setStyle({ fontFamily: result.fontFamily });
   };
 
@@ -326,7 +370,10 @@ export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId:
             type="button"
             role="tab"
             aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              setTab(t.id);
+              if (t.id === "fonts") setFontGroup("Trending");
+            }}
             className={`relative shrink-0 pb-2 text-[14px] ${tab === t.id ? "font-semibold text-fg" : "text-fg-3"}`}
           >
             {t.label}
@@ -357,45 +404,75 @@ export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId:
             className={liftSearch ? "fixed inset-x-0 z-[300] max-h-[45vh] overflow-y-auto bg-bg-1 pb-2" : undefined}
             style={liftSearch ? { bottom: keyboardHeight } : undefined}
           >
-          <div className="mx-3 mt-3 flex items-center gap-2">
-          <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg bg-bg-3 px-3 text-fg-3">
-            <Search size={16} aria-hidden />
-            <input
-              type="search"
-              onFocus={() => setTyping("search")}
-              onBlur={() => setTyping(null)}
-              value={fontQuery}
-              onChange={(e) => setFontQuery(e.target.value)}
-              placeholder="Search fonts"
-              aria-label="Search fonts"
-              className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3 [&::-webkit-search-cancel-button]:hidden"
-            />
-            {fontQuery && (
-              <button type="button" aria-label="Clear search" onClick={() => setFontQuery("")} className="grid h-6 w-6 place-items-center">
-                <X size={14} aria-hidden />
+          {searching && (
+            <div className="mx-3 mt-3 flex items-center gap-2">
+              <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg bg-bg-3 px-3 text-fg-3">
+                <Search size={16} aria-hidden />
+                <input
+                  type="search"
+                  autoFocus
+                  onFocus={() => setTyping("search")}
+                  onBlur={() => setTyping(null)}
+                  value={fontQuery}
+                  onChange={(e) => setFontQuery(e.target.value)}
+                  placeholder="Search fonts"
+                  aria-label="Search fonts"
+                  className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3 [&::-webkit-search-cancel-button]:hidden"
+                />
+              </label>
+              <button type="button" aria-label="Close search" onClick={closeSearch} className="grid h-10 w-10 shrink-0 place-items-center text-fg">
+                <X size={20} aria-hidden />
+              </button>
+            </div>
+          )}
+          <div className="mt-3 flex items-center gap-1 pl-2 pr-3">
+            {!searching && (
+              <button
+                type="button"
+                aria-label="Search fonts"
+                onClick={() => setSearching(true)}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-fg"
+              >
+                <Search size={20} aria-hidden />
               </button>
             )}
-          </label>
-          <button
-            type="button"
-            aria-label="Upload a font"
-            onClick={() => fontInputRef.current?.click()}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-bg-3 text-fg"
-          >
-            <Upload size={18} aria-hidden />
-          </button>
-          <input ref={fontInputRef} type="file" accept={FONT_FILE_ACCEPT} hidden onChange={(e) => void uploadFont(e.target.files?.[0])} />
+            <div role="tablist" aria-label="Font groups" className="scrollbar-none flex min-w-0 flex-1 gap-5 overflow-x-auto px-2">
+              {[...FONT_GROUPS.map((g) => g.id), ...(uploadedFonts.length > 0 ? ["Uploaded"] : [])].map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={!query && fontGroup === id}
+                  onClick={() => {
+                    closeSearch();
+                    setFontGroup(id);
+                  }}
+                  className={chip(!query && fontGroup === id)}
+                >
+                  {id}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              aria-label="Upload a font"
+              onClick={() => fontInputRef.current?.click()}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-fg"
+            >
+              <Upload size={18} aria-hidden />
+            </button>
+            <input ref={fontInputRef} type="file" accept={FONT_FILE_ACCEPT} hidden onChange={(e) => void uploadFont(e.target.files?.[0])} />
           </div>
           {fontError && <p role="alert" className="px-4 pt-2 text-[12px] text-red-400">{fontError}</p>}
-          {matchingUploaded.length > 0 && (
+          {query && matchingUploaded.length > 0 && (
             <>
               <h3 className="px-4 pt-3 text-[12px] font-semibold text-fg-3">Uploaded</h3>
               <div className="grid grid-cols-3 gap-2 px-3 pt-2">{matchingUploaded.map(fontTile)}</div>
               <h3 className="px-4 pt-3 text-[12px] font-semibold text-fg-3">All fonts</h3>
             </>
           )}
-          <div className="grid grid-cols-3 gap-2 p-3">{matchingFonts.map(fontTile)}</div>
-          {matchingFonts.length === 0 && matchingUploaded.length === 0 && (
+          <div className="grid grid-cols-3 gap-2 p-3">{[...(query ? [] : matchingUploaded), ...matchingFonts].map(fontTile)}</div>
+          {query && matchingFonts.length === 0 && matchingUploaded.length === 0 && (
             <p className="px-4 py-6 text-center text-[13px] text-fg-3">No fonts match "{fontQuery}"</p>
           )}
           </div>

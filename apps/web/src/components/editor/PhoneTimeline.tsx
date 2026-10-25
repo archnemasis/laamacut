@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Music, Pencil, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
+import { ChevronLeft, ChevronRight, Music, Pencil, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
 import { getProjectPreview, setProjectCover } from "../../services/project-previews";
 import { PhoneCoverScreen } from "./PhoneCoverScreen";
 import { reorderTrackClips } from "../../services/phone-media";
+import { ensureFilmstrip } from "../../services/filmstrip";
 import { toast } from "../../stores/notification-store";
 import type { Clip, MediaItem } from "@openreel/core";
 import { useProjectStore } from "../../stores/project-store";
@@ -16,8 +17,28 @@ const MAIN_LANE_H = 56;
 const LANE_H = 36;
 const MIN_TRIM = 0.1;
 
-type LaneItem = { id: string; start: number; duration: number; label: string; kind?: "text-clip" | "shape-clip" };
+type LaneItem = { id: string; start: number; duration: number; label: string; kind?: "text-clip" | "shape-clip"; clip?: Clip };
 type TrimDraft = { id: string; side: "start" | "end"; delta: number };
+type TrimSide = TrimDraft["side"];
+
+/** CapCut's white trim handle, stuck to the side of the selected block with an arrow on it. */
+function TrimHandle({ side, value, onPointerDown }: { side: TrimSide; value: number; onPointerDown: (e: React.PointerEvent) => void }) {
+  const Arrow = side === "start" ? ChevronLeft : ChevronRight;
+  return (
+    <span
+      role="slider"
+      aria-label={side === "start" ? "Trim start" : "Trim end"}
+      aria-valuenow={Math.round(value * 10) / 10}
+      onPointerDown={onPointerDown}
+      onClick={(e) => e.stopPropagation()}
+      className={`absolute inset-y-0 z-10 grid w-4 touch-none place-items-center bg-white text-black ${
+        side === "start" ? "-left-4 rounded-l-md" : "-right-4 rounded-r-md"
+      }`}
+    >
+      <Arrow size={14} strokeWidth={3} aria-hidden />
+    </span>
+  );
+}
 
 export const formatPhoneTime = (seconds: number): string => {
   const total = Math.max(0, Math.floor(seconds));
@@ -56,6 +77,7 @@ export function PhoneTimeline({
 }) {
   const project = useProjectStore((s) => s.project);
   const trimClip = useProjectStore((s) => s.trimClip);
+  const updateOverlayClipTiming = useProjectStore((s) => s.updateOverlayClipTiming);
   const moveClip = useProjectStore((s) => s.moveClip);
   const muteTrack = useProjectStore((s) => s.muteTrack);
   const playheadPosition = useTimelineStore((s) => s.playheadPosition);
@@ -103,6 +125,15 @@ export function PhoneTimeline({
     () => new Map(project.mediaLibrary.items.map((m) => [m.id, m] as const)),
     [project.mediaLibrary.items],
   );
+  // Videos on the timeline without a filmstrip (reopened projects) get one,
+  // after a moment so a fresh import's own thumbnails can land first.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const used = new Set(project.timeline.tracks.flatMap((t) => t.clips.map((c) => c.mediaId)));
+      for (const media of project.mediaLibrary.items) if (used.has(media.id)) ensureFilmstrip(media);
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [project.mediaLibrary.items, project.timeline.tracks]);
 
   // The main lane is the first track holding pictures; other picture tracks are
   // overlays, audio clips go in the audio lane, and titles/graphics in the text lane.
@@ -121,6 +152,7 @@ export function PhoneTimeline({
           start: clip.startTime,
           duration: clip.duration,
           label: mediaById.get(clip.mediaId)?.name ?? "Clip",
+          clip,
         };
         if (kindOf(clip) === "audio") audio.push(item);
         else if (track !== mainTrack) overlay.push(item);
@@ -204,34 +236,67 @@ export function PhoneTimeline({
     else select({ type: "clip", id, trackId });
   };
 
-  const beginTrim = (clip: Clip, side: TrimDraft["side"]) => (e: React.PointerEvent) => {
+  /**
+   * How far each side of a block can move, and how to save it. Videos and audio
+   * only stretch back out to the length of their file; pictures, text and
+   * stickers stretch as far as you like. Main clips stay end to end (CapCut's
+   * magnetic main track), so trimming one moves the clips after it.
+   */
+  const trimTarget = (item: { id: string; start: number; duration: number; clip?: Clip; main?: boolean }) => {
+    const { id, start, duration, clip, main } = item;
+    const media = clip ? mediaById.get(clip.mediaId) : undefined;
+    const stretchy = !clip || media?.type === "image";
+    const sourceLength = media?.metadata?.duration;
+    const maxOut = sourceLength && sourceLength > 0 ? sourceLength : Infinity;
+    const inPoint = clip?.inPoint ?? 0;
+    const minStart = main ? (stretchy ? -Infinity : -inPoint) : stretchy ? -start : Math.max(-start, -inPoint);
+    const maxEnd = stretchy || !clip ? Infinity : maxOut - clip.outPoint;
+    const commit = async (side: TrimSide, delta: number) => {
+      const newDuration = side === "start" ? duration - delta : duration + delta;
+      if (!clip) {
+        updateOverlayClipTiming(id, { ...(side === "start" ? { startTime: start + delta } : {}), duration: newDuration });
+        return;
+      }
+      if (stretchy) await trimClip(id, 0, newDuration);
+      else if (side === "start") await trimClip(id, clip.inPoint + delta, undefined);
+      else await trimClip(id, undefined, clip.outPoint + delta);
+      if (main && lanes.mainTrack) {
+        const order = [...lanes.main].sort((a, b) => a.startTime - b.startTime).map((c) => c.id);
+        await reorderTrackClips(lanes.mainTrack.id, order);
+      } else if (side === "start") {
+        await moveClip(id, start + delta);
+      }
+    };
+    return { id, duration, minStart, maxEnd, commit };
+  };
+
+  const beginTrim = (target: ReturnType<typeof trimTarget>, side: TrimSide) => (e: React.PointerEvent) => {
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const startX = e.clientX;
-    const mediaDuration = mediaById.get(clip.mediaId)?.metadata?.duration;
-    const maxOut = mediaDuration && mediaDuration > 0 ? mediaDuration : Infinity;
     const clampDelta = (raw: number) =>
       side === "start"
-        ? Math.min(clip.outPoint - clip.inPoint - MIN_TRIM, Math.max(-clip.inPoint, raw))
-        : Math.min(maxOut - clip.outPoint, Math.max(-(clip.outPoint - clip.inPoint - MIN_TRIM), raw));
-    const move = (ev: PointerEvent) => setTrim({ id: clip.id, side, delta: clampDelta((ev.clientX - startX) / pps) });
+        ? Math.min(target.duration - MIN_TRIM, Math.max(target.minStart, raw))
+        : Math.min(target.maxEnd, Math.max(-(target.duration - MIN_TRIM), raw));
+    const move = (ev: PointerEvent) => setTrim({ id: target.id, side, delta: clampDelta((ev.clientX - startX) / pps) });
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       const delta = clampDelta((ev.clientX - startX) / pps);
       setTrim(null);
       if (Math.abs(delta) < 1 / 60) return;
-      void (async () => {
-        if (side === "start") {
-          await trimClip(clip.id, clip.inPoint + delta, undefined);
-          await moveClip(clip.id, clip.startTime + delta);
-        } else {
-          await trimClip(clip.id, undefined, clip.outPoint + delta);
-        }
-      })();
+      void target.commit(side, delta);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+  };
+
+  /** A block's place while one of its sides is being dragged. */
+  const drafted = (id: string, start: number, duration: number) => {
+    const draft = trim?.id === id ? trim : null;
+    const startDelta = draft?.side === "start" ? draft.delta : 0;
+    const endDelta = draft?.side === "end" ? draft.delta : 0;
+    return { start: start + startDelta, duration: duration - startDelta + endDelta, startDelta };
   };
 
   const justDragged = useRef(false);
@@ -316,24 +381,36 @@ export function PhoneTimeline({
 
   const renderBar = (item: LaneItem, tone: string) => {
     const selected = selectedIds.has(item.id);
+    const place = drafted(item.id, item.start, item.duration);
+    const target = selected ? trimTarget(item) : null;
     return (
-      <button
+      <div
         key={item.id}
-        type="button"
-        aria-label={`Select ${item.label}`}
-        aria-pressed={selected}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (item.kind) select({ type: item.kind, id: item.id });
-          else selectClip(item.id);
-        }}
-        className={`absolute top-1 bottom-1 truncate rounded-md px-2 text-left text-[11px] font-medium text-white ${tone} ${
-          selected ? "ring-2 ring-white" : ""
-        }`}
-        style={{ left: item.start * pps, width: Math.max(8, item.duration * pps) }}
+        className={`absolute top-1 bottom-1 ${selected ? "z-20" : ""}`}
+        style={{ left: place.start * pps, width: Math.max(8, place.duration * pps) }}
       >
-        {item.label}
-      </button>
+        <button
+          type="button"
+          aria-label={`Select ${item.label}`}
+          aria-pressed={selected}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (item.kind) select({ type: item.kind, id: item.id });
+            else selectClip(item.id);
+          }}
+          className={`absolute inset-0 truncate px-2 text-left text-[11px] font-medium text-white ${tone} ${
+            selected ? "rounded-none border-y-2 border-white" : "rounded-md"
+          }`}
+        >
+          {selected ? `${place.duration.toFixed(1)}s · ${item.label}` : item.label}
+        </button>
+        {target && (
+          <>
+            <TrimHandle side="start" value={place.start} onPointerDown={beginTrim(target, "start")} />
+            <TrimHandle side="end" value={place.start + place.duration} onPointerDown={beginTrim(target, "end")} />
+          </>
+        )}
+      </div>
     );
   };
 
@@ -441,13 +518,16 @@ export function PhoneTimeline({
               )}
               {lanes.main.map((clip) => {
                 const selected = selectedIds.has(clip.id);
-                const draft = trim?.id === clip.id ? trim : null;
-                const left = (clip.startTime + (draft?.side === "start" ? draft.delta : 0)) * pps;
-                const clipDuration =
-                  clip.duration - (draft?.side === "start" ? draft.delta : 0) + (draft?.side === "end" ? draft.delta : 0);
+                const place = drafted(clip.id, clip.startTime, clip.duration);
+                // Clips after one whose end is being dragged follow it, as they will once it is saved.
+                const trimmed = trim?.side === "end" ? lanes.main.find((c) => c.id === trim.id) : undefined;
+                const follow = trim && trimmed && clip.startTime > trimmed.startTime ? trim.delta : 0;
+                const left = (place.start + follow) * pps;
+                const clipDuration = place.duration;
                 const clipWidth = Math.max(4, clipDuration * pps);
                 const media = mediaById.get(clip.mediaId);
-                const inPoint = clip.inPoint + (draft?.side === "start" ? draft.delta : 0);
+                const inPoint = media?.type === "image" ? 0 : clip.inPoint + place.startDelta;
+                const target = selected ? trimTarget({ id: clip.id, start: clip.startTime, duration: clip.duration, clip, main: true }) : null;
                 const tiles = Math.max(1, Math.ceil(clipWidth / MAIN_LANE_H));
                 return (
                   <div
@@ -488,26 +568,12 @@ export function PhoneTimeline({
                         <span className="pointer-events-none absolute left-2 top-1 rounded bg-black/60 px-1 text-[11px] font-medium text-white">
                           {clipDuration.toFixed(1)}s
                         </span>
-                        <span
-                          role="slider"
-                          aria-label="Trim start"
-                          aria-valuenow={Math.round(inPoint * 10) / 10}
-                          onPointerDown={beginTrim(clip, "start")}
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute inset-y-0 -left-4 grid w-4 touch-none place-items-center rounded-l-md bg-white"
-                        >
-                          <span className="h-4 w-0.5 rounded bg-black/50" />
-                        </span>
-                        <span
-                          role="slider"
-                          aria-label="Trim end"
-                          aria-valuenow={Math.round((inPoint + clipDuration) * 10) / 10}
-                          onPointerDown={beginTrim(clip, "end")}
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute inset-y-0 -right-4 grid w-4 touch-none place-items-center rounded-r-md bg-white"
-                        >
-                          <span className="h-4 w-0.5 rounded bg-black/50" />
-                        </span>
+                        {target && (
+                          <>
+                            <TrimHandle side="start" value={inPoint} onPointerDown={beginTrim(target, "start")} />
+                            <TrimHandle side="end" value={inPoint + clipDuration} onPointerDown={beginTrim(target, "end")} />
+                          </>
+                        )}
                       </>
                     )}
                   </div>

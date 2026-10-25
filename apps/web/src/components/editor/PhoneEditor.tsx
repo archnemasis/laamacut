@@ -46,6 +46,7 @@ import { Toolbar } from "./Toolbar";
 import { Preview } from "./Preview";
 import { PhoneTimeline } from "./PhoneTimeline";
 import { PhoneTextEditor, type TextEditorTab } from "./PhoneTextEditor";
+import { PhoneAutoCaptions } from "./PhoneAutoCaptions";
 import { PhoneGestures } from "./PhoneGestures";
 import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
@@ -182,6 +183,7 @@ export const PhoneEditor: React.FC = () => {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [clipMenu, setClipMenu] = useState<ClipMenu | null>(null);
   const [panel, setPanel] = useState<ClipPanel | null>(null);
+  const [captionsOpen, setCaptionsOpen] = useState(false);
   const replaceInput = useRef<HTMLInputElement>(null);
   const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean; tab?: TextEditorTab } | null>(null);
   // New projects open straight into the media picker, like CapCut.
@@ -322,7 +324,6 @@ export const PhoneEditor: React.FC = () => {
     { label: "Text", icon: Type, onClick: () => setMenu("text") },
     { label: "Effects", icon: Zap, onClick: () => openForMainClip("effects", "Effects") },
     { label: "Overlay", icon: Layers, onClick: () => overlayInput.current?.click() },
-    { label: "Captions", icon: Captions, onClick: () => openForMainClip("ai", "Captions") },
     { label: "Filters", icon: LooksIcon, onClick: () => openForMainClip("filters", "Filters") },
     { label: "Adjust", icon: SlidersHorizontal, onClick: () => openForMainClip("adjust", "Adjust") },
     { label: "Transitions", icon: Shuffle, onClick: () => open({ kind: "assets", tab: "transitions", title: "Transitions" }) },
@@ -338,7 +339,7 @@ export const PhoneEditor: React.FC = () => {
     ],
     text: [
       { label: "Add text", icon: Plus, onClick: () => void addText() },
-      { label: "Auto captions", icon: Captions, onClick: () => openForMainClip("ai", "Auto captions") },
+      { label: "Auto captions", icon: Captions, onClick: () => setCaptionsOpen(true) },
       { label: "Stickers", icon: Sticker, onClick: () => open({ kind: "assets", tab: "graphics", title: "Stickers" }) },
       { label: "Text template", icon: Type, onClick: () => open({ kind: "assets", tab: "text", title: "Text template" }) },
     ],
@@ -552,6 +553,12 @@ export const PhoneEditor: React.FC = () => {
               <PhoneTextEditor clipId={textEdit.clipId} isNew={textEdit.isNew} initialTab={textEdit.tab} onDone={() => setTextEdit(null)} />
             </PanelErrorBoundary>
           </div>
+        )}
+
+        {captionsOpen && (
+          <PanelErrorBoundary name="Auto captions">
+            <PhoneAutoCaptions onClose={() => setCaptionsOpen(false)} />
+          </PanelErrorBoundary>
         )}
 
         {sheet && (

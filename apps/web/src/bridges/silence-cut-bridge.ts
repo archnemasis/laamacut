@@ -59,13 +59,13 @@ export class SilenceCutBridge {
       throw new Error("Media blob not found");
     }
 
-    onProgress?.(10, "Loading audio...");
+    onProgress?.(10, "Listening...");
 
     const audioContext = this.getAudioContext();
     const arrayBuffer = await mediaItem.blob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-    onProgress?.(30, "Detecting silence...");
+    onProgress?.(30, "Finding the quiet bits...");
 
     const audioEngine = getAudioEngine();
     const rawSilentRanges = audioEngine.detectSilence(
@@ -73,7 +73,7 @@ export class SilenceCutBridge {
       settings.threshold,
     );
 
-    onProgress?.(60, "Processing results...");
+    onProgress?.(60, "Almost done...");
 
     const inPoint = clip.inPoint ?? 0;
     const outPoint = clip.outPoint ?? audioBuffer.duration;
@@ -107,7 +107,7 @@ export class SilenceCutBridge {
           region.start < region.end,
       );
 
-    onProgress?.(90, "Finalizing...");
+    onProgress?.(90, "Almost done...");
 
     const totalSilenceDuration = filteredRegions.reduce(
       (sum, region) => sum + region.duration,
@@ -142,7 +142,7 @@ export class SilenceCutBridge {
     const clipStartTime = initialClip.startTime;
     const sortedRegions = [...silentRegions].sort((a, b) => b.start - a.start);
 
-    onProgress?.(0, "Preparing cuts...");
+    onProgress?.(0, "Cutting...");
 
     const actionHistory = store.actionHistory;
     actionHistory.beginGroup("Cut silence");

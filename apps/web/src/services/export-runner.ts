@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ensureProjectFonts } from "./project-fonts";
 import { prefetchGalleryOriginals, withGalleryOriginals } from "./gallery-originals";
+import { getNativeExporter, planNativeExport, type NativeExportRequest } from "./native-export";
 import {
   getExportEngine,
   type VideoExportSettings,
@@ -440,6 +441,10 @@ export interface UseExportRunner {
     ext: string,
     writableStream: FileSystemWritableFileStream,
   ) => Promise<void>;
+  runNativeExport: (
+    request: import("./native-export").NativeExportRequest,
+    videoSettings: Partial<VideoExportSettings>,
+  ) => Promise<{ uri: string; location: string }>;
   runAudioExport: (settings: Partial<AudioExportSettings>, writable: FileSystemWritableFileStream) => Promise<void>;
   showSavePicker: (filename: string, ext: string, opts?: { streamToFile?: boolean; delivery?: ExportDeliveryMode; onFile?: ExportFileHandler }) => Promise<FileSystemWritableFileStream>;
   reportProgress: (progress01: number, phase: string) => void;
@@ -457,8 +462,11 @@ export interface UseExportRunner {
  * phone asks for a name): the encoder, the project's fonts and its originals.
  */
 export function warmUpExport(project: Project): void {
-  void getExportEngine().initialize().catch(() => undefined);
   void ensureProjectFonts(project).catch(() => undefined);
+  // The phone's own export reads gallery files itself; loading them into the
+  // web view as well would only slow its start.
+  if (getNativeExporter() && !("reason" in planNativeExport(project))) return;
+  void getExportEngine().initialize().catch(() => undefined);
   prefetchGalleryOriginals(project);
 }
 
@@ -467,6 +475,7 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
   const [state, setState] = useState<ExportRunnerState>(INITIAL_STATE);
   const epoch = useRef(0);
   const running = useRef(false);
+  const nativeRunning = useRef(false);
   const cancelled = useRef(false);
   const activeWritable = useRef<FileSystemWritableFileStream | null>(null);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -487,7 +496,7 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
     setState({
       isExporting: true,
       progress: 0,
-      phase: "Initializing...",
+      phase: "Getting ready...",
       error: null,
       complete: false,
     });
@@ -697,10 +706,40 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
     [],
   );
 
+  /**
+   * Export on the phone itself (Android): reports progress like runExport and
+   * resolves with where the video was saved. The caller marks it complete.
+   */
+  const runNativeExport = useCallback(
+    async (request: NativeExportRequest, videoSettings: Partial<VideoExportSettings>): Promise<{ uri: string; location: string }> => {
+      const plugin = getNativeExporter();
+      if (!plugin) throw new Error("Native export is not available");
+      if (running.current) throw new Error("An export is already running");
+      running.current = true;
+      nativeRunning.current = true;
+      const runEpoch = epoch.current;
+      const listener = await plugin.addListener("progress", ({ progress }) => {
+        if (epoch.current === runEpoch && !cancelled.current) reportProgress(progress, "Encoding");
+      });
+      try {
+        const result = await plugin.export(request);
+        if (epoch.current !== runEpoch || cancelled.current) throw new DOMException("Export cancelled", "AbortError");
+        onExported?.(videoSettings);
+        return result;
+      } finally {
+        void listener.remove();
+        running.current = false;
+        nativeRunning.current = false;
+      }
+    },
+    [onExported, reportProgress],
+  );
+
   const cancel = useCallback(() => {
     epoch.current += 1;
     cancelled.current = true;
     void activeWritable.current?.abort().catch(() => undefined);
+    if (nativeRunning.current) void getNativeExporter()?.cancel().catch(() => undefined);
     const engine = getExportEngine();
     engine.cancel();
     setState(INITIAL_STATE);
@@ -714,6 +753,7 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
   return {
     state,
     runExport,
+    runNativeExport,
     runAudioExport,
     showSavePicker,
     reportProgress,

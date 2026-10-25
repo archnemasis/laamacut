@@ -32,7 +32,7 @@ export const useEditorInitialization = () => {
   const initializing = useEngineStore((state) => state.initializing);
   const initError = useEngineStore((state) => state.initError);
   const [bridgesReady, setBridgesReady] = useState(false);
-  const [initStatus, setInitStatus] = useState("Starting...");
+  const [initStatus, setInitStatus] = useState("Loading...");
   const [localError, setLocalError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => {
@@ -49,7 +49,7 @@ export const useEditorInitialization = () => {
       try {
         const currentState = useEngineStore.getState();
         if (!currentState.initialized && !currentState.initializing) {
-          setInitStatus("Initializing video engine...");
+          setInitStatus("Loading...");
           await initialize();
         } else if (currentState.initializing) {
           await new Promise<void>((resolve) => {
@@ -76,19 +76,19 @@ export const useEditorInitialization = () => {
           );
         }
 
-        setInitStatus("Initializing media bridge...");
+        setInitStatus("Almost ready...");
         await initializeMediaBridge();
         if (!isMounted) return;
 
-        setInitStatus("Initializing playback bridge...");
+        setInitStatus("Almost ready...");
         await initializePlaybackBridge();
         if (!isMounted) return;
 
-        setInitStatus("Initializing render bridge...");
+        setInitStatus("Almost ready...");
         await initializeRenderBridge();
         if (!isMounted) return;
 
-        setInitStatus("Initializing effects bridge...");
+        setInitStatus("Almost ready...");
         const projectState = useProjectStore.getState();
         const { width, height } = projectState.project.settings;
         try {
@@ -101,7 +101,7 @@ export const useEditorInitialization = () => {
         }
         if (!isMounted) return;
 
-        setInitStatus("Initializing transition bridge...");
+        setInitStatus("Almost ready...");
         try {
           initializeTransitionBridge(width, height);
         } catch (transitionError) {

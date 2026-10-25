@@ -69,7 +69,7 @@ export const AutoCutSilenceSection: React.FC<AutoCutSilenceSectionProps> = ({
 
     setIsAnalyzing(true);
     setProgress(0);
-    setProgressMessage("Initializing...");
+    setProgressMessage("Getting ready...");
 
     try {
       const bridge = getSilenceCutBridge();
@@ -102,7 +102,7 @@ export const AutoCutSilenceSection: React.FC<AutoCutSilenceSectionProps> = ({
 
     setIsCutting(true);
     setProgress(0);
-    setProgressMessage("Preparing...");
+    setProgressMessage("Getting ready...");
 
     try {
       const bridge = getSilenceCutBridge();

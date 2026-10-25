@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SaverPlugin.class);
         registerPlugin(GalleryPlugin.class);
+        registerPlugin(ExportPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Android 15 draws apps behind the status and navigation bars. Keep the

@@ -39,6 +39,7 @@ export const FONT_CATEGORIES = {
     "Concert One",
     "Fredoka One",
     "Bungee",
+    "Modern",
   ],
   "Elegant & Serif": [
     "Playfair Display",
@@ -72,8 +73,9 @@ export const FONT_CATEGORIES = {
     "Yellowtail",
     "Rock Salt",
     "Permanent Marker",
+    "Finger Paint",
   ],
-  "Fun & Creative": ["Bangers", "Creepster", "Press Start 2P"],
+  "Fun & Creative": ["Bangers", "Creepster", "Press Start 2P", "Boblox Classic", "Super Mario 256"],
   Monospace: ["Roboto Mono", "Space Mono"],
   System: ["Arial", "Helvetica", "Times New Roman", "Georgia", "Verdana"],
 } as const;

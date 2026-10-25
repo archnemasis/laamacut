@@ -146,10 +146,11 @@ self.onmessage = async (
     type: "load" | "transcribe";
     audio?: Float32Array;
     language?: string;
+    task?: "transcribe" | "translate";
     model?: WhisperModelKey;
   }>,
 ) => {
-  const { requestId, type, audio, language } = event.data;
+  const { requestId, type, audio, language, task } = event.data;
   const modelKey = isWhisperModelKey(event.data.model)
     ? event.data.model
     : DEFAULT_WHISPER_MODEL;
@@ -163,8 +164,9 @@ self.onmessage = async (
 
     post(requestId, { type: "transcription-progress", progress: 0.05 });
     const output = await transcriber(audio, {
-      language,
-      task: "transcribe",
+      // No language lets Whisper work out what is being spoken.
+      ...(language ? { language } : {}),
+      task: task ?? "transcribe",
       return_timestamps: true,
       chunk_length_s: 30,
       stride_length_s: 5,

@@ -183,9 +183,9 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
       await addMediaFilesToTimeline(files, (index, mediaId) => {
         const prepared = extras[index];
         if (prepared) applyGalleryVideoExtras(mediaId, { filmstrip: prepared.filmstrip });
-        // Edited with the small copy; export swaps the original back in.
+        // Export goes back to the gallery file (the web export only for small copies).
         const tile = picked[index];
-        if (prepared?.previewCopy && tile.galleryItem) rememberGalleryOriginal(mediaId, tile.galleryItem);
+        if (tile.galleryItem) rememberGalleryOriginal(mediaId, tile.galleryItem, Boolean(prepared?.previewCopy));
       });
     } finally {
       setProgress(null);

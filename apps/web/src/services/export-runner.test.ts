@@ -26,6 +26,7 @@ const { mockEngine, getExportEngineMock } = vi.hoisted(() => {
   };
 });
 
+vi.mock("./native-export", () => ({ getNativeExporter: () => undefined }));
 vi.mock("@openreel/core", () => ({
   getExportEngine: getExportEngineMock,
 }));
@@ -157,7 +158,7 @@ describe("useExportRunner", () => {
       result.current.beginExport();
     });
     expect(result.current.state.isExporting).toBe(true);
-    expect(result.current.state.phase).toBe("Initializing...");
+    expect(result.current.state.phase).toBe("Getting ready...");
 
     const settings: Partial<VideoExportSettings> = { format: "mp4", codec: "h264" };
     await act(async () => {

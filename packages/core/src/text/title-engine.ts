@@ -354,6 +354,14 @@ export class TitleEngine {
             if (style.strokeColor && style.strokeWidth) {
               ctx.strokeStyle = style.strokeColor;
               ctx.lineWidth = style.strokeWidth;
+
+              // Round corners: hand-drawn fonts (Finger Paint) have jagged outlines
+
+              // that sharp joins turn into long spikes.
+
+              ctx.lineJoin = "round";
+
+              ctx.lineCap = "round";
               ctx.strokeText(char, 0, 0);
             }
             ctx.fillStyle = style.color;
@@ -382,6 +390,14 @@ export class TitleEngine {
         if (style.strokeColor && style.strokeWidth) {
           ctx.strokeStyle = style.strokeColor;
           ctx.lineWidth = style.strokeWidth;
+
+          // Round corners: hand-drawn fonts (Finger Paint) have jagged outlines
+
+          // that sharp joins turn into long spikes.
+
+          ctx.lineJoin = "round";
+
+          ctx.lineCap = "round";
           ctx.strokeText(line, 0, y);
         }
 

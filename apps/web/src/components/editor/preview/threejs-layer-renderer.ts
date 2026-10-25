@@ -212,6 +212,8 @@ export class ThreeJSLayerRenderer {
     if (style.strokeColor && style.strokeWidth) {
       ctx.strokeStyle = style.strokeColor;
       ctx.lineWidth = style.strokeWidth;
+
+      ctx.lineJoin = "round";
     }
 
     const lines = textClip.text.split("\n");

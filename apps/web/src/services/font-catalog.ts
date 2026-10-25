@@ -57,3 +57,11 @@ export const GOOGLE_FONT_SPECS: Readonly<Record<string, string>> = {
   "Yellowtail": "Yellowtail",
   "Zilla Slab": "Zilla Slab:wght@300;400;500;600;700",
 };
+
+// Fonts shipped with the app (public/fonts/bundled), loaded from disk so they work offline.
+export const BUNDLED_FONTS: Readonly<Record<string, string>> = {
+  "Boblox Classic": "BobloxClassic.ttf",
+  "Finger Paint": "FingerPaint-Regular.ttf",
+  "Modern": "Unbounded-ExtraBold.ttf",
+  "Super Mario 256": "SuperMario256.ttf",
+};

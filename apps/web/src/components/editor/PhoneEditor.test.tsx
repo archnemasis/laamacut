@@ -27,6 +27,7 @@ const projectState = vi.hoisted(() => ({
   updateSettings: async () => undefined,
   setCanvasBackground: () => undefined,
 }));
+vi.mock("../../services/filmstrip", () => ({ ensureFilmstrip: () => undefined }));
 vi.mock("../../stores/project-store", () => {
   const useProjectStore = (selector: (s: typeof projectState) => unknown) => selector(projectState);
   useProjectStore.getState = () => projectState;

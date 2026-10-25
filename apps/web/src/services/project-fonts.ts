@@ -1,9 +1,10 @@
 import type { Project, MotionComposition } from "@openreel/core";
-import { GOOGLE_FONT_SPECS } from "./font-catalog";
+import { BUNDLED_FONTS, GOOGLE_FONT_SPECS } from "./font-catalog";
 import { initCustomFonts } from "../components/editor/inspector/font-options";
 
 const initialFamilies = new Set(["Geist", "Geist Mono", "Inter"]);
 const pendingStylesheets = new Map<string, Promise<void>>();
+const pendingBundled = new Map<string, Promise<void>>();
 export interface ProjectFont { family: string; weight: string; sample: string }
 
 function loadStylesheet(family: string): Promise<void> {
@@ -31,11 +32,31 @@ function loadStylesheet(family: string): Promise<void> {
   return promise;
 }
 
+/** Add a font shipped with the app to the page, once. */
+function loadBundled(family: string): Promise<void> {
+  const file = BUNDLED_FONTS[family];
+  if (!file || typeof FontFace === "undefined") return Promise.resolve();
+  const pending = pendingBundled.get(family);
+  if (pending) return pending;
+  const promise = new FontFace(family, `url("${import.meta.env.BASE_URL}fonts/bundled/${file}")`)
+    .load()
+    .then((face) => {
+      document.fonts.add(face);
+    })
+    .catch((error: unknown) => {
+      pendingBundled.delete(family);
+      throw error;
+    });
+  pendingBundled.set(family, promise);
+  return promise;
+}
+
 export async function ensureFontFamily(family: string, weight: string | number = 400, sample = "OpenReel"): Promise<void> {
   if (typeof document === "undefined" || !document.fonts || !family) return;
   // Not a catalogue font: it may be one the user uploaded. A stuck font
   // database must never hold up the preview or an export.
-  if (!GOOGLE_FONT_SPECS[family] && !initialFamilies.has(family)) {
+  if (BUNDLED_FONTS[family]) await loadBundled(family);
+  else if (!GOOGLE_FONT_SPECS[family] && !initialFamilies.has(family)) {
     await Promise.race([initCustomFonts().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 3000))]);
   }
   await loadStylesheet(family);

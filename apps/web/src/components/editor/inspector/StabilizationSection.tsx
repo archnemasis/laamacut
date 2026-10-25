@@ -128,11 +128,11 @@ export const StabilizationSection: React.FC<StabilizationSectionProps> = ({
   const stageLabel = (() => {
     switch (stage) {
       case "downloading":
-        return "Downloading stabilization engine...";
+        return "Getting ready...";
       case "detecting":
-        return "Analyzing motion...";
+        return "Checking the shake...";
       case "stabilizing":
-        return "Stabilizing video...";
+        return "Smoothing it out...";
       default:
         return "";
     }

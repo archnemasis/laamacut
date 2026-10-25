@@ -27,6 +27,7 @@ import {
   type PhoneExportChoice,
 } from "./PhoneExportPanel";
 import { PhoneExportScreen, capturePreviewStill, type PhoneExportStatus } from "./PhoneExportScreen";
+import { prepareNativeExport } from "../../services/native-export";
 import { captureProjectPreview, getProjectPreview } from "../../services/project-previews";
 import { getAndroidSaver, saveBlobOnAndroid } from "../../services/android-downloads";
 import { startNewProject } from "../../desktop/start/desktop-project-actions";
@@ -120,6 +121,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
   const {
     state: exportState,
     runExport,
+    runNativeExport,
     runAudioExport,
     showSavePicker,
     markComplete,
@@ -387,9 +389,29 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
         const videoUrl = exportedUrl.current;
         setPhoneRun((run) => (run ? { ...run, videoUrl, location } : run));
       };
-      void handleCustomExport(phoneExportSettings(phoneChoice, project.settings), "download", onFile);
+      const settings = phoneExportSettings(phoneChoice, project.settings);
+      // Like CapCut, the phone puts the video together itself when it can;
+      // anything it can't do yet (or a failure) goes through the web export.
+      const current = useProjectStore.getState().project;
+      const request = await prepareNativeExport(current, settings, exportFilename(current.name, extForFormat(settings.format)));
+      if (request) {
+        try {
+          beginExport();
+          const { uri, location } = await runNativeExport(request, settings);
+          releaseExportedVideo();
+          const videoUrl = window.Capacitor?.convertFileSrc?.(uri) ?? uri;
+          setPhoneRun((run) => (run ? { ...run, videoUrl, location } : run));
+          markComplete();
+          finishExportSoon();
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return failExport(error);
+          console.warn("[export] Phone export failed; trying the web export:", error);
+        }
+      }
+      void handleCustomExport(settings, "download", onFile);
     },
-    [handleCustomExport, phoneChoice, project.settings, renameProject, releaseExportedVideo],
+    [handleCustomExport, phoneChoice, project.settings, renameProject, releaseExportedVideo, beginExport, runNativeExport, markComplete, finishExportSoon, failExport],
   );
   // The runner clears "complete" after a moment; the phone screen keeps it until you leave.
   useEffect(() => {

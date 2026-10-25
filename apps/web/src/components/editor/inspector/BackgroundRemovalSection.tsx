@@ -104,19 +104,19 @@ export const BackgroundRemovalSection: React.FC<
     setIsProcessing(true);
 
     try {
-      updateTaskProgress(taskId, 10, "Initializing AI model...");
+      updateTaskProgress(taskId, 10, "Getting ready...");
 
       if (!isInitialized) {
         await handleInitialize();
       }
 
-      updateTaskProgress(taskId, 30, "Preparing background detection...");
+      updateTaskProgress(taskId, 30, "Finding the background...");
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      updateTaskProgress(taskId, 60, "Configuring effect pipeline...");
+      updateTaskProgress(taskId, 60, "Removing it...");
       await new Promise((resolve) => setTimeout(resolve, 400));
 
-      updateTaskProgress(taskId, 90, "Finalizing setup...");
+      updateTaskProgress(taskId, 90, "Almost done...");
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       updateSettings({ enabled: true });

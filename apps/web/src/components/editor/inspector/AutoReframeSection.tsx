@@ -120,11 +120,11 @@ export const AutoReframeSection: React.FC<AutoReframeSectionProps> = ({
   const handleAnalyze = useCallback(async () => {
     setIsProcessing(true);
     setProgress(0);
-    setProgressMessage("Initializing...");
+    setProgressMessage("Getting ready...");
 
     try {
       if (!isInitialized) {
-        setProgressMessage("Loading AI engine...");
+        setProgressMessage("Getting ready...");
         setProgress(10);
         await handleInitialize();
       }
@@ -134,12 +134,12 @@ export const AutoReframeSection: React.FC<AutoReframeSectionProps> = ({
         throw new Error("Engine not available");
       }
 
-      setProgressMessage("Configuring reframe settings...");
+      setProgressMessage("Finding the action...");
       setProgress(30);
 
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      setProgressMessage("Applying smart crop configuration...");
+      setProgressMessage("Cropping...");
       setProgress(60);
 
       const targetConfig =
@@ -147,7 +147,7 @@ export const AutoReframeSection: React.FC<AutoReframeSectionProps> = ({
 
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      setProgressMessage("Updating project settings...");
+      setProgressMessage("Almost done...");
       setProgress(80);
 
       await updateProjectDimensions({
@@ -155,7 +155,7 @@ export const AutoReframeSection: React.FC<AutoReframeSectionProps> = ({
         height: targetConfig.height,
       });
 
-      setProgressMessage("Finalizing...");
+      setProgressMessage("Almost done...");
       setProgress(90);
 
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -334,7 +334,7 @@ export const AutoReframeSection: React.FC<AutoReframeSectionProps> = ({
           label={
             isInitializing || isProcessing
               ? isInitializing
-                ? "Initializing..."
+                ? "Getting ready..."
                 : "Analyzing..."
               : isApplied
                 ? "Applied - Click to Reanalyze"

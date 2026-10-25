@@ -2,7 +2,10 @@ import type { Project } from "@openreel/core";
 import type { GalleryItem } from "./phone-gallery";
 
 const ORIGINALS_KEY = "laamacut-gallery-originals";
-type GalleryOriginal = Pick<GalleryItem, "uri" | "name" | "mime">;
+type GalleryOriginal = Pick<GalleryItem, "uri" | "name" | "mime"> & {
+  /** False when the clip already holds the full file (HD, photos): web export has nothing to swap. */
+  copy?: boolean;
+};
 
 function loadOriginals(): Record<string, GalleryOriginal> {
   try {
@@ -13,17 +16,23 @@ function loadOriginals(): Record<string, GalleryOriginal> {
 }
 
 /**
- * Remember which gallery file a clip's small editing copy came from, so export
- * can go back to the full-quality original.
+ * Remember which gallery file a clip came from: export goes back to the
+ * full-quality original of a small editing copy, and the phone's native
+ * export reads gallery files directly.
  */
-export function rememberGalleryOriginal(mediaId: string, item: GalleryItem): void {
+export function rememberGalleryOriginal(mediaId: string, item: GalleryItem, copy = true): void {
   try {
     const originals = loadOriginals();
-    originals[mediaId] = { uri: item.uri, name: item.name, mime: item.mime };
+    originals[mediaId] = { uri: item.uri, name: item.name, mime: item.mime, copy };
     localStorage.setItem(ORIGINALS_KEY, JSON.stringify(originals));
   } catch {
     // Storage full or blocked: export falls back to the editing copy.
   }
+}
+
+/** The phone gallery file a clip came from, if it was picked from the gallery. */
+export function galleryOriginalUri(mediaId: string): string | undefined {
+  return loadOriginals()[mediaId]?.uri;
 }
 
 /** Originals being read, so export can start reading them early (see prefetchGalleryOriginals). */
@@ -52,7 +61,7 @@ export function prefetchGalleryOriginals(project: Project): void {
   const originals = loadOriginals();
   for (const item of project.mediaLibrary.items) {
     const original = originals[item.id];
-    if (original) void readOriginal(original, convert);
+    if (original && original.copy !== false) void readOriginal(original, convert);
   }
 }
 
@@ -64,11 +73,11 @@ export function prefetchGalleryOriginals(project: Project): void {
 export async function withGalleryOriginals(project: Project): Promise<Project> {
   const convert = typeof window !== "undefined" ? window.Capacitor?.convertFileSrc : undefined;
   const originals = loadOriginals();
-  if (!convert || !project.mediaLibrary.items.some((item) => originals[item.id])) return project;
+  if (!convert || !project.mediaLibrary.items.some((item) => originals[item.id]?.copy !== false && originals[item.id])) return project;
   const items = await Promise.all(
     project.mediaLibrary.items.map(async (item) => {
       const original = originals[item.id];
-      if (!original) return item;
+      if (!original || original.copy === false) return item;
       const file = await readOriginal(original, convert);
       return file ? { ...item, blob: file } : item;
     }),

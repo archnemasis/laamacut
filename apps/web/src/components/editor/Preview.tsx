@@ -867,11 +867,15 @@ export const Preview: React.FC = () => {
   useEffect(() => () => window.clearTimeout(missingFrameRetryRef.current.timer), []);
   const stillImagesRef = useRef(new Map<string, HTMLImageElement>());
   const offscreenCanvasRef = useRef<OffscreenCanvas | null>(null);
-  const decodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decodeDebounceResolveRef = useRef<((value: ImageBitmap | null) => void) | null>(
     null,
   );
   const decodeRequestSeqRef = useRef(0);
+  // One decode at a time: while scrubbing, each frame that starts finishes and
+  // is shown, and the newest playhead position decodes straight after it.
+  const decodeChainRef = useRef<Promise<void>>(Promise.resolve());
+  /** Bumped when scrubbing stops (e.g. play), so even started decodes are dropped. */
+  const decodeCancelRef = useRef(0);
   const scrubVideoReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -1124,13 +1128,10 @@ export const Preview: React.FC = () => {
   }, [releaseVideoElement]);
 
   const cancelPendingScrubDecode = useCallback((): void => {
-    if (decodeDebounceRef.current) {
-      clearTimeout(decodeDebounceRef.current);
-      decodeDebounceRef.current = null;
-    }
     decodeDebounceResolveRef.current?.(null);
     decodeDebounceResolveRef.current = null;
     decodeRequestSeqRef.current += 1;
+    decodeCancelRef.current += 1;
   }, []);
 
   const releaseScrubVideoElements = useCallback((): void => {
@@ -2427,17 +2428,18 @@ export const Preview: React.FC = () => {
       }
 
       const requestSeq = ++decodeRequestSeqRef.current;
-      const isStaleRequest = () => requestSeq !== decodeRequestSeqRef.current;
+      // Only a request still waiting its turn is dropped for a newer one; once
+      // it has started it runs to the end, so scrubbing keeps showing frames.
+      let started = false;
+      const cancelEpoch = decodeCancelRef.current;
+      const isStaleRequest = () =>
+        cancelEpoch !== decodeCancelRef.current || (!started && requestSeq !== decodeRequestSeqRef.current);
 
       if (scrubVideoReleaseTimerRef.current) {
         clearTimeout(scrubVideoReleaseTimerRef.current);
         scrubVideoReleaseTimerRef.current = null;
       }
 
-      if (decodeDebounceRef.current) {
-        clearTimeout(decodeDebounceRef.current);
-        decodeDebounceRef.current = null;
-      }
       decodeDebounceResolveRef.current?.(null);
       decodeDebounceResolveRef.current = null;
 
@@ -2454,14 +2456,11 @@ export const Preview: React.FC = () => {
 
       return new Promise<ImageBitmap | null>((resolve) => {
         decodeDebounceResolveRef.current = resolve;
-        decodeDebounceRef.current = setTimeout(async () => {
-          decodeDebounceRef.current = null;
+        const decode = async () => {
+          // A newer request already answered this one with null.
+          if (decodeDebounceResolveRef.current !== resolve) return;
           decodeDebounceResolveRef.current = null;
-
-          if (isStaleRequest()) {
-            resolve(null);
-            return;
-          }
+          started = true;
 
           try {
             const clipLocalTime = time - clip.startTime;
@@ -2568,7 +2567,9 @@ export const Preview: React.FC = () => {
               };
 
               video.requestVideoFrameCallback(finish);
-              timeoutId = setTimeout(finish, 300);
+              // A video that isn't on screen may never call back; once it has
+              // seeked its frame is ready, so don't hold scrubbing up for long.
+              timeoutId = setTimeout(finish, video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? 30 : 300);
             });
 
             if (isStaleRequest()) {
@@ -2628,7 +2629,8 @@ export const Preview: React.FC = () => {
             scheduleScrubVideoRelease();
             resolve(null);
           }
-        }, 50);
+        };
+        decodeChainRef.current = decodeChainRef.current.then(decode, decode);
       });
     },
     [
