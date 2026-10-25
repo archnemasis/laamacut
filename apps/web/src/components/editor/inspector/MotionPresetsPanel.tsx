@@ -71,7 +71,7 @@ interface CanvasDimensions {
   height: number;
 }
 
-function generateKeyframesFromPreset(
+export function generateKeyframesFromPreset(
   preset: MotionPreset,
   clipDuration: number,
   baseTransform: Transform,
@@ -156,7 +156,7 @@ function generateKeyframesFromPreset(
   return keyframes;
 }
 
-function buildPreviewCSSKeyframes(preset: MotionPreset): globalThis.Keyframe[] {
+export function buildPreviewCSSKeyframes(preset: MotionPreset): globalThis.Keyframe[] {
   const keyframes: globalThis.Keyframe[] = [];
   const steps = 10;
 

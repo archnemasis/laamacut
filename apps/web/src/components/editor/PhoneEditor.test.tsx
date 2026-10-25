@@ -42,6 +42,13 @@ vi.mock("./Timeline", () => ({ Timeline: () => <div>Timeline</div> }));
 vi.mock("./AssetsPanel", () => ({
   AssetsPanel: ({ tab }: { tab: string }) => <div data-testid="assets-panel">{tab}</div>,
 }));
+vi.mock("./PhoneClipPanels", () => ({
+  PhoneClipPanel: ({ panel, onDone }: { panel: string; onDone: () => void }) => (
+    <section role="dialog" aria-label={panel}>
+      <button type="button" onClick={onDone}>Done</button>
+    </section>
+  ),
+}));
 vi.mock("./InspectorPanel", () => ({
   InspectorPanel: ({ only }: { only?: string }) => <div data-testid="inspector-panel">{only ?? "all"}</div>,
 }));
@@ -81,8 +88,17 @@ describe("PhoneEditor", () => {
     render(<PhoneEditor />);
     const tools = screen.getByRole("navigation", { name: "Clip tools" });
 
+    // Clip tools open CapCut-style panels over the bottom bar.
     fireEvent.click(within(tools).getByRole("button", { name: "Speed" }));
-    expect(screen.getByTestId("inspector-panel")).toHaveTextContent("speed");
+    expect(screen.getByRole("dialog", { name: "speed" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    // Transform opens a second row with Rotate, Mirror and Basic.
+    fireEvent.click(within(tools).getByRole("button", { name: "Transform" }));
+    const transform = screen.getByRole("navigation", { name: "Clip tools" });
+    expect(within(transform).getByRole("button", { name: "Mirror" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to clip tools" }));
 
     fireEvent.click(within(tools).getByRole("button", { name: "Split" }));
     expect(actions.splitTimelineItem).toHaveBeenCalledWith(projectState, "clip-1", expect.any(Number));

@@ -119,3 +119,5 @@ export async function galleryItemToFile(item: GalleryItem): Promise<File> {
   const blob = await response.blob();
   return new File([blob], item.name, { type: item.mime || blob.type });
 }
+
+export { rememberGalleryOriginal } from "./gallery-originals";

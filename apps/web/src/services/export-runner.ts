@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ensureProjectFonts } from "./project-fonts";
+import { withGalleryOriginals } from "./gallery-originals";
 import {
   getExportEngine,
   type VideoExportSettings,
@@ -529,7 +530,10 @@ export function useExportRunner(options: ExportRunnerOptions): UseExportRunner {
         checkCurrent();
         await ensureProjectFonts(project);
         checkCurrent();
-        generator = engine.exportVideo(project, videoSettings, writableStream);
+        // Phone clips are edited with a 720p copy; export renders the originals.
+        const exportProject = await withGalleryOriginals(project);
+        checkCurrent();
+        generator = engine.exportVideo(exportProject, videoSettings, writableStream);
         let finalResult: ExportResult | undefined;
 
         while (true) {

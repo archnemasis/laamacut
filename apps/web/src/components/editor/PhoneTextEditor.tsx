@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Ban, Check } from "@/icons/lucide-compat";
+import { Ban, Check, Search, X } from "@/icons/lucide-compat";
 import type { TextAnimationPreset, TextStyle } from "@openreel/core";
 import { useProjectStore } from "../../stores/project-store";
 import { ensureFontFamily } from "../../services/project-fonts";
@@ -77,6 +77,42 @@ function Slider({ label, value, min, max, step = 1, onChange }: { label: string;
   );
 }
 
+type VirtualKeyboard = EventTarget & { overlaysContent: boolean; boundingRect: DOMRect };
+
+/**
+ * Height of the on-screen keyboard. The Android app draws edge to edge, so the
+ * keyboard covers the page instead of shrinking it; this tells us how much to
+ * lift the text box so it stays visible above the keys.
+ */
+function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const keyboard = (navigator as Navigator & { virtualKeyboard?: VirtualKeyboard }).virtualKeyboard;
+    const viewport = window.visualViewport;
+    const measure = () => {
+      const fromApi = keyboard?.boundingRect.height ?? 0;
+      const fromViewport = viewport ? window.innerHeight - viewport.height - viewport.offsetTop : 0;
+      const next = Math.max(fromApi, fromViewport);
+      setHeight(next > 80 ? next : 0);
+    };
+    let restoreOverlay: boolean | undefined;
+    if (keyboard) {
+      restoreOverlay = keyboard.overlaysContent;
+      keyboard.overlaysContent = true;
+      keyboard.addEventListener("geometrychange", measure);
+    }
+    viewport?.addEventListener("resize", measure);
+    return () => {
+      if (keyboard) {
+        keyboard.removeEventListener("geometrychange", measure);
+        keyboard.overlaysContent = restoreOverlay ?? false;
+      }
+      viewport?.removeEventListener("resize", measure);
+    };
+  }, []);
+  return height;
+}
+
 /**
  * CapCut's text editor: a text box with a tick, then Templates, Fonts,
  * Styles and Animations tabs. Edits apply live to the selected text clip.
@@ -89,6 +125,12 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
   // A new clip starts with an empty box; "Enter text" shows on the preview until you type.
   const [draft, setDraft] = useState(isNew ? "" : clip?.text ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [fontQuery, setFontQuery] = useState("");
+  const keyboardHeight = useKeyboardHeight();
+  // Which box the keyboard is typing into, so that box is the one lifted above it.
+  const [typing, setTyping] = useState<"text" | "search" | null>(null);
+  const liftText = keyboardHeight > 0 && typing !== "search";
+  const liftSearch = keyboardHeight > 0 && typing === "search";
 
   useEffect(() => {
     if (isNew) inputRef.current?.focus();
@@ -149,9 +191,15 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
 
   return (
     <section role="dialog" aria-label="Text" className="phone-text-editor flex h-full flex-col bg-bg-1 text-fg">
-      <div className="flex items-center gap-2 px-3 pt-3">
+      {/* While typing, CapCut shows just the text box, sitting on top of the keyboard. */}
+      <div
+        className={`flex items-center gap-2 px-3 ${liftText ? "fixed inset-x-0 z-[300] bg-bg-1 py-2" : "pt-3"}`}
+        style={liftText ? { bottom: keyboardHeight } : undefined}
+      >
         <input
           ref={inputRef}
+          onFocus={() => setTyping("text")}
+          onBlur={() => setTyping(null)}
           value={draft}
           onChange={(e) => changeText(e.target.value)}
           onKeyDown={(e) => {
@@ -166,7 +214,7 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
         </button>
       </div>
 
-      <div role="tablist" aria-label="Text options" className="scrollbar-none flex shrink-0 gap-6 overflow-x-auto px-4 pt-3">
+      <div role="tablist" aria-label="Text options" className="scrollbar-none flex shrink-0 gap-6 overflow-x-auto border-b border-border px-4 pt-3">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -199,8 +247,31 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
         )}
 
         {tab === "fonts" && (
+          // While searching, the box and results ride on top of the keyboard.
+          <div
+            className={liftSearch ? "fixed inset-x-0 z-[300] max-h-[45vh] overflow-y-auto bg-bg-1 pb-2" : undefined}
+            style={liftSearch ? { bottom: keyboardHeight } : undefined}
+          >
+          <label className="mx-3 mt-3 flex h-10 items-center gap-2 rounded-lg bg-bg-3 px-3 text-fg-3">
+            <Search size={16} aria-hidden />
+            <input
+              type="search"
+              onFocus={() => setTyping("search")}
+              onBlur={() => setTyping(null)}
+              value={fontQuery}
+              onChange={(e) => setFontQuery(e.target.value)}
+              placeholder="Search fonts"
+              aria-label="Search fonts"
+              className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {fontQuery && (
+              <button type="button" aria-label="Clear search" onClick={() => setFontQuery("")} className="grid h-6 w-6 place-items-center">
+                <X size={14} aria-hidden />
+              </button>
+            )}
+          </label>
           <div className="grid grid-cols-3 gap-2 p-3">
-            {FONTS.map((family) => {
+            {FONTS.filter((family) => family.toLowerCase().includes(fontQuery.trim().toLowerCase())).map((family) => {
               const active = style.fontFamily === family;
               return (
                 <button
@@ -215,6 +286,10 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
                 </button>
               );
             })}
+          </div>
+          {!FONTS.some((family) => family.toLowerCase().includes(fontQuery.trim().toLowerCase())) && (
+            <p className="px-4 py-6 text-center text-[13px] text-fg-3">No fonts match "{fontQuery}"</p>
+          )}
           </div>
         )}
 
@@ -288,9 +363,15 @@ export function PhoneTextEditor({ clipId, isNew, onDone }: { clipId: string; isN
 
         {tab === "animations" && (
           <>
-            <div className="flex gap-5 px-4 pt-3">
+            <div className="mx-3 mt-3 flex w-fit rounded-lg bg-bg-3 p-0.5">
               {(["in", "out"] as const).map((part) => (
-                <button key={part} type="button" aria-pressed={animationPart === part} onClick={() => setAnimationPart(part)} className={chip(animationPart === part)}>
+                <button
+                  key={part}
+                  type="button"
+                  aria-pressed={animationPart === part}
+                  onClick={() => setAnimationPart(part)}
+                  className={`rounded-md px-5 py-1.5 text-[13px] ${animationPart === part ? "bg-bg-1 font-semibold text-fg" : "text-fg-3"}`}
+                >
                   {part === "in" ? "In" : "Out"}
                 </button>
               ))}

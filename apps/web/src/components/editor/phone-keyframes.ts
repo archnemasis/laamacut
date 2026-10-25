@@ -35,7 +35,11 @@ export const unflatten = (f: FlatTransform): Partial<Transform> => ({
   rotation: f.rotation,
 });
 
-const isTransformKeyframe = (kf: Keyframe) => (TRANSFORM_PROPS as readonly string[]).includes(kf.property);
+/** In/Out/Combo animations are keyframes too ("motion-…" ids); they are not the user's keyframes. */
+export const isAnimationKeyframe = (kf: Keyframe) => kf.id.startsWith("motion-");
+
+const isTransformKeyframe = (kf: Keyframe) =>
+  !isAnimationKeyframe(kf) && (TRANSFORM_PROPS as readonly string[]).includes(kf.property);
 
 export const hasTransformKeyframes = (kfs: readonly Keyframe[]) => kfs.some(isTransformKeyframe);
 
@@ -45,7 +49,7 @@ export const hasKeyframeAt = (kfs: readonly Keyframe[], time: number) =>
 /** Linear value of one property at `time`, or `fallback` when it has no keyframes. */
 function valueAt(kfs: readonly Keyframe[], prop: TransformProp, time: number, fallback: number): number {
   const points = kfs
-    .filter((kf) => kf.property === prop && typeof kf.value === "number")
+    .filter((kf) => isTransformKeyframe(kf) && kf.property === prop && typeof kf.value === "number")
     .sort((a, b) => a.time - b.time);
   if (points.length === 0) return fallback;
   if (time <= points[0].time) return points[0].value as number;
@@ -113,6 +117,21 @@ export function applyTransform(visual: SelectedVisual, time: number, values: Fla
     return;
   }
   const transform = unflatten(values);
+  // Animations were recorded around the old position and size; carry them along.
+  if (visual.kind !== "shape" && visual.keyframes.some(isAnimationKeyframe)) {
+    const before = flatten(visual.transform);
+    const moved = visual.keyframes.map((kf) => {
+      if (!isAnimationKeyframe(kf) || typeof kf.value !== "number") return kf;
+      const prop = kf.property as TransformProp;
+      if (!(TRANSFORM_PROPS as readonly string[]).includes(prop)) return kf;
+      const value = prop.startsWith("scale")
+        ? before[prop] !== 0 ? kf.value * (values[prop] / before[prop]) : kf.value
+        : kf.value + (values[prop] - before[prop]);
+      return { ...kf, value };
+    });
+    if (visual.kind === "media") store.updateClipKeyframes(visual.id, moved);
+    else store.updateTextClipKeyframes(visual.id, moved);
+  }
   if (visual.kind === "media") void store.updateClipTransform(visual.id, transform);
   else if (visual.kind === "text") store.updateTextTransform(visual.id, transform);
   else store.updateShapeTransform(visual.id, transform);

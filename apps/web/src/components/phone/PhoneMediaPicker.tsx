@@ -5,6 +5,7 @@ import {
   applyGalleryVideoExtras,
   galleryItemToFile,
   getGallery,
+  rememberGalleryOriginal,
   loadHdPreference,
   saveHdPreference,
   prepareGalleryVideo,
@@ -158,8 +159,8 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
     try {
       // Gallery videos get phone-decoded filmstrip frames so the timeline shows
       // pictures from the start. With HD off the phone's 720p copy becomes the
-      // clip itself: the full-size original never loads into memory, which is
-      // what keeps lower-end phones smooth.
+      // clip while editing, so the full-size original never loads into memory
+      // (that keeps lower-end phones smooth). Export reads the original.
       setProgress(hd ? "Preparing videos" : "Preparing videos for smooth editing");
       const extras = await Promise.all(
         picked.map((tile) =>
@@ -178,6 +179,9 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
       await addMediaFilesToTimeline(files, (index, mediaId) => {
         const prepared = extras[index];
         if (prepared) applyGalleryVideoExtras(mediaId, { filmstrip: prepared.filmstrip });
+        // Edited with the 720p copy; export swaps the original back in.
+        const tile = picked[index];
+        if (prepared?.previewCopy && tile.galleryItem) rememberGalleryOriginal(mediaId, tile.galleryItem);
       });
     } finally {
       setProgress(null);

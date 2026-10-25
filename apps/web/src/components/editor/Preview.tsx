@@ -709,10 +709,36 @@ const renderOverlayLayerWithEffects = async (
   clipId: string,
   canvasWidth: number,
   canvasHeight: number,
-  render: (layerCtx: CanvasRenderingContext2D) => void | Promise<void>,
+  render: (
+    layerCtx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+  ) => void | Promise<void>,
 ): Promise<void> => {
+  // Text and graphics are sized in project pixels. When the preview canvas is
+  // smaller than the project (the phone draws at 960 px), draw them at project
+  // size under a scale so they keep their true size relative to the video.
+  const { width: projectWidth, height: projectHeight } =
+    useProjectStore.getState().project.settings;
+  const scaled =
+    projectWidth > 0 &&
+    projectHeight > 0 &&
+    (projectWidth !== canvasWidth || projectHeight !== canvasHeight);
+  const draw = async (target: CanvasRenderingContext2D) => {
+    if (!scaled) {
+      await render(target, canvasWidth, canvasHeight);
+      return;
+    }
+    target.save();
+    target.scale(canvasWidth / projectWidth, canvasHeight / projectHeight);
+    try {
+      await render(target, projectWidth, projectHeight);
+    } finally {
+      target.restore();
+    }
+  };
   if (!clipNeedsFrameProcessing(clipId)) {
-    await render(ctx);
+    await draw(ctx);
     return;
   }
   const layerCanvas = document.createElement("canvas");
@@ -720,7 +746,7 @@ const renderOverlayLayerWithEffects = async (
   layerCanvas.height = canvasHeight;
   const layerCtx = layerCanvas.getContext("2d");
   if (!layerCtx) return;
-  await render(layerCtx);
+  await draw(layerCtx);
   const prepared = await preparePreviewFrame(
     clipId,
     layerCanvas,
@@ -746,14 +772,8 @@ const renderShapeClipWithEffects = async (
     shapeClip.id,
     canvasWidth,
     canvasHeight,
-    (layerCtx) =>
-      renderShapeClipToCanvas(
-        layerCtx,
-        shapeClip,
-        canvasWidth,
-        canvasHeight,
-        time,
-      ),
+    (layerCtx, width, height) =>
+      renderShapeClipToCanvas(layerCtx, shapeClip, width, height, time),
   );
 };
 
@@ -789,14 +809,8 @@ const renderTextClipWithSubjectMask = async (
       textClip.id,
       canvasWidth,
       canvasHeight,
-      (layerCtx) =>
-        renderTextClipToCanvas(
-          layerCtx,
-          textClip,
-          canvasWidth,
-          canvasHeight,
-          time,
-        ),
+      (layerCtx, width, height) =>
+        renderTextClipToCanvas(layerCtx, textClip, width, height, time),
     );
 
   if (!textClip.behindSubject || !subjectFrame || !subjectMask) {
@@ -8099,7 +8113,8 @@ export const Preview: React.FC = () => {
               );
             })}
         </div>
-        {exportState.isExporting && <ExportProgressOverlay progress={exportState.progress} phase={exportState.phase} width={videoAreaSize.width} height={videoAreaSize.height} />}
+        {/* The phone shows its own full-screen export page instead. */}
+        {exportState.isExporting && !isPhone && <ExportProgressOverlay progress={exportState.progress} phase={exportState.phase} width={videoAreaSize.width} height={videoAreaSize.height} />}
       </div>
 
       {/* Player Controls with integrated Scrub Bar */}

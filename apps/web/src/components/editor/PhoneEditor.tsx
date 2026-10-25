@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Blend,
   Check,
   ChevronLeft,
+  FlipHorizontal2,
+  Replace,
+  RotateCw,
+  Scaling,
   Copy,
   Diamond,
   DiamondPlus,
@@ -41,14 +46,15 @@ import { Preview } from "./Preview";
 import { PhoneTimeline } from "./PhoneTimeline";
 import { PhoneTextEditor } from "./PhoneTextEditor";
 import { PhoneGestures } from "./PhoneGestures";
-import { findSelectedVisual, hasKeyframeAt, toggleKeyframe } from "./phone-keyframes";
+import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
+import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
 import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
 import { takePhoneMediaPickerRequest } from "../../services/phone-media";
 import { useRouter } from "../../hooks/use-router";
 import { AssetsPanel, DEFAULT_TITLE_STYLE, type AssetsTab } from "./AssetsPanel";
 import { InspectorPanel } from "./InspectorPanel";
 import { VoiceOverPanel } from "./inspector/VoiceOverPanel";
-import { getTabIdsForClipType, type InspectorTabId } from "./inspector/clip-tabs.config";
+import type { InspectorTabId } from "./inspector/clip-tabs.config";
 import { APPS_BY_RATIO, AppIcon } from "./aspect-apps";
 import { ASPECT_PRESETS, BACKGROUND_SWATCHES } from "./canvas-presets";
 import { PanelErrorBoundary } from "../ErrorBoundary";
@@ -76,17 +82,10 @@ type Menu = "audio" | "text";
 
 type Tool = { label: string; icon: LucideIcon; onClick: () => void; disabled?: boolean };
 
-/** Clip tools, in CapCut order; each opens one inspector section. "delete" marks where Delete goes. */
-const CLIP_SECTIONS: ({ label: string; icon: LucideIcon; section: InspectorTabId } | "delete")[] = [
-  { label: "Volume", icon: Volume2, section: "audio" },
-  { label: "Animations", icon: Film, section: "animate" },
-  { label: "Effects", icon: Wand2, section: "effects" },
-  "delete",
-  { label: "Speed", icon: Gauge, section: "speed" },
-  { label: "Adjust", icon: Palette, section: "color" },
-  { label: "Transform", icon: Move, section: "transform" },
-  { label: "Captions", icon: Captions, section: "ai" },
-];
+/** Second-level row inside the clip tools. */
+type ClipMenu = "transform";
+
+const PANELS: ClipPanel[] = ["speed", "volume", "opacity", "basic", "adjust", "filters", "animations", "effects"];
 
 function ToolButton({ tool }: { tool: Tool }) {
   const Icon = tool.icon;
@@ -178,6 +177,9 @@ function BackgroundSheet() {
 export const PhoneEditor: React.FC = () => {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [clipMenu, setClipMenu] = useState<ClipMenu | null>(null);
+  const [panel, setPanel] = useState<ClipPanel | null>(null);
+  const replaceInput = useRef<HTMLInputElement>(null);
   const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean } | null>(null);
   // New projects open straight into the media picker, like CapCut.
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -226,6 +228,12 @@ export const PhoneEditor: React.FC = () => {
     [selectedItems],
   );
   const isPlaying = playbackState === "playing";
+  // A different selection starts again from the clip's own tool row.
+  const selectionKey = selectedIds.join(",");
+  useEffect(() => {
+    setPanel(null);
+    setClipMenu(null);
+  }, [selectionKey]);
 
   // Media clips live on tracks; text, shapes and stickers are overlays.
   const mediaKind = useMemo(() => {
@@ -256,7 +264,7 @@ export const PhoneEditor: React.FC = () => {
   const open = (next: Sheet) => setSheet(next);
 
   // Like CapCut, Edit, Adjust and Captions act on the picture clip under the playhead.
-  const openForMainClip = (only: InspectorTabId | undefined, title: string) => {
+  const openForMainClip = (only: InspectorTabId | ClipPanel | undefined, title: string) => {
     const pictures = project.timeline.tracks.flatMap((track) =>
       track.clips.filter((c) => project.mediaLibrary.items.find((m) => m.id === c.mediaId)?.type !== "audio"),
     );
@@ -268,7 +276,10 @@ export const PhoneEditor: React.FC = () => {
       return;
     }
     select({ type: "clip", id: clip.id, trackId: clip.trackId });
-    if (only) open({ kind: "inspector", only, title });
+    if (only && (PANELS as string[]).includes(only)) {
+      // After the selection effect has reset the panel.
+      window.setTimeout(() => setPanel(only as ClipPanel), 0);
+    } else if (only) open({ kind: "inspector", only: only as InspectorTabId, title });
   };
 
   /** Add a text clip at the playhead and open the text editor, like CapCut's Add text. */
@@ -299,11 +310,11 @@ export const PhoneEditor: React.FC = () => {
     { label: "Edit", icon: EditIcon, onClick: () => openForMainClip(undefined, "Edit") },
     { label: "Audio", icon: Music, onClick: () => setMenu("audio") },
     { label: "Text", icon: Type, onClick: () => setMenu("text") },
-    { label: "Effects", icon: Zap, onClick: () => open({ kind: "assets", tab: "effects", title: "Effects" }) },
+    { label: "Effects", icon: Zap, onClick: () => openForMainClip("effects", "Effects") },
     { label: "Overlay", icon: Layers, onClick: () => overlayInput.current?.click() },
     { label: "Captions", icon: Captions, onClick: () => openForMainClip("ai", "Captions") },
-    { label: "Filters", icon: LooksIcon, onClick: () => open({ kind: "assets", tab: "recipes", title: "Filters" }) },
-    { label: "Adjust", icon: SlidersHorizontal, onClick: () => openForMainClip("color", "Adjust") },
+    { label: "Filters", icon: LooksIcon, onClick: () => openForMainClip("filters", "Filters") },
+    { label: "Adjust", icon: SlidersHorizontal, onClick: () => openForMainClip("adjust", "Adjust") },
     { label: "Transitions", icon: Shuffle, onClick: () => open({ kind: "assets", tab: "transitions", title: "Transitions" }) },
     { label: "Aspect ratio", icon: Proportions, onClick: () => open({ kind: "ratio", title: "Aspect ratio" }) },
     { label: "Background", icon: PaintBucket, onClick: () => open({ kind: "background", title: "Background" }) },
@@ -335,14 +346,6 @@ export const PhoneEditor: React.FC = () => {
     },
   };
 
-  const sectionTools: Tool[] = mediaKind
-    ? CLIP_SECTIONS.flatMap((entry): Tool[] => {
-        if (entry === "delete") return [deleteTool];
-        if (!getTabIdsForClipType(mediaKind).includes(entry.section)) return [];
-        return [{ label: entry.label, icon: entry.icon, onClick: () => open({ kind: "inspector", only: entry.section, title: entry.label }) }];
-      })
-    : [{ label: "Adjust", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) }, deleteTool];
-
   const splitTool: Tool = {
     label: "Split",
     icon: Scissors,
@@ -367,6 +370,39 @@ export const PhoneEditor: React.FC = () => {
     },
   };
 
+  const panelTool = (label: string, icon: LucideIcon, kind: ClipPanel): Tool => ({ label, icon, onClick: () => setPanel(kind) });
+  /** Rotate and Mirror act on the clip right away; Basic opens the dials. */
+  const nudgeTransform = (change: (t: FlatTransform) => Partial<FlatTransform>) => {
+    if (!selectedVisual) return;
+    const time = playheadPosition - selectedVisual.startTime;
+    const values = currentTransform(selectedVisual, time);
+    applyTransform(selectedVisual, time, { ...values, ...change(values) });
+  };
+  const transformTools: Tool[] = [
+    { label: "Rotate", icon: RotateCw, onClick: () => nudgeTransform((t) => ({ rotation: ((Math.round(t.rotation / 90) * 90 + 90 + 540) % 360) - 180 })) },
+    { label: "Mirror", icon: FlipHorizontal2, onClick: () => nudgeTransform((t) => ({ "scale.x": -t["scale.x"] })) },
+    panelTool("Basic", Scaling, "basic"),
+  ];
+
+  const mediaTools: Tool[] =
+    mediaKind === "audio"
+      ? [splitTool, panelTool("Volume", Volume2, "volume"), panelTool("Speed", Gauge, "speed"), deleteTool, duplicateTool]
+      : [
+          splitTool,
+          ...(mediaKind === "video" ? [panelTool("Volume", Volume2, "volume")] : []),
+          panelTool("Animations", Film, "animations"),
+          panelTool("Effects", Wand2, "effects"),
+          deleteTool,
+          ...(mediaKind === "video" ? [panelTool("Speed", Gauge, "speed")] : []),
+          duplicateTool,
+          { label: "Replace", icon: Replace, onClick: () => replaceInput.current?.click() },
+          panelTool("Adjust", Palette, "adjust"),
+          panelTool("Filters", LooksIcon, "filters"),
+          panelTool("Opacity", Blend, "opacity"),
+          { label: "Transform", icon: Move, onClick: () => setClipMenu("transform") },
+          { label: "More", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) },
+        ];
+
   const clipTools: Tool[] = selectedText
     ? [
         { label: "Edit", icon: Pencil, onClick: () => setTextEdit({ clipId: selectedText, isNew: false }) },
@@ -374,12 +410,23 @@ export const PhoneEditor: React.FC = () => {
         deleteTool,
         duplicateTool,
       ]
-    : [splitTool, ...sectionTools, duplicateTool];
+    : mediaKind
+      ? clipMenu === "transform" ? transformTools : mediaTools
+      : [splitTool, { label: "Adjust", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) }, deleteTool, duplicateTool];
+
+  /** Replace: swap the clip's file, keeping its place and edits. */
+  const replaceClipMedia = async (files: FileList | null) => {
+    const file = files?.[0];
+    const clip = project.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedIds[0]);
+    if (file && clip) await useProjectStore.getState().replaceMediaAsset(clip.mediaId, file);
+  };
 
   const hasSelection = selectedIds.length > 0;
   const tools = hasSelection ? clipTools : menu ? menuTools[menu] : mainTools;
   const back = hasSelection
-    ? { label: "Back to editor tools", onClick: clearSelection }
+    ? clipMenu
+      ? { label: "Back to clip tools", onClick: () => setClipMenu(null) }
+      : { label: "Back to editor tools", onClick: clearSelection }
     : menu
       ? { label: "Back to all tools", onClick: () => setMenu(null) }
       : null;
@@ -466,7 +513,14 @@ export const PhoneEditor: React.FC = () => {
         </nav>
 
         <input ref={soundInput} type="file" accept="audio/*" multiple hidden onChange={(e) => void addAtPlayhead(e.target.files).finally(() => (e.target.value = ""))} />
+        <input ref={replaceInput} type="file" accept="video/*,image/*" hidden onChange={(e) => void replaceClipMedia(e.target.files).finally(() => (e.target.value = ""))} />
         <input ref={overlayInput} type="file" accept="video/*,image/*" multiple hidden onChange={(e) => void addAtPlayhead(e.target.files).finally(() => (e.target.value = ""))} />
+
+        {panel && selectedIds.length === 1 && (
+          <PanelErrorBoundary name="Clip tool">
+            <PhoneClipPanel panel={panel} clipId={selectedIds[0]} onDone={() => setPanel(null)} />
+          </PanelErrorBoundary>
+        )}
 
         {pickerOpen && <PhoneMediaPicker onClose={closePicker} />}
 

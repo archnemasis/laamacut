@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useProjectStore } from "../../stores/project-store";
 import { useTimelineStore } from "../../stores/timeline-store";
 import { applyTransform, currentTransform, findSelectedVisual, type FlatTransform, type SelectedVisual } from "./phone-keyframes";
@@ -16,6 +16,11 @@ interface Gesture {
 }
 
 const TAP_SLOP = 6;
+/** How close (screen px) the centre has to come to the frame's centre lines to snap. */
+const SNAP_DISTANCE = 10;
+
+type Guides = { x: boolean; y: boolean };
+type Box = { left: number; top: number; width: number; height: number };
 
 const centre = (points: Point[]): Point => ({
   x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
@@ -34,6 +39,18 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
   const pointers = useRef(new Map<number, Point>());
   const frame = useRef<number | null>(null);
   const pending = useRef<FlatTransform | null>(null);
+  const [guides, setGuides] = useState<Guides>({ x: false, y: false });
+  /** The video frame inside this overlay, where the guide lines are drawn. */
+  const [frameBox, setFrameBox] = useState<Box | null>(null);
+  const guidesRef = useRef<Guides>({ x: false, y: false });
+  const showGuides = (next: Guides) => {
+    const was = guidesRef.current;
+    if (was.x === next.x && was.y === next.y) return;
+    // A tiny buzz as it clicks into place, like CapCut.
+    if ((next.x && !was.x) || (next.y && !was.y)) navigator.vibrate?.(8);
+    guidesRef.current = next;
+    setGuides(next);
+  };
 
   // Restart from the current fingers whenever one is added or lifted, so the
   // clip doesn't jump between one-finger drag and two-finger pinch.
@@ -44,6 +61,8 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
       gesture.current = null;
       return;
     }
+    const box = target.getBoundingClientRect();
+    setFrameBox({ left: screen.left - box.left, top: screen.top - box.top, width: screen.width, height: screen.height });
     const { settings } = useProjectStore.getState().project;
     const time = useTimelineStore.getState().playheadPosition - visual.startTime;
     const previous = gesture.current?.visual.id === visual.id ? pending.current : null;
@@ -75,6 +94,14 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
     const next = { ...g.start };
     next["position.x"] = g.start["position.x"] + shift.x * g.perPixel.x;
     next["position.y"] = g.start["position.y"] + shift.y * g.perPixel.y;
+    // Snap the centre onto the frame's vertical and horizontal centre lines.
+    // Media positions are offsets from the centre; text and graphics are 0..1.
+    const centreValue = g.visual.kind === "media" ? 0 : 0.5;
+    const snapX = Math.abs(next["position.x"] - centreValue) <= SNAP_DISTANCE * g.perPixel.x;
+    const snapY = Math.abs(next["position.y"] - centreValue) <= SNAP_DISTANCE * g.perPixel.y;
+    if (snapX) next["position.x"] = centreValue;
+    if (snapY) next["position.y"] = centreValue;
+    showGuides({ x: snapX, y: snapY });
     if (now.length >= 2) {
       const zoom = spread(is[0], is[1]) / Math.max(1, spread(was[0], was[1]));
       next["scale.x"] = Math.max(0.05, g.start["scale.x"] * zoom);
@@ -82,13 +109,15 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
       next.rotation = g.start.rotation + (angle(is[0], is[1]) - angle(was[0], was[1]));
     }
     pending.current = next;
-    if (frame.current === null) {
-      frame.current = requestAnimationFrame(() => {
-        frame.current = null;
-        const live = gesture.current;
-        if (live && pending.current) applyTransform(findSelectedVisual(live.visual.id) ?? live.visual, live.time, pending.current);
-      });
-    }
+    if (frame.current === null) frame.current = requestAnimationFrame(flush);
+  };
+
+  /** Apply the latest move now (once per frame, and when the finger lifts). */
+  const flush = () => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    const live = gesture.current;
+    if (live && pending.current) applyTransform(findSelectedVisual(live.visual.id) ?? live.visual, live.time, pending.current);
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -112,6 +141,7 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     pointers.current.delete(e.pointerId);
     const g = gesture.current;
+    if (g?.moved) flush();
     if (pointers.current.size > 0) {
       begin(e.currentTarget);
       return;
@@ -119,6 +149,7 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
     if (g && !g.moved && g.visual.kind === "text") onTapText(g.visual.id);
     gesture.current = null;
     pending.current = null;
+    showGuides({ x: false, y: false });
   };
 
   return (
@@ -131,6 +162,14 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
       onPointerCancel={onPointerUp}
       className="absolute inset-0 z-20"
       style={{ touchAction: "none" }}
-    />
+    >
+      {frameBox && (guides.x || guides.y) && (
+        <div aria-hidden className="pointer-events-none absolute" style={frameBox}>
+          {guides.x && <span data-testid="snap-guide-x" className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[var(--accent)]" />}
+          {guides.y && <span data-testid="snap-guide-y" className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[var(--accent)]" />}
+        </div>
+      )}
+    </div>
   );
 }
+

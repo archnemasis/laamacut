@@ -26,6 +26,9 @@ import {
   savePhoneExportChoice,
   type PhoneExportChoice,
 } from "./PhoneExportPanel";
+import { PhoneExportScreen, capturePreviewStill, type PhoneExportStatus } from "./PhoneExportScreen";
+import { startNewProject } from "../../desktop/start/desktop-project-actions";
+import { requestPhoneMediaPicker } from "../../services/phone-media";
 import { CompressDialog } from "./CompressDialog";
 import { deriveSourceExportMatch } from "../../services/export-source-match";
 import { useExportRunner, extForFormat, exportFilename, type ExportDeliveryMode } from "../../services/export-runner";
@@ -281,10 +284,26 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
   // Phone: CapCut exports straight away with the quality chip's settings.
   const [phoneSettingsOpen, setPhoneSettingsOpen] = useState(false);
   const [phoneChoice, setPhoneChoice] = useState<PhoneExportChoice>(loadPhoneExportChoice);
+  // CapCut's full-screen export: progress, then "Saved to device".
+  const [phoneRun, setPhoneRun] = useState<{ status: PhoneExportStatus; label: string; still?: string; error?: string } | null>(null);
   const exportFromPhone = useCallback(() => {
     setPhoneSettingsOpen(false);
+    setPhoneRun({
+      status: "exporting",
+      label: RESOLUTIONS.find((r) => r.value === phoneChoice.resolution)?.label ?? `${phoneChoice.resolution}p`,
+      still: capturePreviewStill(),
+    });
     void handleCustomExport(phoneExportSettings(phoneChoice, project.settings));
   }, [handleCustomExport, phoneChoice, project.settings]);
+  // The runner clears "complete" after a moment; the phone screen keeps it until you leave.
+  useEffect(() => {
+    if (phoneRun?.status !== "exporting") return;
+    if (exportState.complete) setPhoneRun({ ...phoneRun, status: "saved" });
+    else if (exportState.error) {
+      setPhoneRun({ ...phoneRun, status: "error", error: exportState.error });
+      resetError();
+    }
+  }, [phoneRun, exportState.complete, exportState.error, resetError]);
 
   const handleRecordingComplete = useCallback(
     async (screenBlob: Blob, webcamBlob?: Blob) => {
@@ -631,6 +650,41 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
       />
 
       <SettingsDialog />
+
+      {phone && phoneRun && (
+        <PhoneExportScreen
+          status={phoneRun.status}
+          progress={exportState.progress}
+          label={phoneRun.label}
+          still={phoneRun.still}
+          aspect={(project.settings.width || 16) / (project.settings.height || 9)}
+          error={phoneRun.error}
+          onBack={() => {
+            if (phoneRun.status === "exporting") handleCancelExport();
+            setPhoneRun(null);
+          }}
+          onDone={() => {
+            setPhoneRun(null);
+            void useProjectStore.getState().forceSave().finally(() => navigate("welcome"));
+          }}
+          onNewProject={() => {
+            setPhoneRun(null);
+            // Via home so the editor remounts and opens the gallery for the new project.
+            void useProjectStore.getState().forceSave().finally(() => {
+              navigate("welcome");
+              setTimeout(() => {
+                startNewProject();
+                requestPhoneMediaPicker();
+                navigate("editor");
+              }, 0);
+            });
+          }}
+          onExportOptions={() => {
+            setPhoneRun(null);
+            setPhoneSettingsOpen(true);
+          }}
+        />
+      )}
 
       {activeModal === "history" && (
         <>
