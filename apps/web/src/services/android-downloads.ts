@@ -1,4 +1,5 @@
 import { toast } from "../stores/notification-store";
+import type { GalleryPlugin } from "./phone-gallery";
 
 /**
  * Native file saver plugin of the Laamacut Android app (SaverPlugin.java).
@@ -14,7 +15,10 @@ export interface AndroidSaver {
 
 declare global {
   interface Window {
-    Capacitor?: { Plugins?: { LaamacutSaver?: AndroidSaver } };
+    Capacitor?: {
+      Plugins?: { LaamacutSaver?: AndroidSaver; LaamacutGallery?: GalleryPlugin };
+      convertFileSrc?: (uri: string) => string;
+    };
   }
 }
 
