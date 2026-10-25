@@ -22,6 +22,8 @@ export interface GalleryPlugin {
   /** Hardware-encode a smaller H.264 copy; resolves to its file:// path. */
   compress(options: { uri: string; height: number }): Promise<{ path: string }>;
   discard(options: { path: string }): Promise<void>;
+  /** Filmstrip frames decoded by the phone, as JPEG data URLs. */
+  frames(options: { uri: string; count: number; height: number }): Promise<{ frames: { timestamp: number; data: string }[] }>;
 }
 
 export function getGallery(): GalleryPlugin | undefined {
@@ -47,21 +49,64 @@ export function saveHdPreference(hd: boolean): void {
   }
 }
 
+/** What the phone prepares for a gallery video before it goes on the timeline. */
+export interface GalleryVideoExtras {
+  filmstrip: { timestamp: number; url: string }[];
+  /** 720p copy for smooth editing playback (HD off). */
+  previewCopy?: Blob;
+}
+
 /**
- * Make a 720p preview copy of a gallery video and use it for editing playback
- * of the imported clip. Runs in the background; the original plays until then.
+ * Have the phone decode filmstrip frames and, with HD off, encode a 720p
+ * preview copy. Either may fail on unusual files; the clip still imports.
  */
-export async function attachPreviewCopy(uri: string, mediaId: string): Promise<void> {
+export async function prepareGalleryVideo(uri: string, hd: boolean): Promise<GalleryVideoExtras> {
   const gallery = getGallery();
   const convert = window.Capacitor?.convertFileSrc;
-  if (!gallery || !convert) return;
-  const { path } = await gallery.compress({ uri, height: 720 });
-  try {
-    const blob = await (await fetch(convert(path))).blob();
-    const item = useProjectStore.getState().project.mediaLibrary.items.find((m) => m.id === mediaId);
-    if (item) previewProxyCache.adopt(item, new Blob([blob], { type: "video/mp4" }), "medium");
-  } finally {
-    await gallery.discard({ path }).catch(() => undefined);
+  if (!gallery || !convert) return { filmstrip: [] };
+  const filmstrip = gallery
+    .frames({ uri, count: 10, height: 160 })
+    .then(({ frames }) => frames.map((frame) => ({ timestamp: frame.timestamp, url: frame.data })))
+    .catch(() => []);
+  const previewCopy = hd
+    ? Promise.resolve(undefined)
+    : gallery
+        .compress({ uri, height: 720 })
+        .then(async ({ path }) => {
+          try {
+            const blob = await (await fetch(convert(path))).blob();
+            return new Blob([blob], { type: "video/mp4" });
+          } finally {
+            await gallery.discard({ path }).catch(() => undefined);
+          }
+        })
+        .catch((error: unknown) => {
+          console.warn("[phone-gallery] Preview copy failed; using the original:", error);
+          return undefined;
+        });
+  return { filmstrip: await filmstrip, previewCopy: await previewCopy };
+}
+
+/** Put the prepared filmstrip and preview copy on an imported clip. */
+export function applyGalleryVideoExtras(mediaId: string, extras: GalleryVideoExtras): void {
+  const { project } = useProjectStore.getState();
+  const item = project.mediaLibrary.items.find((m) => m.id === mediaId);
+  if (!item) return;
+  if (extras.filmstrip.length > 0) {
+    const updated = { ...item, thumbnailUrl: extras.filmstrip[0].url, filmstripThumbnails: extras.filmstrip };
+    useProjectStore.setState({
+      project: {
+        ...project,
+        mediaLibrary: {
+          ...project.mediaLibrary,
+          items: project.mediaLibrary.items.map((m) => (m.id === mediaId ? updated : m)),
+        },
+      },
+    });
+  }
+  if (extras.previewCopy) {
+    const current = useProjectStore.getState().project.mediaLibrary.items.find((m) => m.id === mediaId);
+    if (current) previewProxyCache.adopt(current, extras.previewCopy, "medium");
   }
 }
 

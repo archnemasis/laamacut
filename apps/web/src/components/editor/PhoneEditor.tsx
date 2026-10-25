@@ -165,6 +165,15 @@ export const PhoneEditor: React.FC = () => {
   // New projects open straight into the media picker, like CapCut.
   const [pickerOpen, setPickerOpen] = useState(false);
   const startedFromNewProject = useRef(false);
+  // The preview only draws a frame on play or seek; ask it to redraw when the
+  // editor opens and whenever clips or media change, so a picture always shows.
+  const mediaItems = useProjectStore((s) => s.project.mediaLibrary.items);
+  const tracks = useProjectStore((s) => s.project.timeline.tracks);
+  useEffect(() => {
+    const redraw = () => window.dispatchEvent(new Event("openreel:preview-invalidate"));
+    const timers = [150, 700, 2000].map((ms) => window.setTimeout(redraw, ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [mediaItems, tracks]);
   const { navigate } = useRouter();
   useEffect(() => {
     if (takePhoneMediaPickerRequest()) {
@@ -300,7 +309,7 @@ export const PhoneEditor: React.FC = () => {
     <div className="phone-editor flex h-full w-full flex-col overflow-hidden bg-bg text-fg">
       <Toolbar phone />
 
-      <div ref={previewRef} className="phone-preview min-h-0 shrink-0 basis-[38%] bg-black">
+      <div ref={previewRef} className="phone-preview min-h-0 shrink-0 basis-[48%] bg-black">
         <PanelErrorBoundary name="Stage">
           <Preview />
         </PanelErrorBoundary>

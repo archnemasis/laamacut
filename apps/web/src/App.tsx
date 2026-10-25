@@ -58,7 +58,8 @@ function App() {
   const hasHandledInitialRoute = useRef(false);
   useKieAIPoller();
   const showWelcome =
-    ["welcome", "templates", "recent"].includes(route) && !skipWelcomeScreen;
+    // Phones always show their home screen (the old Skip on startup switch was for the web welcome).
+    ["welcome", "templates", "recent"].includes(route) && (phone || !skipWelcomeScreen);
   const isSharePage = route === "share" && params.shareId;
 
   useEffect(() => {

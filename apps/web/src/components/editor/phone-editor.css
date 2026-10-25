@@ -24,3 +24,15 @@
 .phone-editor .phone-preview {
   --stage-bg: #000000;
 }
+
+/* Like CapCut, the phone preview fills its area edge to edge on black. */
+.phone-editor [data-preview-area] {
+  padding: 0 !important;
+  background: #000000;
+}
+
+.phone-editor [data-preview-screen] {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+}

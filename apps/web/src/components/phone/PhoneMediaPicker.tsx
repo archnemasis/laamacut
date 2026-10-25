@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "@/icons/lucide-compat";
 import { addMediaFilesToTimeline } from "../../services/phone-media";
 import {
-  attachPreviewCopy,
+  applyGalleryVideoExtras,
   galleryItemToFile,
   getGallery,
   loadHdPreference,
   saveHdPreference,
+  prepareGalleryVideo,
+  type GalleryVideoExtras,
   type GalleryAccess,
   type GalleryItem,
   type GalleryKind,
@@ -156,21 +158,22 @@ export function PhoneMediaPicker({ onClose }: { onClose: () => void }) {
     if (picked.length === 0) return;
     try {
       const files: File[] = [];
+      const extras: (Promise<GalleryVideoExtras> | undefined)[] = [];
       for (const [i, tile] of picked.entries()) {
         setProgress(`Loading ${i + 1} of ${picked.length}`);
         if (tile.file) files.push(tile.file);
         else if (tile.galleryItem) files.push(await galleryItemToFile(tile.galleryItem));
+        // Gallery videos get phone-decoded filmstrip frames and, with HD off, a
+        // 720p copy for smooth playback, so they show a picture from the start.
+        // Exports always use the full-quality original.
+        extras.push(tile.galleryItem && tile.kind === "video" ? prepareGalleryVideo(tile.galleryItem.uri, hd) : undefined);
       }
+      setProgress(hd ? "Preparing videos" : "Preparing videos for smooth editing");
+      const ready = await Promise.all(extras);
       setProgress("Adding to timeline");
-      // HD off: edit with a 720p copy made by the phone's encoder (smooth on
-      // slower phones). Exports always use the full-quality original.
       await addMediaFilesToTimeline(files, (index, mediaId) => {
-        const item = picked[index]?.galleryItem;
-        if (!hd && item && picked[index].kind === "video") {
-          void attachPreviewCopy(item.uri, mediaId).catch((error: unknown) =>
-            console.warn("[PhoneMediaPicker] Preview copy failed; using the original:", error),
-          );
-        }
+        const prepared = ready[index];
+        if (prepared) applyGalleryVideoExtras(mediaId, prepared);
       });
     } finally {
       setProgress(null);

@@ -7674,6 +7674,7 @@ export const Preview: React.FC = () => {
       {/* Video Area */}
       <div
         ref={videoAreaRef}
+        data-preview-area
         className={`flex-1 min-h-0 min-w-0 relative flex items-center justify-center bg-bg-1 transition-all duration-300 ${
           isMaximized || isFullscreen ? "p-0" : "p-[18px]"
         } ${zoomLevel > 1 ? "overflow-auto" : ""}`}
@@ -7682,6 +7683,7 @@ export const Preview: React.FC = () => {
       >
         <div
           ref={overlayRef}
+          data-preview-screen
           className={`relative isolate bg-[var(--screen-bg)] overflow-visible transition-all duration-300 ${
             isMaximized || isFullscreen
               ? "rounded-none ring-0 shadow-none"

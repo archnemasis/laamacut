@@ -45,7 +45,7 @@ export function canvasForMedia(media: Pick<MediaItem, "metadata">): { width: num
  */
 export async function addMediaFilesToTimeline(
   files: readonly File[],
-  onImported?: (index: number, mediaId: string) => void,
+  onImported?: (index: number, mediaId: string) => void | Promise<void>,
 ): Promise<number> {
   const store = useProjectStore.getState;
   const startedEmpty = !findMainTrack(store().project)?.clips.length;
@@ -55,7 +55,7 @@ export async function addMediaFilesToTimeline(
     const imported = await store().importMedia(file);
     const mediaId = imported.success ? imported.actionId : undefined;
     if (!mediaId) continue;
-    onImported?.(index, mediaId);
+    await onImported?.(index, mediaId);
 
     if (startedEmpty && added === 0) {
       const media = store().project.mediaLibrary.items.find((m) => m.id === mediaId);

@@ -36,6 +36,8 @@ if (isDesktop) {
 // The Android app ships its files inside the APK, so it needs no offline cache.
 if (getAndroidSaver()) {
   installAndroidDownloads();
+  // Android restores the last page on launch; the app should open on its home screen.
+  if (window.location.hash !== "#/welcome") window.history.replaceState(null, "", "#/welcome");
 } else registerServiceWorker().then((registration) => {
   if (registration) {
   }

@@ -9,8 +9,16 @@ const addMediaFilesToTimeline = vi.hoisted(() =>
 );
 const adopt = vi.hoisted(() => vi.fn());
 vi.mock("../../stores/preview-proxy-store", () => ({ previewProxyCache: { adopt } }));
+const projectState = vi.hoisted(() => ({
+  project: { mediaLibrary: { items: [0, 1, 2].map((i) => ({ id: `media-${i}`, type: "video" })) as Array<Record<string, unknown>> } },
+}));
 vi.mock("../../stores/project-store", () => ({
-  useProjectStore: { getState: () => ({ project: { mediaLibrary: { items: [0, 1, 2].map((i) => ({ id: `media-${i}`, type: "video" })) } } }) },
+  useProjectStore: {
+    getState: () => projectState,
+    setState: (next: { project: typeof projectState.project }) => {
+      projectState.project = next.project;
+    },
+  },
 }));
 vi.mock("../../services/phone-media", () => ({ addMediaFilesToTimeline }));
 
@@ -31,6 +39,7 @@ const gallery = {
   thumbnail: vi.fn(async () => ({ data: "data:image/jpeg;base64,AAAA" })),
   compress: vi.fn(async ({ uri }: { uri: string }) => ({ path: `file:///cache/${uri.split("/").pop()}.mp4` })),
   discard: vi.fn(async () => undefined),
+  frames: vi.fn(async () => ({ frames: [{ timestamp: 0.5, data: "data:image/jpeg;base64,BBBB" }] })),
 };
 
 beforeEach(() => {
@@ -79,6 +88,8 @@ describe("PhoneMediaPicker gallery", () => {
     expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/2", height: 720 });
     expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/1", height: 720 });
     expect(gallery.discard).toHaveBeenCalledTimes(2);
+    // The phone-decoded filmstrip is on the clip before it reaches the timeline.
+    expect(projectState.project.mediaLibrary.items[0]).toMatchObject({ thumbnailUrl: "data:image/jpeg;base64,BBBB" });
   });
 
   it("keeps full resolution when HD is on", async () => {

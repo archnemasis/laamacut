@@ -69,7 +69,12 @@ export function PhoneTimeline({
   const touches = useRef(new Map<number, { x: number; y: number }>());
 
   const half = width / 2;
-  const duration = Math.max(project.timeline.duration ?? 0, 0);
+  // A reopened project can report 0 until its next edit, so also measure the clips.
+  const duration = Math.max(
+    project.timeline.duration ?? 0,
+    ...project.timeline.tracks.flatMap((t) => t.clips.map((c) => c.startTime + c.duration)),
+    0,
+  );
   const selectedIds = useMemo(
     () => new Set(selectedItems.filter((i) => i.type === "clip").map((i) => i.id)),
     [selectedItems],

@@ -5,6 +5,7 @@ import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
@@ -233,5 +234,54 @@ public class GalleryPlugin extends Plugin {
             }
         }
         call.resolve();
+    }
+
+    /**
+     * Filmstrip frames for the timeline, decoded by the phone: `count` frames
+     * spread across the video, `height` pixels tall, as JPEG data URLs.
+     */
+    @PluginMethod
+    public void frames(PluginCall call) {
+        String uri = call.getString("uri");
+        int count = Math.max(1, Math.min(30, call.getInt("count", 10)));
+        int height = call.getInt("height", 160);
+        if (uri == null) {
+            call.reject("Missing uri");
+            return;
+        }
+        getBridge().execute(() -> {
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            try {
+                retriever.setDataSource(getContext(), Uri.parse(uri));
+                String durationText = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+                long durationMs = durationText == null ? 0 : Long.parseLong(durationText);
+                JSArray frames = new JSArray();
+                for (int i = 0; i < count; i++) {
+                    long timeMs = count == 1 ? 0 : (long) (durationMs * (i + 0.5) / count);
+                    Bitmap frame = retriever.getFrameAtTime(timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                    if (frame == null) continue;
+                    int width = Math.max(1, Math.round(frame.getWidth() * (height / (float) frame.getHeight())));
+                    Bitmap scaled = Bitmap.createScaledBitmap(frame, width, height, true);
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    scaled.compress(Bitmap.CompressFormat.JPEG, 70, out);
+                    JSObject item = new JSObject();
+                    item.put("timestamp", timeMs / 1000.0);
+                    item.put("data", "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP));
+                    frames.put(item);
+                    if (scaled != frame) scaled.recycle();
+                    frame.recycle();
+                }
+                JSObject result = new JSObject();
+                result.put("frames", frames);
+                call.resolve(result);
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            } finally {
+                try {
+                    retriever.release();
+                } catch (Exception ignored) {
+                }
+            }
+        });
     }
 }
