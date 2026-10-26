@@ -1,5 +1,7 @@
 import { useProjectStore } from "../stores/project-store";
 import { previewProxyCache } from "../stores/preview-proxy-store";
+import { loadFilmstrip } from "./filmstrip-cache";
+import { GalleryFile } from "./gallery-file";
 
 /** The Android app's LaamacutGallery plugin (GalleryPlugin.java). */
 export type GalleryAccess = "granted" | "limited" | "denied";
@@ -14,14 +16,31 @@ export interface GalleryItem {
   duration?: number;
 }
 
+export interface GalleryVideoProbe {
+  width: number;
+  height: number;
+  /** 0 when the file doesn't say. */
+  fps: number;
+  /** Seconds. */
+  duration?: number;
+  videoCodec?: string;
+  audioTracks?: number;
+  sampleRate?: number;
+  channels?: number;
+}
+
 export interface GalleryPlugin {
   access(): Promise<{ access: GalleryAccess }>;
   requestAccess(): Promise<{ access: GalleryAccess }>;
   list(options: { kind: GalleryKind; offset: number; limit: number }): Promise<{ items: GalleryItem[] }>;
   thumbnail(options: { uri: string; size: number }): Promise<{ data: string }>;
-  /** Hardware-encode a smaller H.264 copy; resolves to its file:// path, or none when the video is already small. */
+  /** Size as shown (rotation applied) and frame rate, read without decoding the video. */
+  probe(options: { uri: string }): Promise<GalleryVideoProbe>;
+  /** Hardware-encode a smaller H.264 copy (short side `height`, at most 30fps), kept on the phone; resolves to its file:// path, or none when the video is already small. */
   compress(options: { uri: string; height: number }): Promise<{ path?: string }>;
   discard(options: { path: string }): Promise<void>;
+  /** The video's audio track copied out as an .m4a (cached); no path when it has no sound. */
+  extractAudio(options: { uri: string }): Promise<{ path?: string }>;
   /** Filmstrip frames decoded by the phone, as JPEG data URLs. */
   frames(options: { uri: string; count: number; height: number }): Promise<{ frames: { timestamp: number; data: string }[] }>;
 }
@@ -32,7 +51,7 @@ export function getGallery(): GalleryPlugin | undefined {
 
 const HD_KEY = "laamacut-phone-hd";
 
-/** HD off (the default) edits with 540p preview copies; exports always use the original. */
+/** HD off (the default) edits heavy videos from small preview copies; exports always use the original. */
 export function loadHdPreference(): boolean {
   try {
     return localStorage.getItem(HD_KEY) === "1";
@@ -52,8 +71,15 @@ export function saveHdPreference(hd: boolean): void {
 /** What the phone prepares for a gallery video before it goes on the timeline. */
 export interface GalleryVideoExtras {
   filmstrip: { timestamp: number; url: string }[];
-  /** 540p copy for smooth editing playback (HD off). */
+  /** Small copy for smooth editing playback (HD off). */
   previewCopy?: Blob;
+}
+
+/** What the phone makes for a gallery video, decided from a quick look at the file. */
+export interface GalleryVideoPlan {
+  filmstrip: Promise<GalleryVideoExtras["filmstrip"]>;
+  /** A small copy being made, for videos too heavy to edit smoothly as they are. */
+  previewCopy?: Promise<Blob | undefined>;
 }
 
 /**
@@ -66,38 +92,50 @@ function queueCopy<T>(start: () => Promise<T>): Promise<T> {
   copyQueue = next;
   return next;
 }
-const PREVIEW_HEIGHT = 540;
+/** Short side of a preview copy: sharp in the phone preview, still light to decode. */
+const PREVIEW_SHORT_SIDE = 720;
+/** Phones play up to 1080p at 60fps smoothly, so those videos need no copy. */
+const SMOOTH_SHORT_SIDE = 1080;
+const SMOOTH_FPS = 61;
+
+/** True when a video is too big or too fast to play smoothly in the editor (unknown counts as heavy). */
+export function isHeavyVideo(probe: GalleryVideoProbe | undefined): boolean {
+  if (!probe) return true;
+  return Math.min(probe.width, probe.height) > SMOOTH_SHORT_SIDE || probe.fps > SMOOTH_FPS;
+}
+
+function makePreviewCopy(gallery: GalleryPlugin, uri: string, convert: (path: string) => string): Promise<Blob | undefined> {
+  return queueCopy(() => gallery.compress({ uri, height: PREVIEW_SHORT_SIDE }))
+    .then(async ({ path }) => {
+      if (!path) return undefined;
+      // The copy stays on the phone, so a reopened project gets it back at once.
+      const blob = await (await fetch(convert(path))).blob();
+      return new Blob([blob], { type: "video/mp4" });
+    })
+    .catch((error: unknown) => {
+      console.warn("[phone-gallery] Preview copy failed; using the original:", error);
+      return undefined;
+    });
+}
 
 /**
- * Have the phone decode filmstrip frames and, with HD off, encode a 540p
- * preview copy. Either may fail on unusual files; the clip still imports.
+ * Like CapCut, only heavy videos (over 1080p or 60fps) get a preview copy,
+ * made in the background while editing starts on the original, which is
+ * read straight from storage (GalleryFile). The phone decodes filmstrip
+ * frames either way; any step may fail on unusual files and the clip still
+ * imports.
  */
-
-export async function prepareGalleryVideo(uri: string, hd: boolean): Promise<GalleryVideoExtras> {
+export async function prepareGalleryVideo(item: GalleryItem, hd: boolean): Promise<GalleryVideoPlan> {
   const gallery = getGallery();
   const convert = window.Capacitor?.convertFileSrc;
-  if (!gallery || !convert) return { filmstrip: [] };
-  const filmstrip = gallery
-    .frames({ uri, count: 10, height: 160 })
-    .then(({ frames }) => frames.map((frame) => ({ timestamp: frame.timestamp, url: frame.data })))
-    .catch(() => []);
-  const previewCopy = hd
-    ? Promise.resolve(undefined)
-    : queueCopy(() => gallery.compress({ uri, height: PREVIEW_HEIGHT }))
-        .then(async ({ path }) => {
-          if (!path) return undefined;
-          try {
-            const blob = await (await fetch(convert(path))).blob();
-            return new Blob([blob], { type: "video/mp4" });
-          } finally {
-            await gallery.discard({ path }).catch(() => undefined);
-          }
-        })
-        .catch((error: unknown) => {
-          console.warn("[phone-gallery] Preview copy failed; using the original:", error);
-          return undefined;
-        });
-  return { filmstrip: await filmstrip, previewCopy: await previewCopy };
+  if (!gallery || !convert) return { filmstrip: Promise.resolve([]) };
+  const filmstrip = loadFilmstrip(item.uri, () =>
+    gallery.frames({ uri: item.uri, count: 10, height: 160 }).then(({ frames }) => frames.map((frame) => ({ timestamp: frame.timestamp, url: frame.data }))),
+  );
+  if (hd) return { filmstrip };
+  const probe = await gallery.probe({ uri: item.uri }).catch(() => undefined);
+  if (!isHeavyVideo(probe)) return { filmstrip };
+  return { filmstrip, previewCopy: makePreviewCopy(gallery, item.uri, convert) };
 }
 
 /** Put the prepared filmstrip and preview copy on an imported clip. */
@@ -120,6 +158,33 @@ export function applyGalleryVideoExtras(mediaId: string, extras: GalleryVideoExt
   if (extras.previewCopy) {
     const current = useProjectStore.getState().project.mediaLibrary.items.find((m) => m.id === mediaId);
     if (current) previewProxyCache.adopt(current, extras.previewCopy, "medium");
+  }
+}
+
+/**
+ * Give a reopened project's heavy gallery videos their preview copies back.
+ * The copies are kept on the phone, so this is quick; without them the
+ * editor would decode the full-size original, which is choppy and can run
+ * the phone out of video decoders.
+ */
+const restoringCopies = new Set<string>();
+export function restoreGalleryPreviewCopies(items: { id: string; type: string; blob?: Blob | null }[]): void {
+  const gallery = getGallery();
+  const convert = window.Capacitor?.convertFileSrc;
+  if (!gallery || !convert || loadHdPreference()) return;
+  for (const item of items) {
+    if (item.type !== "video" || !(item.blob instanceof GalleryFile)) continue;
+    if (previewProxyCache.store.getState().entries[item.id] || restoringCopies.has(item.id)) continue;
+    restoringCopies.add(item.id);
+    const { uri } = item.blob.source;
+    void gallery
+      .probe({ uri })
+      .catch(() => undefined)
+      .then((probe) => (isHeavyVideo(probe) ? makePreviewCopy(gallery, uri, convert) : undefined))
+      .then((previewCopy) => {
+        if (previewCopy) applyGalleryVideoExtras(item.id, { filmstrip: [], previewCopy });
+      })
+      .finally(() => restoringCopies.delete(item.id));
   }
 }
 

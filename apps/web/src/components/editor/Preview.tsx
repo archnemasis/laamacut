@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { usePhoneEditor } from "../../hooks/useCompactEditor";
 import React, {
   useRef,
@@ -843,6 +844,11 @@ interface ClipWithPlaceholder {
 }
 
 const PHONE_PREVIEW_MAX_DIMENSION = 960;
+/**
+ * Videos that have been seeked at least once. On Android a video that has
+ * only loaded has no picture to copy yet, even though it says it is ready.
+ */
+const seekedVideos = new WeakSet<HTMLVideoElement>();
 
 export const Preview: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -876,6 +882,8 @@ export const Preview: React.FC = () => {
   const decodeChainRef = useRef<Promise<void>>(Promise.resolve());
   /** Bumped when scrubbing stops (e.g. play), so even started decodes are dropped. */
   const decodeCancelRef = useRef(0);
+  /** When decoding each source last failed: it isn't reloaded straight away, so a failing video can't open decoder after decoder. */
+  const decodeFailedAtRef = useRef(new Map<string, number>());
   const scrubVideoReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -1473,7 +1481,6 @@ export const Preview: React.FC = () => {
   const select = useUIStore((state) => state.select);
 
   const {
-    playheadPosition,
     playbackState,
     playbackLockedReason,
     playbackRate,
@@ -1486,7 +1493,28 @@ export const Preview: React.FC = () => {
     seekTo,
     seekRelative,
     setPlayheadPosition,
-  } = useTimelineStore();
+  } = useTimelineStore(
+    useShallow((s) => ({
+      playbackState: s.playbackState,
+      playbackLockedReason: s.playbackLockedReason,
+      playbackRate: s.playbackRate,
+      loopEnabled: s.loopEnabled,
+      loopStart: s.loopStart,
+      loopEnd: s.loopEnd,
+      isScrubbing: s.isScrubbing,
+      pause: s.pause,
+      togglePlayback: s.togglePlayback,
+      seekTo: s.seekTo,
+      seekRelative: s.seekRelative,
+      setPlayheadPosition: s.setPlayheadPosition,
+    })),
+  );
+  // On phones the preview doesn't re-render on every frame of playback (that
+  // makes it choppy): the draw loop follows the clock itself, and
+  // playheadPositionRef below stays live.
+  const playheadPosition =
+    useTimelineStore((s) => (isPhone && s.playbackState === "playing" ? null : s.playheadPosition)) ??
+    useTimelineStore.getState().playheadPosition;
 
   useEffect(() => {
     isScrubbingRef.current = isScrubbing;
@@ -1653,8 +1681,29 @@ export const Preview: React.FC = () => {
         bitmap.close();
       }
       nativeImageBitmapCacheRef.current.clear();
+
+      for (const entry of lastDecodedFrameRef.current.values()) entry.bitmap.close();
+      lastDecodedFrameRef.current.clear();
+      lastGoodFrameRef.current?.close();
+      lastGoodFrameRef.current = null;
+
+      // Closing the editor: the shared engines keep nothing of this project
+      // on the GPU (the bridge's hold on this canvas, loaded videos, frames).
+      const bridge = getRenderBridge();
+      if (bridge.getCanvas() === canvasRef.current) bridge.setCanvas(null);
+      bridge.clearCache();
+      useEngineStore.getState().videoEngine?.releaseIdleResources();
+      // Running audio keeps an Android audio stream (and the CPU) busy on the
+      // home screen. Playback resumes the graph itself; the engine is resumed
+      // when the editor opens again (below).
+      void audioGraphRef.current?.suspend().catch(() => undefined);
+      void useEngineStore.getState().audioEngine?.suspend().catch(() => undefined);
     };
   }, [releaseScrubVideoElements]);
+
+  useEffect(() => {
+    void useEngineStore.getState().audioEngine?.resume().catch(() => undefined);
+  }, []);
 
   // Set canvas internal resolution ONLY when project settings change
   // This follows the WebGPU best practice of keeping internal resolution fixed
@@ -1723,6 +1772,7 @@ export const Preview: React.FC = () => {
 
     return () => {
       if (rendererRef.current) {
+        RendererFactory.getInstance().release(rendererRef.current);
         rendererRef.current.destroy();
         rendererRef.current = null;
         rendererInitializedRef.current = false;
@@ -2473,7 +2523,10 @@ export const Preview: React.FC = () => {
             const mediaTime = isStabilized ? adjustedLocalTime : (clip.inPoint || 0) + adjustedLocalTime;
             const cacheKey = isStabilized ? `${clip.mediaId}:stabilized` : clip.mediaId;
             let cached = videoElementCacheRef.current.get(cacheKey);
-
+            if (!cached && Date.now() - (decodeFailedAtRef.current.get(cacheKey) ?? 0) < 2000) {
+              resolve(null);
+              return;
+            }
             if (!cached) {
               const url = URL.createObjectURL(mediaBlob);
               const video = document.createElement("video");
@@ -2498,17 +2551,21 @@ export const Preview: React.FC = () => {
                 };
               });
 
-              if (isStaleRequest()) {
-                releaseVideoElement({ video, url });
-                resolve(null);
-                return;
-              }
-
+              // Keep the loaded video even if this request went stale: the
+              // next one uses it. Dropping it made every edit on a still frame
+              // (a pinch sends dozens) open a new hardware decoder, until the
+              // phone ran out of memory.
               cached = { video, url, lastUsed: Date.now() };
               videoElementCacheRef.current.set(cacheKey, cached);
 
               while (videoElementCacheRef.current.size > 2) {
                 evictOldestVideoElement();
+              }
+
+              if (isStaleRequest()) {
+                scheduleScrubVideoRelease();
+                resolve(null);
+                return;
               }
             }
 
@@ -2521,11 +2578,16 @@ export const Preview: React.FC = () => {
             );
             const seekTime =
               clampedTime <= 0 && video.duration > 0.002 ? 0.001 : clampedTime;
+            // A video that has no picture yet (just loaded, or a big 1440p+
+            // file on a phone) needs far longer than a quick seek to show one.
+            const firstPicture =
+              !seekedVideos.has(video) || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA;
             if (
               Math.abs(video.currentTime - seekTime) > 0.01 ||
-              video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+              firstPicture
             ) {
               video.currentTime = seekTime;
+              seekedVideos.add(video);
               await new Promise<void>((res) => {
                 let settled = false;
                 let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -2542,7 +2604,7 @@ export const Preview: React.FC = () => {
                   settled = true;
                   video.removeEventListener("seeked", onSeeked);
                   res();
-                }, 250);
+                }, firstPicture ? 3000 : 250);
               });
             }
 
@@ -2596,7 +2658,7 @@ export const Preview: React.FC = () => {
 
               video.addEventListener("loadeddata", finish);
               video.addEventListener("canplay", finish);
-              timeoutId = setTimeout(finish, 250);
+              timeoutId = setTimeout(finish, 3000);
             });
 
             if (isStaleRequest()) {
@@ -2619,12 +2681,15 @@ export const Preview: React.FC = () => {
               // Only a shortcut for the next repaint.
             }
             resolve(frame);
-          } catch {
+          } catch (error) {
+            console.warn("[Preview] Frame decode failed:", error);
             if (!isStaleRequest()) failProxyPlayback(clip.mediaId, mediaBlob);
-            const cached = videoElementCacheRef.current.get(clip.mediaId);
+            const failedKey = vidstab.hasStabilized(clip.id) ? `${clip.mediaId}:stabilized` : clip.mediaId;
+            decodeFailedAtRef.current.set(failedKey, Date.now());
+            const cached = videoElementCacheRef.current.get(failedKey);
             if (cached) {
               releaseVideoElement(cached);
-              videoElementCacheRef.current.delete(clip.mediaId);
+              videoElementCacheRef.current.delete(failedKey);
             }
             scheduleScrubVideoRelease();
             resolve(null);
@@ -3304,9 +3369,13 @@ export const Preview: React.FC = () => {
   }, [isPlaying]);
 
   const playheadPositionRef = useRef(playheadPosition);
-  useEffect(() => {
-    playheadPositionRef.current = playheadPosition;
-  }, [playheadPosition]);
+  useEffect(
+    () =>
+      useTimelineStore.subscribe((state) => {
+        playheadPositionRef.current = state.playheadPosition;
+      }),
+    [],
+  );
 
   useEffect(() => {
     setImageLoadCallback(() => {
@@ -6175,8 +6244,10 @@ export const Preview: React.FC = () => {
   const renderInFlightRef = useRef<boolean>(false);
   const pendingRenderTimeRef = useRef<number | null>(null);
   const latestDoRenderRef = useRef<(time: number) => void>(() => undefined);
+  const decodeRetryRef = useRef<{ time: number; count: number; timer: ReturnType<typeof setTimeout> | null }>({ time: Number.NaN, count: 0, timer: null });
   useEffect(() => () => {
     if (modifiedRenderTimerRef.current) clearTimeout(modifiedRenderTimerRef.current);
+    if (decodeRetryRef.current.timer) clearTimeout(decodeRetryRef.current.timer);
   }, []);
 
   useEffect(() => {
@@ -6220,13 +6291,35 @@ export const Preview: React.FC = () => {
         const rendered = await renderFrameDirectly(time);
         if (!rendered) {
           await renderFallbackFrame(time);
+          // The fallback is a small timeline thumbnail while the real frame
+          // decodes: try again shortly so the sharp frame replaces it.
+          const retry = decodeRetryRef.current;
+          if (retry.time !== time) {
+            retry.time = time;
+            retry.count = 0;
+          }
+          if (retry.timer) clearTimeout(retry.timer);
+          if (retry.count < 8) {
+            retry.count += 1;
+            retry.timer = setTimeout(() => {
+              retry.timer = null;
+              const timeline = useTimelineStore.getState();
+              if (timeline.playbackState !== "playing" && timeline.playheadPosition === time && pendingRenderTimeRef.current === null) {
+                latestDoRenderRef.current(time);
+              }
+            }, 200 * retry.count);
+          }
+        } else {
+          decodeRetryRef.current.count = 0;
         }
       } finally {
         renderInFlightRef.current = false;
         const next = pendingRenderTimeRef.current;
         if (next !== null) {
           pendingRenderTimeRef.current = null;
-          doRender(next);
+          // The newest renderer, not this one: the project may have changed
+          // (text typed, media imported) while this slow frame was drawing.
+          latestDoRenderRef.current(next);
         } else {
           pendingRenderTimeRef.current = null;
         }

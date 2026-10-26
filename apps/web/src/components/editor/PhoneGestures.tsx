@@ -19,7 +19,11 @@ interface Gesture {
 
 const TAP_SLOP = 6;
 /** How close (screen px) the centre has to come to the frame's centre lines to snap. */
-const SNAP_DISTANCE = 10;
+const SNAP_DISTANCE = 18;
+/** How far (screen px) it has to be pulled off a centre line to let go: sticky, like CapCut. */
+const RELEASE_DISTANCE = 40;
+/** Two fingers wobble the centre while pinching, so a pinch holds on harder. */
+const PINCH_RELEASE_DISTANCE = 60;
 /** A pinch only starts rotating once the fingers twist this far (degrees), so zooming doesn't tilt. */
 const ROTATE_START = 12;
 /** Rotation clicks onto 0°, 90°, 180° and 270° within this many degrees. */
@@ -109,8 +113,10 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
     // Snap the centre onto the frame's vertical and horizontal centre lines.
     // Media positions are offsets from the centre; text and graphics are 0..1.
     const centreValue = g.visual.kind === "media" ? 0 : 0.5;
-    const snapX = Math.abs(next["position.x"] - centreValue) <= SNAP_DISTANCE * g.perPixel.x;
-    const snapY = Math.abs(next["position.y"] - centreValue) <= SNAP_DISTANCE * g.perPixel.y;
+    const release = now.length >= 2 ? PINCH_RELEASE_DISTANCE : RELEASE_DISTANCE;
+    const held = guidesRef.current;
+    const snapX = Math.abs(next["position.x"] - centreValue) <= (held.x ? release : SNAP_DISTANCE) * g.perPixel.x;
+    const snapY = Math.abs(next["position.y"] - centreValue) <= (held.y ? release : SNAP_DISTANCE) * g.perPixel.y;
     if (snapX) next["position.x"] = centreValue;
     if (snapY) next["position.y"] = centreValue;
     showGuides({ x: snapX, y: snapY });

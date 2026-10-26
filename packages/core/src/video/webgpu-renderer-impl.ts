@@ -563,6 +563,7 @@ export class WebGPURenderer implements Renderer {
     this.textureSampler = null;
 
     // Destroy device
+    this.context?.unconfigure();
     if (this.device) {
       this.device.destroy();
       this.device = null;

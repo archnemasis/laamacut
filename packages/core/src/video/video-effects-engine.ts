@@ -1847,6 +1847,7 @@ export class VideoEffectsEngine {
   dispose(): void {
     // Clean up new renderer
     if (this.renderer) {
+      this.rendererFactory?.release(this.renderer);
       this.renderer.destroy();
       this.renderer = null;
     }
@@ -1962,4 +1963,5 @@ export function disposeVideoEffectsEngine(): void {
     videoEffectsEngineInstance.dispose();
     videoEffectsEngineInstance = null;
   }
+  initializationPromise = null;
 }

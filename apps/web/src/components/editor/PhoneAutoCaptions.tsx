@@ -9,7 +9,8 @@ import { addCaptionEmoji, removeFillerWords } from "../../services/caption-text"
 import { CaptionLookPreview, CaptionPreviewKeyframes, useCaptionPreviewTick } from "./inspector/CaptionLookPreview";
 import { useCaptionTranscriber } from "./inspector/use-caption-transcriber";
 
-type Source = "video" | "voiceover";
+/** Where the speech comes from: the videos' own sound, the audio clips (voiceovers, music, extracted sound), or both. */
+type Source = "both" | "video" | "audio";
 type Picker = "source" | "language" | "translate" | "templates" | null;
 
 const MAX_WORDS_PER_LINE = 5;
@@ -38,14 +39,22 @@ const TRANSLATIONS = [
   { code: "en", name: "English" },
 ];
 
-/** The clips each source captions: the videos' own sound, or the audio clips (voiceovers). */
+const SOURCE_NAMES: Record<Source, string> = { both: "Video & audio", video: "Video", audio: "Audio" };
+
+/** The clips a source captions, in timeline order. Muted tracks are left out: nobody hears them. */
 function sourceClips(source: Source): { clip: Clip; media: MediaItem }[] {
   const { project } = useProjectStore.getState();
   const mediaById = new Map(project.mediaLibrary.items.map((m) => [m.id, m] as const));
+  const wanted = (type: string | undefined) =>
+    (type === "video" && source !== "audio") || (type === "audio" && source !== "video");
   return project.timeline.tracks
-    .flatMap((track) => (track.muted && source === "video" ? [] : track.clips))
+    .flatMap((track) => (track.muted ? [] : track.clips))
     .map((clip) => ({ clip, media: mediaById.get(clip.mediaId) }))
-    .filter((item): item is { clip: Clip; media: MediaItem } => item.media?.type === (source === "video" ? "video" : "audio"))
+    .filter((item): item is { clip: Clip; media: MediaItem } => wanted(item.media?.type))
+    // A video and its linked audio clip are the same speech: caption it once.
+    .filter((item, index, all) =>
+      all.findIndex((other) => other.clip.mediaId === item.clip.mediaId && Math.abs(other.clip.startTime - item.clip.startTime) < 0.01) === index,
+    )
     .sort((a, b) => a.clip.startTime - b.clip.startTime);
 }
 
@@ -163,7 +172,7 @@ export function PhoneAutoCaptions({ onClose }: { onClose: () => void }) {
   const { progress, progressMessage, selectedModel, transcribeClip } = useCaptionTranscriber();
   const tick = useCaptionPreviewTick();
   const previewBottom = usePreviewBottom();
-  const [source, setSource] = useState<Source>("video");
+  const [source, setSource] = useState<Source>("both");
   const [language, setLanguage] = useState("auto");
   const [translate, setTranslate] = useState("none");
   const [lookId, setLookId] = useState(DEFAULT_CAPTION_LOOK.id);
@@ -172,12 +181,16 @@ export function PhoneAutoCaptions({ onClose }: { onClose: () => void }) {
   const [advanced, setAdvanced] = useState(false);
   const [picker, setPicker] = useState<Picker>(null);
   const [working, setWorking] = useState<string | null>(null);
-  const hasVoiceover = sourceClips("voiceover").length > 0;
+  const hasVideo = sourceClips("video").length > 0;
+  const hasAudio = sourceClips("audio").length > 0;
 
   const generate = async () => {
     const clips = sourceClips(source);
     if (clips.length === 0) {
-      toast.error("Nothing to caption", source === "video" ? "Add a video with sound first." : "Record or add a voiceover first.");
+      toast.error(
+        "Nothing to caption",
+        source === "video" ? "Add a video with sound first." : source === "audio" ? "Record a voiceover or add audio first." : "Add a video or audio first.",
+      );
       return;
     }
     useTimelineStore.getState().pause();
@@ -261,7 +274,7 @@ export function PhoneAutoCaptions({ onClose }: { onClose: () => void }) {
       </header>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-        <Row icon={ScanText} label="Generate from" value={source === "video" ? "Video" : "Voiceover"} onClick={() => setPicker("source")} />
+        <Row icon={ScanText} label="Generate from" value={SOURCE_NAMES[source]} onClick={() => setPicker("source")} />
         <Row icon={Languages} label="Spoken language" value={languageName} onClick={() => setPicker("language")} />
 
         <div className="rounded-2xl bg-[#2a2a2a] py-3">
@@ -327,8 +340,9 @@ export function PhoneAutoCaptions({ onClose }: { onClose: () => void }) {
           title="Generate from"
           value={source}
           options={[
-            { code: "video", name: "Video", icon: Play },
-            { code: "voiceover", name: "Voiceover", icon: Mic, disabled: !hasVoiceover },
+            { code: "both", name: SOURCE_NAMES.both, icon: ScanText },
+            { code: "video", name: SOURCE_NAMES.video, icon: Play, disabled: !hasVideo },
+            { code: "audio", name: SOURCE_NAMES.audio, icon: Mic, disabled: !hasAudio },
           ]}
           onPick={(code) => setSource(code as Source)}
           onClose={() => setPicker(null)}

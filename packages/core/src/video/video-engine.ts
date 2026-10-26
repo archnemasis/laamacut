@@ -567,6 +567,21 @@ export class VideoEngine {
   }
 
   /**
+   * Let go of everything held only to make the next frame quicker: decoded
+   * frames, loaded videos (each holds a hardware decoder) and the full-size
+   * scratch canvases. Called when the editor closes; all of it comes back on
+   * demand. On phones this is hundreds of MB of graphics memory.
+   */
+  releaseIdleResources(): void {
+    this.clearCache();
+    this.clearVideoElementCache();
+    this.decodeCanvas = null;
+    this.decodeCtx = null;
+    this.compositeCanvas = null;
+    this.compositeCtx = null;
+  }
+
+  /**
    * Invalidate every cache keyed by a specific media id, so that a media item
    * whose blob was swapped in place (e.g. an AI tool result replacing a clip's
    * source video) is re-decoded instead of serving stale frames.

@@ -11,6 +11,7 @@ import type {
   TimeRange,
 } from "./types";
 import { DEFAULT_AUDIO_CONFIG } from "./types";
+import { audioDataOf } from "../media/audio-track-source";
 import { AudioEffectsEngine } from "./audio-effects-engine";
 import {
   getPanFromAudioEffects,
@@ -155,7 +156,9 @@ export class AudioEngine {
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
       this.effectsEngine = new AudioEffectsEngine();
-      await this.effectsEngine.initialize();
+      // One context: a second live one keeps another audio stream open, and
+      // nodes from different contexts can't be connected to each other.
+      await this.effectsEngine.initialize(this.audioContext);
 
       this.initialized = true;
     } catch (error) {
@@ -406,7 +409,7 @@ export class AudioEngine {
 
     if (audioTrackIndex === 0) {
       try {
-        const arrayBuffer = await mediaItem.blob.arrayBuffer();
+        const arrayBuffer = await audioDataOf(mediaItem.blob);
         const audioBuffer = await context.decodeAudioData(arrayBuffer);
         this.mediaBuffers.set(cacheKey, audioBuffer);
         return audioBuffer;
@@ -981,10 +984,11 @@ export class AudioEngine {
     await this.effectsEngine?.dispose();
     this.effectsEngine = null;
 
-    if (this.audioContext) {
+    // The effects engine shares this context and may have closed it already.
+    if (this.audioContext && this.audioContext.state !== "closed") {
       await this.audioContext.close();
-      this.audioContext = null;
     }
+    this.audioContext = null;
 
     this.masterGain = null;
     this.initialized = false;

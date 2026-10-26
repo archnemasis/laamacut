@@ -60,7 +60,8 @@ export const loadAudioBuffer = async (
         progress: 0.55,
         message: "Decoding source audio",
       });
-      const arrayBuffer = await blob.arrayBuffer();
+      const { audioDataOf } = await import("@openreel/core/media");
+      const arrayBuffer = await audioDataOf(blob);
       const decoded = await audioContext.decodeAudioData(arrayBuffer);
       options.onProgress?.({
         stage: "decoding",

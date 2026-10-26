@@ -40,6 +40,12 @@ function TrimHandle({ side, value, onPointerDown }: { side: TrimSide; value: num
   );
 }
 
+/** The playhead's time, re-rendering once a second rather than every frame. */
+function PhoneCurrentTime() {
+  const seconds = useTimelineStore((s) => Math.floor(s.playheadPosition));
+  return <span className="text-fg">{formatPhoneTime(seconds)}</span>;
+}
+
 export const formatPhoneTime = (seconds: number): string => {
   const total = Math.max(0, Math.floor(seconds));
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
@@ -80,7 +86,6 @@ export function PhoneTimeline({
   const updateOverlayClipTiming = useProjectStore((s) => s.updateOverlayClipTiming);
   const moveClip = useProjectStore((s) => s.moveClip);
   const muteTrack = useProjectStore((s) => s.muteTrack);
-  const playheadPosition = useTimelineStore((s) => s.playheadPosition);
   const selectedItems = useUIStore((s) => s.selectedItems);
   const select = useUIStore((s) => s.select);
   const clearSelection = useUIStore((s) => s.clearSelection);
@@ -177,12 +182,18 @@ export function PhoneTimeline({
     return () => observer.disconnect();
   }, []);
 
-  // Follow the playhead unless the user is swiping the timeline.
+  // Follow the playhead unless the user is swiping the timeline. Done outside
+  // React, so playback doesn't re-render the whole timeline on every frame.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || userScrollingRef.current) return;
-    el.scrollLeft = playheadPosition * pps;
-  }, [playheadPosition, pps, width]);
+    const follow = (position: number) => {
+      const el = scrollRef.current;
+      if (el && !userScrollingRef.current) el.scrollLeft = position * pps;
+    };
+    follow(useTimelineStore.getState().playheadPosition);
+    return useTimelineStore.subscribe((state, previous) => {
+      if (state.playheadPosition !== previous.playheadPosition) follow(state.playheadPosition);
+    });
+  }, [pps, width]);
 
   const markUserScroll = useCallback(() => {
     userScrollingRef.current = true;
@@ -391,7 +402,7 @@ export function PhoneTimeline({
       >
         <button
           type="button"
-          aria-label={`Select ${item.label}`}
+          aria-label={`Select ${item.label}, at ${formatPhoneTime(item.start)}`}
           aria-pressed={selected}
           onClick={(e) => {
             e.stopPropagation();
@@ -441,6 +452,8 @@ export function PhoneTimeline({
         onPointerCancel={onPointerUp}
         onWheel={onWheel}
         onClick={() => clearSelection()}
+        role="region"
+        aria-label="Timeline"
         className="scrollbar-none relative min-h-0 flex-1 overflow-x-auto overflow-y-auto"
         style={{ touchAction: "pan-x pan-y" }}
       >
@@ -470,7 +483,7 @@ export function PhoneTimeline({
 
           <div className="relative space-y-2 pt-3 pb-6" style={{ paddingLeft: half }}>
             {/* Main track: mute switch before 00:00, then the clip filmstrip */}
-            <div className="relative" style={{ height: MAIN_LANE_H }}>
+            <div role="group" aria-label="Video" className="relative" style={{ height: MAIN_LANE_H }}>
               {lanes.mainTrack && (
                 <button
                   type="button"
@@ -582,19 +595,19 @@ export function PhoneTimeline({
             </div>
 
             {lanes.overlay.length > 0 && (
-              <div className="relative" style={{ height: LANE_H }}>
+              <div role="group" aria-label={`Overlays, ${lanes.overlay.length}`} className="relative" style={{ height: LANE_H }}>
                 {lanes.overlay.map((item) => renderBar(item, "bg-[#5b4bb7]"))}
               </div>
             )}
 
-            <div className="relative" style={{ height: LANE_H }}>
+            <div role="group" aria-label={`Audio, ${lanes.audio.length}`} className="relative" style={{ height: LANE_H }}>
               <Music aria-hidden size={16} className="absolute top-1/2 -translate-y-1/2 text-fg-3" style={{ left: -34 }} />
               {lanes.audio.length > 0
                 ? lanes.audio.map((item) => renderBar(item, "bg-[#1f7a5a]"))
                 : addLane("Add audio", onAddAudio)}
             </div>
 
-            <div className="relative" style={{ height: LANE_H }}>
+            <div role="group" aria-label={`Text and captions, ${lanes.text.length}`} className="relative" style={{ height: LANE_H }}>
               <Type aria-hidden size={16} className="absolute top-1/2 -translate-y-1/2 text-fg-3" style={{ left: -34 }} />
               {lanes.text.length > 0
                 ? lanes.text.map((item) => renderBar(item, "bg-[#e8890c]"))
@@ -606,7 +619,7 @@ export function PhoneTimeline({
 
       {/* Current time, pinned over the start of the ruler */}
       <div className="pointer-events-none absolute left-0 top-0 z-20 flex h-7 items-center bg-bg pl-3 pr-2 font-mono text-[12px] text-fg-3">
-        <span className="text-fg">{formatPhoneTime(playheadPosition)}</span>&nbsp;/ {formatPhoneTime(duration)}
+        <PhoneCurrentTime />&nbsp;/ {formatPhoneTime(duration)}
       </div>
 
       {/* Fixed centre playhead */}

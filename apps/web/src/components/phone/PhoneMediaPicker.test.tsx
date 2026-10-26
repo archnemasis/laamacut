@@ -20,12 +20,14 @@ vi.mock("../../stores/project-store", () => ({
     },
   },
 }));
+vi.mock("../../services/filmstrip-cache", () => ({ loadFilmstrip: (_key: string, make: () => Promise<unknown>) => make() }));
 vi.mock("../../services/phone-media", async () => {
   const { create } = await import("zustand");
   return { addMediaFilesToTimeline, usePhoneImportStore: create(() => ({ loading: null })) };
 });
 
 import { PhoneMediaPicker } from "./PhoneMediaPicker";
+import { GalleryFile } from "../../services/gallery-file";
 
 const gallery = {
   access: vi.fn(async () => ({ access: "denied" as const })),
@@ -40,6 +42,8 @@ const gallery = {
         : [{ uri: "content://p/1", name: "cat.jpg", mime: "image/jpeg", size: 5 }],
   })),
   thumbnail: vi.fn(async () => ({ data: "data:image/jpeg;base64,AAAA" })),
+  // A 4K phone video unless a test says otherwise: heavy enough for a preview copy.
+  probe: vi.fn(async () => ({ width: 2160, height: 3840, fps: 30 })),
   compress: vi.fn(async ({ uri }: { uri: string }) => ({ path: `file:///cache/${uri.split("/").pop()}.mp4` })),
   discard: vi.fn(async () => undefined),
   frames: vi.fn(async () => ({ frames: [{ timestamp: 0.5, data: "data:image/jpeg;base64,BBBB" }] })),
@@ -87,18 +91,33 @@ describe("PhoneMediaPicker gallery", () => {
     const files = addMediaFilesToTimeline.mock.calls[0][0];
     expect(files.map((f) => f.name)).toEqual(["party.mp4", "beach.mp4", "cat.jpg"]);
 
-    // HD is off by default: each video (not the photo) is edited from its 720p
-    // copy, so the full-size original is never fetched.
+    // Videos aren't copied in: they read straight from the gallery. HD is off
+    // by default, so heavy ones get 720p copies that take over the preview
+    // once the phone has made them.
     expect(files.map((f) => f.type)).toEqual(["video/mp4", "video/mp4", "image/jpeg"]);
+    expect(files[0]).toBeInstanceOf(GalleryFile);
+    expect(files[0].size).toBe(10);
     const fetched = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
     expect(fetched.some((url) => url.endsWith("content://v/1"))).toBe(false);
-    expect(fetched.some((url) => url.endsWith("cache/1.mp4"))).toBe(true);
-    expect(adopt).not.toHaveBeenCalled();
-    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/2", height: 540 });
-    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/1", height: 540 });
-    expect(gallery.discard).toHaveBeenCalledTimes(2);
+    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/2", height: 720 });
+    expect(gallery.compress).toHaveBeenCalledWith({ uri: "content://v/1", height: 720 });
+    await waitFor(() => expect(adopt).toHaveBeenCalledTimes(2));
+    expect(adopt).toHaveBeenCalledWith(expect.objectContaining({ id: "media-0" }), expect.any(Blob), "medium");
+    // Copies stay on the phone so a reopened project gets them back.
+    expect(gallery.discard).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem("laamacut-gallery-originals") ?? "{}")["media-0"]).toMatchObject({ uri: "content://v/2", copy: false });
     // The phone-decoded filmstrip is on the clip before it reaches the timeline.
     expect(projectState.project.mediaLibrary.items[0]).toMatchObject({ thumbnailUrl: "data:image/jpeg;base64,BBBB" });
+  });
+
+  it("makes no copy for videos phones already play smoothly", async () => {
+    gallery.probe.mockResolvedValue({ width: 1080, height: 1920, fps: 30 });
+    render(<PhoneMediaPicker onClose={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Select beach.mp4" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(addMediaFilesToTimeline).toHaveBeenCalled());
+    expect(gallery.compress).not.toHaveBeenCalled();
+    gallery.probe.mockResolvedValue({ width: 2160, height: 3840, fps: 30 });
   });
 
   it("keeps full resolution when HD is on", async () => {

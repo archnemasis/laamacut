@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "@/icons/lucide-compat";
 import { addMediaFilesToTimeline, usePhoneImportStore } from "../../services/phone-media";
+import { GalleryFile } from "../../services/gallery-file";
 import {
   applyGalleryVideoExtras,
   galleryItemToFile,
@@ -161,31 +162,34 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
     const setProgress = (loading: string | null) => usePhoneImportStore.setState({ loading });
     onClose(true);
     try {
-      // Gallery videos get phone-decoded filmstrip frames so the timeline shows
-      // pictures from the start. With HD off the phone's small copy becomes the
-      // clip while editing, so the full-size original never loads into memory
-      // (that keeps lower-end phones smooth). Export reads the original.
+      // Like CapCut, gallery videos aren't copied in: the clip reads the video
+      // straight from the phone's storage (GalleryFile), so it opens at once
+      // whatever its size. They get phone-decoded filmstrip frames so the
+      // timeline shows pictures from the start, and with HD off, heavy videos
+      // (over 1080p or 60fps) get a small copy made in the background that
+      // takes over the preview when it's ready. Export reads the original.
       setProgress("Loading videos");
-      const extras = await Promise.all(
-        picked.map((tile) =>
-          tile.galleryItem && tile.kind === "video" ? prepareGalleryVideo(tile.galleryItem.uri, hd) : undefined,
-        ),
+      const plans = await Promise.all(
+        picked.map((tile) => (tile.galleryItem && tile.kind === "video" ? prepareGalleryVideo(tile.galleryItem, hd) : undefined)),
       );
       const files: File[] = [];
       for (const [i, tile] of picked.entries()) {
         setProgress(`Loading ${i + 1} of ${picked.length}`);
-        const copy = extras[i]?.previewCopy;
         if (tile.file) files.push(tile.file);
-        else if (copy && tile.galleryItem) files.push(new File([copy], tile.galleryItem.name, { type: "video/mp4" }));
+        else if (tile.galleryItem && plans[i]) files.push(new GalleryFile(tile.galleryItem));
         else if (tile.galleryItem) files.push(await galleryItemToFile(tile.galleryItem));
       }
+      const filmstrips = await Promise.all(plans.map((plan) => plan?.filmstrip ?? []));
       setProgress("Adding to timeline");
       await addMediaFilesToTimeline(files, (index, mediaId) => {
-        const prepared = extras[index];
-        if (prepared) applyGalleryVideoExtras(mediaId, { filmstrip: prepared.filmstrip });
-        // Export goes back to the gallery file (the web export only for small copies).
+        const plan = plans[index];
+        if (plan) applyGalleryVideoExtras(mediaId, { filmstrip: filmstrips[index] });
+        // Export, and reopening the project, go back to the gallery file.
         const tile = picked[index];
-        if (tile.galleryItem) rememberGalleryOriginal(mediaId, tile.galleryItem, Boolean(prepared?.previewCopy));
+        if (tile.galleryItem) rememberGalleryOriginal(mediaId, tile.galleryItem, false);
+        void plan?.previewCopy?.then((previewCopy) => {
+          if (previewCopy) applyGalleryVideoExtras(mediaId, { filmstrip: [], previewCopy });
+        });
       });
     } finally {
       setProgress(null);
@@ -326,7 +330,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
             role="switch"
             aria-checked={hd}
             aria-label="HD"
-            title={hd ? "Full resolution: best quality, may lag on slower phones" : "Smooth editing: videos are compressed to 540p. Turn on HD for full resolution"}
+            title={hd ? "Full resolution: best quality, may lag on slower phones" : "Smooth editing: 4K and high frame rate videos preview from a light copy. Turn on HD for full resolution"}
             onClick={() => {
               saveHdPreference(!hd);
               setHd(!hd);

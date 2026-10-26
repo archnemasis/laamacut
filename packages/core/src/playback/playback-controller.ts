@@ -11,6 +11,7 @@ import type {
   FrameRenderResult,
 } from "./types";
 import { DEFAULT_PLAYBACK_CONFIG } from "./types";
+import { audioDataOf } from "../media/audio-track-source";
 import {
   MasterTimelineClock,
   initializeMasterClock,
@@ -684,8 +685,7 @@ export class PlaybackController {
 
     const audioContext = this.masterClock.getAudioContext();
 
-    const decodePromise = mediaItem.blob
-      .arrayBuffer()
+    const decodePromise = audioDataOf(mediaItem.blob)
       .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
       .then((buffer) => {
         this.audioBufferCache.set(mediaItem.id, buffer);

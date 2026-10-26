@@ -44,6 +44,7 @@ import {
 } from "@/icons/lucide-compat";
 import { Toolbar } from "./Toolbar";
 import { Preview } from "./Preview";
+import { PhoneFullscreenControls } from "./PhoneFullscreenControls";
 import { PhoneTimeline } from "./PhoneTimeline";
 import { PhoneTextEditor, type TextEditorTab } from "./PhoneTextEditor";
 import { PhoneAutoCaptions } from "./PhoneAutoCaptions";
@@ -54,6 +55,7 @@ import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
 import { takePhoneMediaPickerRequest, usePhoneImportStore } from "../../services/phone-media";
 import { autoSaveManager } from "../../services/auto-save";
 import { captureProjectPreview } from "../../services/project-previews";
+import { restoreGalleryPreviewCopies } from "../../services/phone-gallery";
 import { useRouter } from "../../hooks/use-router";
 import { AssetsPanel, DEFAULT_TITLE_STYLE, type AssetsTab } from "./AssetsPanel";
 import { InspectorPanel } from "./InspectorPanel";
@@ -200,6 +202,9 @@ export const PhoneEditor: React.FC = () => {
     const timers = [150, 700, 2000].map((ms) => window.setTimeout(redraw, ms));
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [mediaItems, tracks]);
+  // Heavy gallery videos edit from small preview copies kept on the phone;
+  // a reopened project gets them back instead of decoding the full-size originals.
+  useEffect(() => restoreGalleryPreviewCopies(mediaItems), [mediaItems]);
   const { navigate } = useRouter();
   // Keep the home screen's cover for this project fresh whenever it saves.
   useEffect(() => {
@@ -227,13 +232,24 @@ export const PhoneEditor: React.FC = () => {
   const redo = useProjectStore((s) => s.redo);
   const canUndo = useProjectStore((s) => s.canUndo);
   const canRedo = useProjectStore((s) => s.canRedo);
-  const playheadPosition = useTimelineStore((s) => s.playheadPosition);
+  // Not followed during playback: re-rendering the whole editor on every
+  // frame makes playback choppy on phones. Actions read the live playhead.
+  const playheadPosition =
+    useTimelineStore((s) => (s.playbackState === "playing" ? null : s.playheadPosition)) ??
+    useTimelineStore.getState().playheadPosition;
+  const playheadNow = () => useTimelineStore.getState().playheadPosition;
   const playbackState = useTimelineStore((s) => s.playbackState);
   const togglePlayback = useTimelineStore((s) => s.togglePlayback);
   const selectedItems = useUIStore((s) => s.selectedItems);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const select = useUIStore((s) => s.select);
   const previewRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    const update = () => setFullscreen(document.fullscreenElement === previewRef.current && previewRef.current !== null);
+    document.addEventListener("fullscreenchange", update);
+    return () => document.removeEventListener("fullscreenchange", update);
+  }, []);
 
   const selectedIds = useMemo(
     () => selectedItems.filter((item) => item.type === "clip" || item.type === "text-clip" || item.type === "shape-clip").map((item) => item.id),
@@ -281,7 +297,7 @@ export const PhoneEditor: React.FC = () => {
       track.clips.filter((c) => project.mediaLibrary.items.find((m) => m.id === c.mediaId)?.type !== "audio"),
     );
     const clip =
-      pictures.find((c) => playheadPosition >= c.startTime && playheadPosition < c.startTime + c.duration) ??
+      pictures.find((c) => playheadNow() >= c.startTime && playheadNow() < c.startTime + c.duration) ??
       pictures[0];
     if (!clip) {
       setPickerOpen(true);
@@ -364,8 +380,9 @@ export const PhoneEditor: React.FC = () => {
     onClick: () => {
       const store = useProjectStore.getState();
       void (async () => {
-        for (const id of getSplittableTimelineItemIds(store.project, selectedIds, playheadPosition)) {
-          await splitTimelineItem(store, id, playheadPosition);
+        const at = playheadNow();
+        for (const id of getSplittableTimelineItemIds(store.project, selectedIds, at)) {
+          await splitTimelineItem(store, id, at);
         }
       })();
     },
@@ -385,7 +402,7 @@ export const PhoneEditor: React.FC = () => {
   /** Rotate and Mirror act on the clip right away; Basic opens the dials. */
   const nudgeTransform = (change: (t: FlatTransform) => Partial<FlatTransform>) => {
     if (!selectedVisual) return;
-    const time = playheadPosition - selectedVisual.startTime;
+    const time = playheadNow() - selectedVisual.startTime;
     const values = currentTransform(selectedVisual, time);
     applyTransform(selectedVisual, time, { ...values, ...change(values) });
   };
@@ -460,9 +477,10 @@ export const PhoneEditor: React.FC = () => {
             <span className="text-[13px]">{importing}</span>
           </div>
         )}
-        {selectedVisual && !isPlaying && (
+        {selectedVisual && !isPlaying && !fullscreen && (
           <PhoneGestures selectedId={selectedVisual.id} onTapText={(clipId) => setTextEdit({ clipId, isNew: false })} />
         )}
+        {fullscreen && <PhoneFullscreenControls onExit={() => void document.exitFullscreen?.()} />}
       </div>
 
       <div className="grid h-12 shrink-0 grid-cols-3 items-center px-3">
@@ -488,7 +506,7 @@ export const PhoneEditor: React.FC = () => {
               type="button"
               aria-label={keyframeHere ? "Remove keyframe" : "Add keyframe"}
               aria-pressed={keyframeHere}
-              onClick={() => toggleKeyframe(selectedVisual, playheadPosition - selectedVisual.startTime)}
+              onClick={() => toggleKeyframe(selectedVisual, playheadNow() - selectedVisual.startTime)}
               className={`grid h-10 w-10 place-items-center ${keyframeHere ? "text-accent" : "text-fg"}`}
             >
               {keyframeHere ? <Diamond size={20} fill="currentColor" aria-hidden /> : <DiamondPlus size={20} aria-hidden />}

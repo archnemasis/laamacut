@@ -1,4 +1,5 @@
-import { nativeMediaAvailable, extractAudioWavViaNative } from "./native-media-bridge";
+import { nativeMediaAvailable, extractAudioWavViaNative, NoAudioStreamError } from "./native-media-bridge";
+import { hasAudioTrackSource } from "./audio-track-source";
 
 export { NoAudioStreamError } from "./native-media-bridge";
 
@@ -13,6 +14,13 @@ export async function extractAudioWav(
   audioTrackIndex = 0,
   options?: ExtractAudioProgressOptions,
 ): Promise<Blob> {
+  // Phone gallery videos hand over their sound directly (an .m4a, which every
+  // caller decodes with decodeAudioData just like a WAV).
+  if (hasAudioTrackSource(file) && audioTrackIndex === 0) {
+    const track = await file.loadAudioTrack();
+    if (!track) throw new NoAudioStreamError();
+    return track;
+  }
   if (nativeMediaAvailable()) {
     return extractAudioWavViaNative(file, audioTrackIndex);
   }

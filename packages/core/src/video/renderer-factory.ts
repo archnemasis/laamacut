@@ -116,6 +116,13 @@ export class RendererFactory {
     return this.currentRenderer;
   }
 
+  /** Forget a renderer its owner has destroyed, so its canvas and GPU device can be freed. */
+  release(renderer: Renderer): void {
+    if (this.currentRenderer !== renderer) return;
+    this.currentRenderer = null;
+    this.config = null;
+  }
+
   destroyRenderer(): void {
     if (this.currentRenderer) {
       this.currentRenderer.destroy();

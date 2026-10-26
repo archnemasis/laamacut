@@ -4,6 +4,7 @@ import type { Action, MediaItem } from "@openreel/core";
 import type { ProjectState } from "../project-store";
 import { getMediaBridge, initializeMediaBridge } from "../../bridges/media-bridge";
 import { saveMediaBlob, deleteMediaBlob } from "../../services/media-storage";
+import { GalleryFile } from "../../services/gallery-file";
 import { toast } from "../notification-store";
 
 type Get = StoreApi<ProjectState>["getState"];
@@ -151,8 +152,9 @@ export function createMediaSlice(set: Set, get: Get): MediaSlice {
         set({ project: updatedProject });
 
         // Copying the file into storage can take a while for big files, so it
-        // runs in the background instead of holding up the import.
-        void saveMediaBlob(
+        // runs in the background instead of holding up the import. Phone
+        // gallery videos aren't copied at all: the project keeps where they are.
+        if (!(file instanceof GalleryFile)) void saveMediaBlob(
           updatedProject.id,
           newMediaItem.id,
           file,
@@ -167,7 +169,10 @@ export function createMediaSlice(set: Set, get: Get): MediaSlice {
 
         if (newMediaItem.metadata.hasAudio && !newMediaItem.waveformData) {
           setTimeout(async () => {
-            const waveform = await mediaBridge.generateWaveform(file, newMediaItem.id);
+            // A gallery video's waveform comes from its sound alone, not the whole video.
+            const source = file instanceof GalleryFile ? await file.loadAudioTrack().catch(() => null) : file;
+            if (!source) return;
+            const waveform = await mediaBridge.generateWaveform(source, newMediaItem.id);
             if (!waveform?.peaks) return;
             const current = get().project;
             if (current.id !== updatedProject.id) return;
@@ -185,7 +190,8 @@ export function createMediaSlice(set: Set, get: Get): MediaSlice {
           }, 200);
         }
 
-        if (mediaType === "video" && !thumbnailUrl) {
+        // Gallery videos get their filmstrip from the phone's decoder instead.
+        if (mediaType === "video" && !thumbnailUrl && !(file instanceof GalleryFile)) {
           setTimeout(async () => {
             try {
               const thumbs = await mediaBridge.generateThumbnailsForMedia(

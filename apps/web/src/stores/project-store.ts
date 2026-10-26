@@ -94,6 +94,7 @@ import {
   loadFileHandle,
   loadDirectoryHandle,
 } from "../services/media-storage";
+import { restoreGalleryFile } from "../services/gallery-file";
 import {
   createMissingMediaItem,
   restoreMediaItem,
@@ -3058,7 +3059,7 @@ export const useProjectStore = create<ProjectState>()(
           const restoredItems = await Promise.all(
             recoveredProject.mediaLibrary.items.map(async (item) => {
               try {
-                return await restoreMediaItem(item, blobMap.get(item.id));
+                return await restoreMediaItem(item, blobMap.get(item.id) ?? restoreGalleryFile(item));
               } catch (error) {
                 console.warn(
                   `[ProjectStore] Failed to restore media ${item.name}; marking it missing:`,

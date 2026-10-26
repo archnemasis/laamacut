@@ -78,8 +78,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5">
-      <div className="min-w-0">
+    // The label keeps a readable width; on a narrow phone a wide control
+    // moves under it instead of squeezing the text into a column.
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5">
+      <div className="min-w-[11rem] flex-1">
         <Text display="block" type="supporting" color="primary" className="text-sm">
           {label}
         </Text>
@@ -89,7 +91,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
           </Text>
         )}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="max-w-full shrink-0">{children}</div>
     </div>
   );
 }

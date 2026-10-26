@@ -33,6 +33,7 @@ export {
 } from "./native-media-bridge";
 export type { NativeMediaBridge } from "./native-media-bridge";
 export { extractAudioWav } from "./extract-audio";
+export { audioDataOf, hasAudioTrackSource, type AudioTrackSource } from "./audio-track-source";
 
 // Media Import Service
 export {

@@ -12,6 +12,7 @@ import { initCustomFonts } from "./components/editor/inspector/font-options";
 import { setEncoderBackendFactory } from "@openreel/core";
 import { NativeFFmpegBackend } from "./services/native-ffmpeg-backend";
 import { getAndroidSaver, installAndroidDownloads } from "./services/android-downloads";
+import { installGalleryFileUrls } from "./services/gallery-file";
 
 const DesktopApp = React.lazy(() =>
   import("./desktop/DesktopApp").then((module) => ({
@@ -36,6 +37,7 @@ if (isDesktop) {
 // The Android app ships its files inside the APK, so it needs no offline cache.
 if (getAndroidSaver()) {
   installAndroidDownloads();
+  installGalleryFileUrls();
   // Android restores the last page on launch; the app should open on its home screen.
   if (window.location.hash !== "#/welcome") window.history.replaceState(null, "", "#/welcome");
 } else registerServiceWorker().then((registration) => {

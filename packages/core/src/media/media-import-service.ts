@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { hasAudioTrackSource } from "./audio-track-source";
 import type { MediaItem, MediaMetadata } from "../types/project";
 import type {
   ProcessedMedia,
@@ -105,8 +106,10 @@ export class MediaImportService {
     const warnings: string[] = [];
     const validation = await this.validateFormat(file);
     if (!validation.supported) {
-      // Try FFmpeg fallback if enabled
-      if (opts.useFallback) {
+      // Try FFmpeg fallback if enabled. Never for files read from a phone
+      // gallery: the fallback loads the whole video into memory, which crashes
+      // the app on big phone videos.
+      if (opts.useFallback && !hasAudioTrackSource(file)) {
         try {
           return await this.importWithFallback(file, opts);
         } catch (fallbackError) {
@@ -168,7 +171,7 @@ export class MediaImportService {
           );
         }
 
-        if (opts.useFallback && opts.transcodeUnsupported) {
+        if (opts.useFallback && opts.transcodeUnsupported && !hasAudioTrackSource(file)) {
           try {
             return await this.importWithFallback(file, opts, {
               format: "mp4",
@@ -276,8 +279,8 @@ export class MediaImportService {
         warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
-      // Try fallback on any error
-      if (opts.useFallback) {
+      // Try fallback on any error (not for phone gallery files, see above)
+      if (opts.useFallback && !hasAudioTrackSource(file)) {
         try {
           return await this.importWithFallback(file, opts);
         } catch (fallbackError) {

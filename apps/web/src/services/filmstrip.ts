@@ -2,6 +2,7 @@ import type { MediaItem } from "@openreel/core";
 import { useProjectStore } from "../stores/project-store";
 import { galleryOriginalUri } from "./gallery-originals";
 import { getGallery } from "./phone-gallery";
+import { loadFilmstrip } from "./filmstrip-cache";
 
 const FRAMES = 10;
 const HEIGHT = 160;
@@ -72,8 +73,10 @@ export function ensureFilmstrip(media: MediaItem): void {
   const blob = media.blob;
   making.add(media.id);
   void (async () => {
-    let frames = await phoneFrames(media.id).catch(() => []);
-    if (frames.length === 0 && blob) frames = await videoFrames(blob).catch(() => []);
+    const frames = await loadFilmstrip(galleryOriginalUri(media.id) ?? `media:${media.id}`, async () => {
+      const fromPhone = await phoneFrames(media.id).catch(() => []);
+      return fromPhone.length > 0 || !blob ? fromPhone : videoFrames(blob);
+    });
     if (frames.length === 0) return;
     const { project } = useProjectStore.getState();
     const current = project.mediaLibrary.items.find((m) => m.id === media.id);

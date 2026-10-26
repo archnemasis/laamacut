@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { disposeVideoEffectsEngine } from "@openreel/core";
 import { useEngineStore } from "../stores/engine-store";
 import { useProjectStore } from "../stores/project-store";
 import {
@@ -134,6 +135,9 @@ export const useEditorInitialization = () => {
       disposePlaybackBridge();
       disposeMediaBridge();
       disposeRenderBridge();
+      // The render bridge's effects engine is shared and holds a whole GPU
+      // device; the next editor makes a new one.
+      disposeVideoEffectsEngine();
       disposeEffectsBridge();
       disposeTransitionBridge();
     };

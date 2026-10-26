@@ -2,7 +2,7 @@ import type { Project } from "@openreel/core";
 import type { GalleryItem } from "./phone-gallery";
 
 const ORIGINALS_KEY = "laamacut-gallery-originals";
-type GalleryOriginal = Pick<GalleryItem, "uri" | "name" | "mime"> & {
+export type GalleryOriginal = Pick<GalleryItem, "uri" | "name" | "mime"> & {
   /** False when the clip already holds the full file (HD, photos): web export has nothing to swap. */
   copy?: boolean;
 };
@@ -28,6 +28,11 @@ export function rememberGalleryOriginal(mediaId: string, item: GalleryItem, copy
   } catch {
     // Storage full or blocked: export falls back to the editing copy.
   }
+}
+
+/** Where a clip's gallery file is, and whether the clip holds an editing copy of it. */
+export function galleryOriginal(mediaId: string): GalleryOriginal | undefined {
+  return loadOriginals()[mediaId];
 }
 
 /** The phone gallery file a clip came from, if it was picked from the gallery. */

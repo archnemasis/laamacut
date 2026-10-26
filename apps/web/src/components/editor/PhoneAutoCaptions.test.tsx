@@ -28,10 +28,48 @@ describe("PhoneAutoCaptions", () => {
     vi.clearAllMocks();
   });
 
-  it("only offers Voiceover when there is an audio clip", () => {
+  it("generates from video and audio by default, and only offers Audio when there is an audio clip", () => {
     render(<PhoneAutoCaptions onClose={() => {}} />);
+    expect(screen.getByRole("button", { name: /Generate from/ })).toHaveTextContent("Video & audio");
     fireEvent.click(screen.getByRole("button", { name: /Generate from/ }));
-    expect(screen.getByRole("radio", { name: "Voiceover" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Video & audio" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Video" })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "Audio" })).toBeDisabled();
+  });
+
+  it("captions the chosen source: both, just the audio, or just the video", async () => {
+    const voice = { id: "c2", mediaId: "m2", trackId: "t2", startTime: 3, duration: 2 };
+    const music = { id: "c3", mediaId: "m3", trackId: "t3", startTime: 0, duration: 9 };
+    const linked = { id: "c4", mediaId: "m1", trackId: "t4", startTime: 0, duration: 2 };
+    const saved = structuredClone(state.project);
+    state.project.mediaLibrary.items.push({ id: "m2", type: "audio", name: "Voice.m4a" }, { id: "m3", type: "audio", name: "Song.mp3" });
+    state.project.timeline.tracks.push(
+      { id: "t2", muted: false, clips: [voice] },
+      { id: "t3", muted: true, clips: [music] },
+      { id: "t4", muted: false, clips: [linked] },
+    );
+    const run = async (choice: string | null) => {
+      transcribeClip.mockClear();
+      const onClose = vi.fn();
+      render(<PhoneAutoCaptions onClose={onClose} />);
+      if (choice) {
+        fireEvent.click(screen.getByRole("button", { name: /Generate from/ }));
+        fireEvent.click(screen.getByRole("radio", { name: choice }));
+        fireEvent.click(screen.getByRole("button", { name: "Done" }));
+      }
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      cleanup();
+      return (transcribeClip.mock.calls as unknown as [{ id: string }][]).map(([clip]) => clip.id);
+    };
+    try {
+      // The muted song is skipped, and the video's linked audio is the same speech as the video.
+      expect(await run(null)).toEqual(["c1", "c2"]);
+      expect(await run("Audio")).toEqual(["c2"]);
+      expect(await run("Video")).toEqual(["c1"]);
+    } finally {
+      state.project = saved;
+    }
   });
 
   it("opens every template in a two-column sheet", () => {
