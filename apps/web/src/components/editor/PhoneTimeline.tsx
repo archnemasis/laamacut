@@ -16,6 +16,11 @@ const DEFAULT_PPS = 56;
 const MAIN_LANE_H = 56;
 const LANE_H = 36;
 const MIN_TRIM = 0.1;
+/** How close (screen px) a dragged edge or block has to come to another edge to click onto it. */
+const SNAP_PX = 12;
+
+/** A half-saved clip can briefly have no time; place it at 0 rather than at NaN px. */
+const finite = (value: number | undefined): number => (Number.isFinite(value) ? (value as number) : 0);
 
 type LaneItem = { id: string; start: number; duration: number; label: string; kind?: "text-clip" | "shape-clip"; clip?: Clip };
 type TrimDraft = { id: string; side: "start" | "end"; delta: number };
@@ -98,9 +103,13 @@ export function PhoneTimeline({
   const userScrollTimer = useRef<number | undefined>(undefined);
   const pinchRef = useRef<{ distance: number; pps: number } | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
-  // Long-press a main clip, then drag it sideways to reorder (CapCut).
+  // Long-press a main clip, then drag it sideways to reorder (CapCut). Other
+  // blocks (overlays, audio, text) long-press to slide along the timeline.
   const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
   const dragRef = useRef<{ id: string; x0: number; dx: number } | null>(null);
+  /** The time a dragged edge or block has clicked onto, drawn as a guide line. */
+  const [snapLine, setSnapLine] = useState<number | null>(null);
+  const lastSnap = useRef<number | null>(null);
   const pressTimer = useRef<number | undefined>(undefined);
   const [cover, setCover] = useState(() => getProjectPreview(project.id)?.cover ? getProjectPreview(project.id)?.image ?? null : null);
 
@@ -118,8 +127,8 @@ export function PhoneTimeline({
   const half = width / 2;
   // A reopened project can report 0 until its next edit, so also measure the clips.
   const duration = Math.max(
-    project.timeline.duration ?? 0,
-    ...project.timeline.tracks.flatMap((t) => t.clips.map((c) => c.startTime + c.duration)),
+    finite(project.timeline.duration),
+    ...project.timeline.tracks.flatMap((t) => t.clips.map((c) => finite(c.startTime) + finite(c.duration))),
     0,
   );
   const selectedIds = useMemo(
@@ -154,8 +163,8 @@ export function PhoneTimeline({
       for (const clip of track.clips) {
         const item = {
           id: clip.id,
-          start: clip.startTime,
-          duration: clip.duration,
+          start: finite(clip.startTime),
+          duration: finite(clip.duration),
           label: mediaById.get(clip.mediaId)?.name ?? "Clip",
           clip,
         };
@@ -163,11 +172,12 @@ export function PhoneTimeline({
         else if (track !== mainTrack) overlay.push(item);
       }
     }
+    const at = (c: { id: string; startTime: number; duration: number }) => ({ id: c.id, start: finite(c.startTime), duration: finite(c.duration) });
     const text: LaneItem[] = [
-      ...(project.textClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: c.text || "Text", kind: "text-clip" as const })),
-      ...(project.shapeClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Shape", kind: "shape-clip" as const })),
-      ...(project.svgClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Graphic", kind: "shape-clip" as const })),
-      ...(project.stickerClips ?? []).map((c) => ({ id: c.id, start: c.startTime, duration: c.duration, label: "Sticker", kind: "shape-clip" as const })),
+      ...(project.textClips ?? []).map((c) => ({ ...at(c), label: c.text || "Text", kind: "text-clip" as const })),
+      ...(project.shapeClips ?? []).map((c) => ({ ...at(c), label: "Shape", kind: "shape-clip" as const })),
+      ...(project.svgClips ?? []).map((c) => ({ ...at(c), label: "Graphic", kind: "shape-clip" as const })),
+      ...(project.stickerClips ?? []).map((c) => ({ ...at(c), label: "Sticker", kind: "shape-clip" as const })),
     ];
     const main = (mainTrack?.clips ?? []).filter((c) => kindOf(c) !== "audio");
     return { mainTrack, main, overlay, audio, text };
@@ -278,23 +288,64 @@ export function PhoneTimeline({
         await moveClip(id, start + delta);
       }
     };
-    return { id, duration, minStart, maxEnd, commit };
+    return { id, start, duration, main: !!main, minStart, maxEnd, commit };
+  };
+
+  /**
+   * Edges a dragged block or trim handle clicks onto: the start, the playhead,
+   * and the ends of every other block, so text or music can be cut exactly to
+   * the end of a video. Main clips stay end to end, so their own joins count too.
+   */
+  const snapPoints = (exclude: string): number[] => {
+    const points = [0, useTimelineStore.getState().playheadPosition];
+    const edges = (start: number, length: number) => points.push(start, start + length);
+    for (const c of lanes.main) if (c.id !== exclude) edges(finite(c.startTime), finite(c.duration));
+    for (const item of [...lanes.overlay, ...lanes.audio, ...lanes.text]) if (item.id !== exclude) edges(item.start, item.duration);
+    return points;
+  };
+
+  /** The nearest snap point within reach of `time`, or null. */
+  const snapTime = (time: number, points: number[]): number | null => {
+    let best: number | null = null;
+    for (const point of points) {
+      if (Math.abs(point - time) * pps <= SNAP_PX && (best === null || Math.abs(point - time) < Math.abs(best - time))) best = point;
+    }
+    return best;
+  };
+
+  /** Show the guide line, with a tiny buzz as it clicks onto a new edge. */
+  const showSnap = (time: number | null) => {
+    if (time !== null && time !== lastSnap.current) navigator.vibrate?.(8);
+    lastSnap.current = time;
+    setSnapLine(time);
   };
 
   const beginTrim = (target: ReturnType<typeof trimTarget>, side: TrimSide) => (e: React.PointerEvent) => {
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const startX = e.clientX;
+    const points = snapPoints(target.id);
+    // A main clip's start always stays joined to the clip before it, so only its end snaps.
+    const snaps = side === "end" || !target.main;
+    const edge = side === "start" ? target.start : target.start + target.duration;
     const clampDelta = (raw: number) =>
       side === "start"
         ? Math.min(target.duration - MIN_TRIM, Math.max(target.minStart, raw))
         : Math.min(target.maxEnd, Math.max(-(target.duration - MIN_TRIM), raw));
-    const move = (ev: PointerEvent) => setTrim({ id: target.id, side, delta: clampDelta((ev.clientX - startX) / pps) });
+    const resolve = (ev: PointerEvent) => {
+      const raw = (ev.clientX - startX) / pps;
+      const snapped = snaps ? snapTime(edge + raw, points) : null;
+      const delta = clampDelta(snapped === null ? raw : snapped - edge);
+      showSnap(snapped !== null && Math.abs(edge + delta - snapped) < 1e-6 ? snapped : null);
+      return delta;
+    };
+    const move = (ev: PointerEvent) => setTrim({ id: target.id, side, delta: resolve(ev) });
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      const delta = clampDelta((ev.clientX - startX) / pps);
+      const delta = resolve(ev);
       setTrim(null);
+      showSnap(null);
       if (Math.abs(delta) < 1 / 60) return;
       void target.commit(side, delta);
     };
@@ -323,8 +374,18 @@ export function PhoneTimeline({
     await reorderTrackClips(track.id, order);
   };
 
-  const startPress = (clip: Clip) => (e: React.PointerEvent<HTMLDivElement>) => {
-    if (lanes.main.length < 2) return;
+  /**
+   * Hold a block still for a moment, then drag it sideways. `place` turns the
+   * finger's travel (px) into how far the block shows as moved (px), so a
+   * block can click onto snap points; `drop` saves it.
+   */
+  const holdToDrag = (
+    e: React.PointerEvent,
+    id: string,
+    place: (dx: number) => number,
+    drop: (dx: number) => Promise<void> | void,
+    onBegin?: () => void,
+  ) => {
     const x0 = e.clientX;
     const y0 = e.clientY;
     const cleanup = () => {
@@ -343,12 +404,13 @@ export function PhoneTimeline({
     pressTimer.current = window.setTimeout(() => {
       cleanup();
       navigator.vibrate?.(15);
-      dragRef.current = { id: clip.id, x0, dx: 0 };
-      setDrag({ id: clip.id, dx: 0 });
+      onBegin?.();
+      dragRef.current = { id, x0, dx: 0 };
+      setDrag({ id, dx: 0 });
       const move = (ev: PointerEvent) => {
         if (!dragRef.current) return;
-        dragRef.current.dx = ev.clientX - x0;
-        setDrag({ id: clip.id, dx: dragRef.current.dx });
+        dragRef.current.dx = place(ev.clientX - x0);
+        setDrag({ id, dx: dragRef.current.dx });
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -357,14 +419,41 @@ export function PhoneTimeline({
         const done = dragRef.current;
         dragRef.current = null;
         setDrag(null);
+        showSnap(null);
         justDragged.current = true;
         window.setTimeout(() => (justDragged.current = false), 50);
-        if (done) void dropClip(done.id, done.dx);
+        if (done && Math.abs(done.dx) >= 1) void drop(done.dx);
       };
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
       window.addEventListener("pointercancel", up);
     }, 380);
+  };
+
+  const startPress = (clip: Clip) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (lanes.main.length < 2) return;
+    holdToDrag(e, clip.id, (dx) => dx, (dx) => dropClip(clip.id, dx));
+  };
+
+  /** Overlays, audio and text: hold, then slide along the timeline; either end clicks onto other edges. */
+  const startBarPress = (item: LaneItem) => (e: React.PointerEvent<HTMLDivElement>) => {
+    const points = snapPoints(item.id);
+    const place = (dx: number) => {
+      const shift = Math.max(-item.start, dx / pps);
+      const startSnap = snapTime(item.start + shift, points);
+      const endSnap = startSnap === null ? snapTime(item.start + item.duration + shift, points) : null;
+      const snapped = startSnap !== null ? startSnap - item.start : endSnap !== null ? endSnap - item.start - item.duration : shift;
+      const moved = Math.max(-item.start, snapped);
+      showSnap(startSnap ?? endSnap);
+      return moved * pps;
+    };
+    const drop = async (dx: number) => {
+      const start = Math.max(0, item.start + dx / pps);
+      if (item.clip) await moveClip(item.id, start);
+      else updateOverlayClipTiming(item.id, { startTime: start, duration: item.duration });
+    };
+    const pick = () => (item.kind ? select({ type: item.kind, id: item.id }) : select({ type: "clip", id: item.id, trackId: item.clip?.trackId }));
+    holdToDrag(e, item.id, place, drop, pick);
   };
 
   /** CapCut's Cover: a frame of the video, or a picture from the device, shown on the home screen. */
@@ -394,18 +483,21 @@ export function PhoneTimeline({
     const selected = selectedIds.has(item.id);
     const place = drafted(item.id, item.start, item.duration);
     const target = selected ? trimTarget(item) : null;
+    const dragging = drag?.id === item.id;
     return (
       <div
         key={item.id}
-        className={`absolute top-1 bottom-1 ${selected ? "z-20" : ""}`}
-        style={{ left: place.start * pps, width: Math.max(8, place.duration * pps) }}
+        onPointerDown={startBarPress(item)}
+        onContextMenu={(e) => e.preventDefault()}
+        className={`absolute top-1 bottom-1 select-none ${selected ? "z-20" : ""} ${dragging ? "z-40 opacity-90 shadow-xl ring-2 ring-accent" : ""}`}
+        style={{ left: place.start * pps, width: Math.max(8, place.duration * pps), translate: dragging ? `${drag?.dx ?? 0}px 0` : undefined }}
       >
         <button
           type="button"
-          aria-label={`Select ${item.label}, at ${formatPhoneTime(item.start)}`}
-          aria-pressed={selected}
+          aria-label={`${selected ? "Selected" : "Select"} ${item.label}, ${formatPhoneTime(item.start)} to ${formatPhoneTime(item.start + item.duration)}`}
           onClick={(e) => {
             e.stopPropagation();
+            if (justDragged.current) return;
             if (item.kind) select({ type: item.kind, id: item.id });
             else selectClip(item.id);
           }}
@@ -482,6 +574,14 @@ export function PhoneTimeline({
           </div>
 
           <div className="relative space-y-2 pt-3 pb-6" style={{ paddingLeft: half }}>
+            {snapLine !== null && (
+              <div
+                aria-hidden
+                data-testid="timeline-snap-line"
+                className="pointer-events-none absolute inset-y-0 z-50 w-px bg-[var(--accent)]"
+                style={{ left: half + snapLine * pps }}
+              />
+            )}
             {/* Main track: mute switch before 00:00, then the clip filmstrip */}
             <div role="group" aria-label="Video" className="relative" style={{ height: MAIN_LANE_H }}>
               {lanes.mainTrack && (
@@ -531,7 +631,7 @@ export function PhoneTimeline({
               )}
               {lanes.main.map((clip) => {
                 const selected = selectedIds.has(clip.id);
-                const place = drafted(clip.id, clip.startTime, clip.duration);
+                const place = drafted(clip.id, finite(clip.startTime), finite(clip.duration));
                 // Clips after one whose end is being dragged follow it, as they will once it is saved.
                 const trimmed = trim?.side === "end" ? lanes.main.find((c) => c.id === trim.id) : undefined;
                 const follow = trim && trimmed && clip.startTime > trimmed.startTime ? trim.delta : 0;
@@ -547,8 +647,7 @@ export function PhoneTimeline({
                     key={clip.id}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Select ${media?.name ?? "clip"}`}
-                    aria-pressed={selected}
+                    aria-label={`${selected ? "Selected" : "Select"} ${media?.name ?? "clip"}`}
                     onPointerDown={startPress(clip)}
                     onContextMenu={(e) => e.preventDefault()}
                     onClick={(e) => {

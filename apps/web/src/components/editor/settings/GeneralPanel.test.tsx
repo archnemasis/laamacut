@@ -85,12 +85,12 @@ describe("GeneralPanel appearance", () => {
   it("switches between Dark, AMOLED black, Light and Match system", () => {
     useThemeStore.getState().setMode("dark");
     render(<GeneralPanel />);
-    const choices = screen.getAllByRole("radio").map((radio) => radio.textContent);
+    const choices = screen.getAllByRole("radio").map((radio) => radio.closest("label")?.textContent);
     expect(choices).toEqual(["Dark", "AMOLED black", "Light", "Match system"]);
 
     fireEvent.click(screen.getByRole("radio", { name: "AMOLED black" }));
     expect(useThemeStore.getState().mode).toBe("amoled");
-    expect(screen.getByRole("radio", { name: "AMOLED black" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "AMOLED black" })).toBeChecked();
 
     fireEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(useThemeStore.getState().mode).toBe("light");

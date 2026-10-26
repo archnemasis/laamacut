@@ -35,16 +35,13 @@ function ThemePicker() {
       {THEME_CHOICES.map(({ mode: choice, swatch: [window, panel] }) => {
         const selected = mode === choice;
         return (
-          <button
+          <label
             key={choice}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => setMode(choice)}
-            className={`flex flex-col gap-2 rounded-lg border p-2 text-left text-xs transition-colors ${
+            className={`flex cursor-pointer flex-col gap-2 rounded-lg border p-2 text-left text-xs transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
               selected ? "border-accent bg-accent-soft text-fg" : "border-border text-fg-2 hover:border-border-strong"
             }`}
           >
+            <input type="radio" name="theme" className="sr-only" checked={selected} onChange={() => setMode(choice)} />
             <span
               aria-hidden
               className="relative block h-12 w-full overflow-hidden rounded-md border border-border"
@@ -56,7 +53,7 @@ function ThemePicker() {
               <span className="absolute left-2 top-1.5 h-1.5 w-6 rounded-full bg-accent" />
             </span>
             <span className="font-medium">{THEME_LABELS[choice]}</span>
-          </button>
+          </label>
         );
       })}
     </div>

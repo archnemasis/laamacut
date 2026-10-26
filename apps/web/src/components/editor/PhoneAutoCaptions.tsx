@@ -128,21 +128,24 @@ function ChoiceSheet({
         </header>
         <div role="radiogroup" aria-label={title} className="max-h-[50vh] space-y-2 overflow-y-auto p-4">
           {options.map((option) => (
-            <button
+            <label
               key={option.code}
-              type="button"
-              role="radio"
-              aria-checked={picked === option.code}
-              disabled={option.disabled}
-              onClick={() => setPicked(option.code)}
-              className="flex h-14 w-full items-center gap-3 rounded-2xl bg-[#2a2a2a] px-4 text-left disabled:opacity-40"
+              className="flex h-14 w-full items-center gap-3 rounded-2xl bg-[#2a2a2a] px-4 text-left has-[:disabled]:opacity-40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-white"
             >
+              <input
+                type="radio"
+                name={title}
+                className="sr-only"
+                checked={picked === option.code}
+                disabled={option.disabled}
+                onChange={() => setPicked(option.code)}
+              />
               {option.icon && <option.icon size={20} aria-hidden />}
               <span className="flex-1 text-[16px] font-semibold">{option.name}</span>
               <span className={`grid h-6 w-6 place-items-center rounded-full ${picked === option.code ? "bg-[#5ac8dc] text-black" : "border-2 border-white/30"}`}>
                 {picked === option.code && <Check size={14} strokeWidth={3} aria-hidden />}
               </span>
-            </button>
+            </label>
           ))}
         </div>
         <div className="px-4">
@@ -242,19 +245,15 @@ export function PhoneAutoCaptions({ onClose }: { onClose: () => void }) {
     const item = captionLookById(id);
     const active = lookId === id;
     return (
-      <button
+      <label
         key={id}
-        type="button"
-        role="radio"
-        aria-checked={active}
-        aria-label={item.label}
-        onClick={() => setLookId(id)}
-        className={`grid shrink-0 place-items-center overflow-hidden rounded-xl bg-[#2a2a2a] ${big ? "aspect-square text-[24px]" : "h-[86px] w-[86px] text-[14px]"} ${
+        className={`grid shrink-0 place-items-center overflow-hidden rounded-xl bg-[#2a2a2a] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-white ${big ? "aspect-square text-[24px]" : "h-[86px] w-[86px] text-[14px]"} ${
           active ? "ring-2 ring-white" : ""
         }`}
       >
+        <input type="radio" name={big ? "caption-template-all" : "caption-template"} aria-label={item.label} className="sr-only" checked={active} onChange={() => setLookId(id)} />
         <CaptionLookPreview look={item} tick={tick} />
-      </button>
+      </label>
     );
   };
 

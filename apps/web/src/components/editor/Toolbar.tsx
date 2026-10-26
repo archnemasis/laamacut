@@ -44,6 +44,7 @@ import { useSettingsStore } from "../../stores/settings-store";
 import { SettingsDialog } from "./settings/SettingsDialog";
 import { Icon } from "@/icons/Icon";
 import { toast } from "../../stores/notification-store";
+import { useBackHandler } from "../../services/back-stack";
 import { useAnalytics, AnalyticsEvents } from "../../hooks/useAnalytics";
 import {
   ToolcraftDropdownMenu as DropdownMenu,
@@ -349,6 +350,19 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
     exportedUrl.current = null;
   }, []);
   useEffect(() => releaseExportedVideo, [releaseExportedVideo]);
+  // Android's back gesture: close the export screen (stopping a running export),
+  // then the export options, and last of all the project itself, back to home.
+  useBackHandler(
+    !!phone && phoneRun !== null,
+    () => {
+      if (phoneRun?.status === "exporting") handleCancelExport();
+      setPhoneRun(null);
+      releaseExportedVideo();
+    },
+    50,
+  );
+  useBackHandler(!!phone && phoneSettingsOpen, () => setPhoneSettingsOpen(false), 45);
+  useBackHandler(!!phone, () => void useProjectStore.getState().forceSave().finally(() => navigate("welcome")), 0);
   /** Export: first CapCut's naming prompt over the export screen, with the cover behind it. */
   const exportFromPhone = useCallback(() => {
     setPhoneSettingsOpen(false);

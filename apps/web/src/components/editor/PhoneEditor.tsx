@@ -50,6 +50,7 @@ import { PhoneTimeline } from "./PhoneTimeline";
 import { PhoneTextEditor, type TextEditorTab } from "./PhoneTextEditor";
 import { PhoneAutoCaptions } from "./PhoneAutoCaptions";
 import { PhoneTextToSpeech } from "./PhoneTextToSpeech";
+import { useBackHandler } from "../../services/back-stack";
 import { PhoneGestures } from "./PhoneGestures";
 import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
@@ -467,6 +468,16 @@ export const PhoneEditor: React.FC = () => {
     : menu
       ? { label: "Back to all tools", onClick: () => setMenu(null) }
       : null;
+
+  // Android's back gesture closes the top layer, one at a time, before it can leave.
+  useBackHandler(fullscreen, () => void document.exitFullscreen?.(), 40);
+  useBackHandler(textEdit !== null, () => setTextEdit(null), 30);
+  useBackHandler(captionsOpen, () => setCaptionsOpen(false), 30);
+  useBackHandler(speechOpen, () => { setSpeechOpen(false); setMenu(null); }, 30);
+  useBackHandler(pickerOpen, () => closePicker(), 30);
+  useBackHandler(sheet !== null, () => setSheet(null), 20);
+  useBackHandler(panel !== null && selectedIds.length === 1, () => setPanel(null), 20);
+  useBackHandler(back !== null, () => back?.onClick(), 10);
 
   return (
     <div className="phone-editor flex h-full w-full flex-col overflow-hidden bg-bg text-fg">

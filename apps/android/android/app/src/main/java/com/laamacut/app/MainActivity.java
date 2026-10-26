@@ -8,6 +8,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -30,6 +31,22 @@ public class MainActivity extends BridgeActivity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 WebResourceResponse media = MediaServer.handle(MainActivity.this, request);
                 return media != null ? media : super.shouldInterceptRequest(view, request);
+            }
+        });
+
+        // Back (the edge swipe or button) closes the app's own sheets and screens
+        // one at a time; only when nothing is open does it leave the app.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                getBridge().getWebView().evaluateJavascript(
+                    "window.__laamacutBack ? window.__laamacutBack() : false",
+                    handled -> {
+                        if ("true".equals(handled)) return;
+                        setEnabled(false);
+                        getOnBackPressedDispatcher().onBackPressed();
+                        setEnabled(true);
+                    });
             }
         });
 

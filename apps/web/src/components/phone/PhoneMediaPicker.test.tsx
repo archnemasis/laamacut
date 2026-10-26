@@ -74,16 +74,16 @@ describe("PhoneMediaPicker gallery", () => {
     const onClose = vi.fn();
     render(<PhoneMediaPicker onClose={onClose} />);
 
-    expect(await screen.findByRole("button", { name: "Select beach.mp4" })).toBeInTheDocument();
+    expect(await screen.findByRole("checkbox", { name: /^beach.mp4/ })).toBeInTheDocument();
     expect(gallery.requestAccess).toHaveBeenCalled();
     expect(screen.getByText("00:22")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Select party.mp4" }));
-    fireEvent.click(screen.getByRole("button", { name: "Select beach.mp4" }));
-    expect(screen.getByRole("button", { name: "Deselect party.mp4" })).toHaveTextContent("1");
+    fireEvent.click(screen.getByRole("checkbox", { name: /^party.mp4/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^beach.mp4/ }));
+    expect(screen.getByRole("checkbox", { name: "party.mp4, 00:15, number 1" })).toBeChecked();
 
     fireEvent.click(screen.getByRole("tab", { name: "Photos" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Select cat.jpg" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /^cat.jpg/ }));
 
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     // Straight back to the editor, which shows the loading state.
@@ -113,7 +113,7 @@ describe("PhoneMediaPicker gallery", () => {
   it("makes no copy for videos phones already play smoothly", async () => {
     gallery.probe.mockResolvedValue({ width: 1080, height: 1920, fps: 30 });
     render(<PhoneMediaPicker onClose={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Select beach.mp4" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /^beach.mp4/ }));
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(addMediaFilesToTimeline).toHaveBeenCalled());
     expect(gallery.compress).not.toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe("PhoneMediaPicker gallery", () => {
 
   it("keeps full resolution when HD is on", async () => {
     render(<PhoneMediaPicker onClose={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Select beach.mp4" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /^beach.mp4/ }));
     const hdSwitch = screen.getByRole("switch", { name: "HD" });
     fireEvent.click(hdSwitch);
     expect(hdSwitch).toHaveAttribute("aria-checked", "true");

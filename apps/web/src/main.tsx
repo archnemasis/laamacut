@@ -13,6 +13,7 @@ import { setEncoderBackendFactory } from "@openreel/core";
 import { NativeFFmpegBackend } from "./services/native-ffmpeg-backend";
 import { getAndroidSaver, installAndroidDownloads } from "./services/android-downloads";
 import { installGalleryFileUrls } from "./services/gallery-file";
+import { installBackBridge } from "./services/back-stack";
 
 const DesktopApp = React.lazy(() =>
   import("./desktop/DesktopApp").then((module) => ({
@@ -38,6 +39,7 @@ if (isDesktop) {
 if (getAndroidSaver()) {
   installAndroidDownloads();
   installGalleryFileUrls();
+  installBackBridge();
   // Android restores the last page on launch; the app should open on its home screen.
   if (window.location.hash !== "#/welcome") window.history.replaceState(null, "", "#/welcome");
 } else registerServiceWorker().then((registration) => {

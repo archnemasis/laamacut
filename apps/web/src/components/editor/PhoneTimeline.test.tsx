@@ -73,6 +73,53 @@ describe("PhoneTimeline", () => {
     expect(state.trimClip).toHaveBeenCalledWith("c1", undefined, 10);
   });
 
+  it("snaps a trimmed end onto the end of the video", () => {
+    useUIStore.setState({ selectedItems: [{ type: "text-clip", id: "x1" }] });
+    render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);
+    // The text ends at 3s; dragging to just short of 5s clicks onto the video's end.
+    drag(screen.getByRole("slider", { name: "Trim end" }), 56 * 2 - 6);
+    expect(state.updateOverlayClipTiming).toHaveBeenCalledWith("x1", { duration: 4 });
+  });
+
+  const hold = (block: HTMLElement, dx: number) => {
+    vi.useFakeTimers();
+    try {
+      block.dispatchEvent(new MouseEvent("pointerdown", { clientX: 100, clientY: 10, bubbles: true }));
+      vi.advanceTimersByTime(400);
+      window.dispatchEvent(new MouseEvent("pointermove", { clientX: 100 + dx, clientY: 10 }));
+      window.dispatchEvent(new MouseEvent("pointerup", { clientX: 100 + dx, clientY: 10 }));
+    } finally {
+      vi.useRealTimers();
+    }
+  };
+  const textBlock = () => screen.getByRole("button", { name: /^Select Hello/ }).parentElement!;
+
+  it("holds and slides text along the timeline", () => {
+    render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);
+    hold(textBlock(), 56);
+    expect(state.updateOverlayClipTiming).toHaveBeenCalledWith("x1", { startTime: 2, duration: 2 });
+    expect(useUIStore.getState().selectedItems).toEqual([{ type: "text-clip", id: "x1" }]);
+  });
+
+  it("snaps a slid block's end onto the end of the video", () => {
+    render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);
+    hold(textBlock(), 56 * 2 - 6);
+    expect(state.updateOverlayClipTiming).toHaveBeenCalledWith("x1", { startTime: 3, duration: 2 });
+  });
+
+  it("slides audio with moveClip", () => {
+    const saved = structuredClone(state.project);
+    state.project.mediaLibrary.items.push({ id: "m2", type: "audio", name: "Song.mp3", metadata: { duration: 30 } });
+    state.project.timeline.tracks.push({
+      id: "t2", type: "audio", muted: false,
+      clips: [{ id: "a1", mediaId: "m2", trackId: "t2", startTime: 0.5, duration: 1, inPoint: 0, outPoint: 1 }],
+    });
+    render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);
+    hold(screen.getByRole("button", { name: /^Select Song.mp3/ }).parentElement!, 56 * 2);
+    expect(state.moveClip).toHaveBeenCalledWith("a1", 2.5);
+    state.project = saved;
+  });
+
   it("stretches text as far as you drag it", () => {
     useUIStore.setState({ selectedItems: [{ type: "text-clip", id: "x1" }] });
     render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);

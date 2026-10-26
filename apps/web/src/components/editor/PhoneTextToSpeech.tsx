@@ -165,19 +165,22 @@ export function PhoneTextToSpeech({ onClose }: { onClose: () => void }) {
             {PHONE_VOICES.map((voice) => {
               const active = voice.id === voiceId;
               return (
-                <button
+                <label
                   key={voice.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  aria-label={`${voice.name}, ${voice.description}`}
-                  onClick={() => setVoiceId(voice.id)}
-                  className={`flex w-[86px] shrink-0 flex-col items-center gap-1 rounded-xl bg-[#2a2a2a] px-2 py-3 ${active ? "ring-2 ring-white" : ""}`}
+                  className={`flex w-[86px] shrink-0 flex-col items-center gap-1 rounded-xl bg-[#2a2a2a] px-2 py-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-white ${active ? "ring-2 ring-white" : ""}`}
                 >
+                  <input
+                    type="radio"
+                    name="voice"
+                    aria-label={`${voice.name}, ${voice.description}`}
+                    className="sr-only"
+                    checked={active}
+                    onChange={() => setVoiceId(voice.id)}
+                  />
                   <AudioLines size={22} aria-hidden className={active ? "text-[#5ac8dc]" : "text-white/70"} />
                   <span className="text-[14px] font-semibold">{voice.name}</span>
                   <span className="text-center text-[11px] leading-tight text-white/50">{voice.description}</span>
-                </button>
+                </label>
               );
             })}
           </div>

@@ -273,8 +273,15 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
               <button
                 key={tile.key}
                 type="button"
-                aria-label={`${selected ? "Deselect" : "Select"} ${tile.name}`}
-                aria-pressed={selected}
+                role="checkbox"
+                aria-checked={selected}
+                aria-label={[
+                  tile.name || (tile.kind === "video" ? "Video" : "Photo"),
+                  tile.kind === "video" && tile.duration ? formatDuration(tile.duration) : null,
+                  selected ? `number ${position + 1}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
                 onClick={() => toggle(tile.key)}
                 className="relative aspect-square overflow-hidden bg-black"
               >

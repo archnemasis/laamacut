@@ -157,7 +157,7 @@ export function PhoneExportScreen({ status, progress, label, still, videoUrl, lo
   // Portalled to <body> so no editor layer can stack on top of it. The class
   // keeps the phone's teal accent outside the editor tree.
   return createPortal(
-    <div role="dialog" aria-label={status === "saved" ? "Saved to device" : "Exporting"} className="phone-editor dark fixed inset-0 z-[400] flex flex-col overflow-hidden bg-black text-fg">
+    <div role="dialog" aria-label={status === "saved" ? "Saved to device" : status === "naming" ? "Export" : "Exporting"} className="phone-editor dark fixed inset-0 z-[400] flex flex-col overflow-hidden bg-black text-fg">
       {status === "saved" && still && (
         <img src={still} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-40 blur-3xl" />
       )}
@@ -178,10 +178,14 @@ export function PhoneExportScreen({ status, progress, label, still, videoUrl, lo
       {status !== "saved" ? (
         <div className="relative flex flex-1 flex-col items-center px-6 pt-10">
           <h1 className="text-center text-[26px] font-bold tracking-tight">
-            {status === "error" ? "Export failed" : `Exporting in ${label}...`}
+            {status === "error" ? "Export failed" : status === "naming" ? `Ready to export in ${label}` : `Exporting in ${label}...`}
           </h1>
           <p className="mt-2 text-center text-[14px] text-fg-3">
-            {status === "error" ? error ?? "Something went wrong." : "Please don't close Laamacut or lock your screen."}
+            {status === "error"
+              ? error ?? "Something went wrong."
+              : status === "naming"
+                ? "Name your video to start."
+                : "Please don't close Laamacut or lock your screen."}
           </p>
           <div className="relative mt-12 w-[80%] bg-black" style={{ aspectRatio: String(aspect) }}>
             {still && (
@@ -192,8 +196,8 @@ export function PhoneExportScreen({ status, progress, label, still, videoUrl, lo
                 style={{ opacity: 0.12 + 0.88 * (percent / 100) }}
               />
             )}
-            <ProgressRing percent={percent} />
-            {status !== "error" && (
+            {status !== "naming" && <ProgressRing percent={percent} />}
+            {status === "exporting" && (
               <span className="absolute inset-0 grid place-items-center text-[30px] font-semibold tabular-nums [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">
                 {percent.toFixed(1)}%
               </span>
