@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AudioLines,
   Blend,
   Check,
   ChevronLeft,
@@ -48,6 +49,7 @@ import { PhoneFullscreenControls } from "./PhoneFullscreenControls";
 import { PhoneTimeline } from "./PhoneTimeline";
 import { PhoneTextEditor, type TextEditorTab } from "./PhoneTextEditor";
 import { PhoneAutoCaptions } from "./PhoneAutoCaptions";
+import { PhoneTextToSpeech } from "./PhoneTextToSpeech";
 import { PhoneGestures } from "./PhoneGestures";
 import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
@@ -186,6 +188,7 @@ export const PhoneEditor: React.FC = () => {
   const [clipMenu, setClipMenu] = useState<ClipMenu | null>(null);
   const [panel, setPanel] = useState<ClipPanel | null>(null);
   const [captionsOpen, setCaptionsOpen] = useState(false);
+  const [speechOpen, setSpeechOpen] = useState(false);
   const replaceInput = useRef<HTMLInputElement>(null);
   const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean; tab?: TextEditorTab } | null>(null);
   // New projects open straight into the media picker, like CapCut.
@@ -352,10 +355,12 @@ export const PhoneEditor: React.FC = () => {
     audio: [
       { label: "Sounds", icon: Music, onClick: () => soundInput.current?.click() },
       { label: "Record", icon: Mic, onClick: () => open({ kind: "voiceover", title: "Record" }) },
+      { label: "Text to speech", icon: AudioLines, onClick: () => setSpeechOpen(true) },
     ],
     text: [
       { label: "Add text", icon: Plus, onClick: () => void addText() },
       { label: "Auto captions", icon: Captions, onClick: () => setCaptionsOpen(true) },
+      { label: "Text to speech", icon: AudioLines, onClick: () => setSpeechOpen(true) },
       { label: "Stickers", icon: Sticker, onClick: () => open({ kind: "assets", tab: "graphics", title: "Stickers" }) },
       { label: "Text template", icon: Type, onClick: () => open({ kind: "assets", tab: "text", title: "Text template" }) },
     ],
@@ -576,6 +581,12 @@ export const PhoneEditor: React.FC = () => {
         {captionsOpen && (
           <PanelErrorBoundary name="Auto captions">
             <PhoneAutoCaptions onClose={() => setCaptionsOpen(false)} />
+          </PanelErrorBoundary>
+        )}
+
+        {speechOpen && (
+          <PanelErrorBoundary name="Text to speech">
+            <PhoneTextToSpeech onClose={() => { setSpeechOpen(false); setMenu(null); }} />
           </PanelErrorBoundary>
         )}
 
