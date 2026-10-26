@@ -18,6 +18,8 @@ const LANE_H = 36;
 const MIN_TRIM = 0.1;
 /** How close (screen px) a dragged edge or block has to come to another edge to click onto it. */
 const SNAP_PX = 12;
+/** A lane with more blocks than this is stepped through with Previous/Next for screen readers, not dozens of overlapping buttons. */
+const MANY_BLOCKS = 6;
 
 /** A half-saved clip can briefly have no time; place it at 0 rather than at NaN px. */
 const finite = (value: number | undefined): number => (Number.isFinite(value) ? (value as number) : 0);
@@ -479,7 +481,7 @@ export function PhoneTimeline({
   const mainMuted = lanes.mainTrack?.muted ?? false;
   const contentWidth = Math.max(duration, 0.1) * pps;
 
-  const renderBar = (item: LaneItem, tone: string) => {
+  const renderBar = (item: LaneItem, tone: string, quiet = false) => {
     const selected = selectedIds.has(item.id);
     const place = drafted(item.id, item.start, item.duration);
     const target = selected ? trimTarget(item) : null;
@@ -487,6 +489,7 @@ export function PhoneTimeline({
     return (
       <div
         key={item.id}
+        aria-hidden={quiet && !selected ? true : undefined}
         onPointerDown={startBarPress(item)}
         onContextMenu={(e) => e.preventDefault()}
         className={`absolute top-1 bottom-1 select-none ${selected ? "z-20" : ""} ${dragging ? "z-40 opacity-90 shadow-xl ring-2 ring-accent" : ""}`}
@@ -494,6 +497,7 @@ export function PhoneTimeline({
       >
         <button
           type="button"
+          tabIndex={quiet && !selected ? -1 : undefined}
           aria-label={`${selected ? "Selected" : "Select"} ${item.label}, ${formatPhoneTime(item.start)} to ${formatPhoneTime(item.start + item.duration)}`}
           onClick={(e) => {
             e.stopPropagation();
@@ -513,6 +517,31 @@ export function PhoneTimeline({
             <TrimHandle side="end" value={place.start + place.duration} onPointerDown={beginTrim(target, "end")} />
           </>
         )}
+      </div>
+    );
+  };
+
+  /** Select the block after (or before) the selected one, or the playhead when none is selected. */
+  const stepper = (items: LaneItem[], noun: string) => {
+    const sorted = [...items].sort((a, b) => a.start - b.start);
+    const step = (direction: 1 | -1) => {
+      const at = sorted.findIndex((item) => selectedIds.has(item.id));
+      const playhead = useTimelineStore.getState().playheadPosition;
+      const next =
+        at >= 0
+          ? sorted[at + direction]
+          : direction === 1
+            ? sorted.find((item) => item.start >= playhead - 1e-6)
+            : [...sorted].reverse().find((item) => item.start < playhead - 1e-6);
+      if (!next) return;
+      if (next.kind) select({ type: next.kind, id: next.id });
+      else select({ type: "clip", id: next.id, trackId: next.clip?.trackId });
+      useTimelineStore.getState().seekTo(next.start);
+    };
+    return (
+      <div className="sr-only">
+        <button type="button" onClick={(e) => { e.stopPropagation(); step(-1); }}>{`Previous ${noun}`}</button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); step(1); }}>{`Next ${noun}`}</button>
       </div>
     );
   };
@@ -700,16 +729,18 @@ export function PhoneTimeline({
             )}
 
             <div role="group" aria-label={`Audio, ${lanes.audio.length}`} className="relative" style={{ height: LANE_H }}>
+              {lanes.audio.length > MANY_BLOCKS && stepper(lanes.audio, "audio clip")}
               <Music aria-hidden size={16} className="absolute top-1/2 -translate-y-1/2 text-fg-3" style={{ left: -34 }} />
               {lanes.audio.length > 0
-                ? lanes.audio.map((item) => renderBar(item, "bg-[#1f7a5a]"))
+                ? lanes.audio.map((item) => renderBar(item, "bg-[#1f7a5a]", lanes.audio.length > MANY_BLOCKS))
                 : addLane("Add audio", onAddAudio)}
             </div>
 
             <div role="group" aria-label={`Text and captions, ${lanes.text.length}`} className="relative" style={{ height: LANE_H }}>
+              {lanes.text.length > MANY_BLOCKS && stepper(lanes.text, "caption")}
               <Type aria-hidden size={16} className="absolute top-1/2 -translate-y-1/2 text-fg-3" style={{ left: -34 }} />
               {lanes.text.length > 0
-                ? lanes.text.map((item) => renderBar(item, "bg-[#e8890c]"))
+                ? lanes.text.map((item) => renderBar(item, "bg-[#e8890c]", lanes.text.length > MANY_BLOCKS))
                 : addLane("Add text", onAddText)}
             </div>
           </div>

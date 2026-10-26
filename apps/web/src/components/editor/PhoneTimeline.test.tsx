@@ -120,6 +120,19 @@ describe("PhoneTimeline", () => {
     state.project = saved;
   });
 
+  it("steps through a caption-heavy lane with Previous/Next instead of dozens of buttons", () => {
+    const saved = state.project.textClips;
+    state.project.textClips = Array.from({ length: 10 }, (_, i) => ({ id: `cap${i}`, text: `Line ${i}`, startTime: i * 0.5, duration: 0.5 }));
+    render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next caption" }));
+    expect(useUIStore.getState().selectedItems).toEqual([{ type: "text-clip", id: "cap0" }]);
+    fireEvent.click(screen.getByRole("button", { name: "Next caption" }));
+    expect(useUIStore.getState().selectedItems).toEqual([{ type: "text-clip", id: "cap1" }]);
+    // The bars themselves are hidden from screen readers until one is selected.
+    expect(screen.queryByRole("button", { name: /^Select Line 5/ })).toBeNull();
+    state.project.textClips = saved;
+  });
+
   it("stretches text as far as you drag it", () => {
     useUIStore.setState({ selectedItems: [{ type: "text-clip", id: "x1" }] });
     render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);

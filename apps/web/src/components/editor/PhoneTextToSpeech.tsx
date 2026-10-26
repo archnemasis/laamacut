@@ -119,7 +119,7 @@ export function PhoneTextToSpeech({ onClose }: { onClose: () => void }) {
             </p>
             <ol className="mt-3 list-decimal space-y-1 pl-5">
               <li>Sign up free at elevenlabs.io</li>
-              <li>Open API keys and tap Create key</li>
+              <li>Open API keys and tap Create key. Switch on only Text to Speech for it, so it can't do anything else</li>
               <li>Copy the key and paste it below</li>
             </ol>
             <button
@@ -143,7 +143,7 @@ export function PhoneTextToSpeech({ onClose }: { onClose: () => void }) {
               className="h-12 w-full rounded-xl bg-[#2a2a2a] px-4 text-[15px] outline-none focus:ring-2 focus:ring-[#5ac8dc]"
             />
           </label>
-          <p className="text-[12px] text-white/50">Kept on this phone only, encrypted.</p>
+          <p className="text-[12px] text-white/50">Kept on this phone only, locked in Android's secure storage.</p>
         </div>
       ) : (
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">

@@ -63,9 +63,20 @@ export async function speak(text: string, voiceId: string, apiKey: string, signa
   return new Blob([await response.blob()], { type: "audio/mpeg" });
 }
 
-// The key is kept on the phone, encrypted with a key the app can use but
-// never read out (a non-extractable WebCrypto key), so it isn't stored as
-// plain text and there's no password to type.
+// On the phone the key goes to the Android Keystore (see SecretsPlugin.java):
+// it is encrypted with a key held in the phone's secure hardware that can't be
+// read out. Without that bridge (a browser) it falls back to a non-extractable
+// WebCrypto key kept beside it in IndexedDB.
+interface SecretsPlugin {
+  set(options: { name: string; value: string }): Promise<void>;
+  get(options: { name: string }): Promise<{ value?: string }>;
+  remove(options: { name: string }): Promise<void>;
+}
+const nativeSecrets = (): SecretsPlugin | undefined =>
+  typeof window !== "undefined"
+    ? (window as unknown as { Capacitor?: { Plugins?: { LaamacutSecrets?: SecretsPlugin } } }).Capacitor?.Plugins?.LaamacutSecrets
+    : undefined;
+
 const DB_NAME = "laamacut-voice";
 const STORE = "kv";
 
@@ -100,6 +111,11 @@ async function deviceKey(): Promise<CryptoKey> {
 }
 
 export async function saveVoiceKey(apiKey: string): Promise<void> {
+  const native = nativeSecrets();
+  if (native) {
+    await native.set({ name: "elevenlabs", value: apiKey.trim() });
+    return;
+  }
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await deviceKey(), new TextEncoder().encode(apiKey.trim()));
   await run("readwrite", (s) => s.put({ iv, data }, "elevenlabs"));
@@ -107,6 +123,8 @@ export async function saveVoiceKey(apiKey: string): Promise<void> {
 
 export async function loadVoiceKey(): Promise<string | null> {
   try {
+    const native = nativeSecrets();
+    if (native) return (await native.get({ name: "elevenlabs" })).value ?? null;
     const saved = await run<{ iv: Uint8Array<ArrayBuffer>; data: ArrayBuffer } | undefined>("readonly", (s) => s.get("elevenlabs"));
     if (!saved) return null;
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: saved.iv }, await deviceKey(), saved.data);
@@ -117,5 +135,10 @@ export async function loadVoiceKey(): Promise<string | null> {
 }
 
 export async function forgetVoiceKey(): Promise<void> {
+  const native = nativeSecrets();
+  if (native) {
+    await native.remove({ name: "elevenlabs" });
+    return;
+  }
   await run("readwrite", (s) => s.delete("elevenlabs"));
 }
