@@ -37,7 +37,7 @@ describe("compact editing workspace", () => {
     resize(820);
     const panels = useUIStore.getState().panels;
     useUIStore.setState({ keyframeEditorOpen: false, selectedItems: [], panels: {
-      ...panels, agentChat: { ...panels.agentChat, visible: false },
+      ...panels,
       audioMixer: { ...panels.audioMixer, visible: false },
     } });
     vi.spyOn(useProjectStore.getState(), "initializeAutoSave").mockResolvedValue();
@@ -77,12 +77,10 @@ describe("compact editing workspace", () => {
     expect(view.getByLabelText("Video preview")).toBeInTheDocument();
   });
 
-  it("has no AI tab and closes an AI panel left open by an older version", () => {
-    const panels = useUIStore.getState().panels;
-    useUIStore.setState({ panels: { ...panels, agentChat: { ...panels.agentChat, visible: true } } });
+  it("has no AI editor tab or chat button", () => {
     const view = render(<EditorInterface />);
     expect(view.queryByRole("button", { name: "AI" })).toBeNull();
     expect(view.queryByRole("button", { name: "AI editing" })).toBeNull();
-    expect(useUIStore.getState().panels.agentChat.visible).toBe(false);
+    expect(view.queryByRole("button", { name: "AI Editor chat" })).toBeNull();
   });
 });

@@ -9,7 +9,6 @@ import { useUIStore } from "./stores/ui-store";
 import { useProjectStore } from "./stores/project-store";
 import { useRouter } from "./hooks/use-router";
 import { useProjectRecovery } from "./hooks/useProjectRecovery";
-import { useKieAIPoller } from "./hooks/useKieAIPoller";
 import { SOCIAL_MEDIA_PRESETS, type SocialMediaCategory } from "@openreel/core";
 import { ToolcraftText as Text } from "@openreel/ui";
 
@@ -56,7 +55,6 @@ function App() {
 
   const { route, params, navigate, parsedDimensions, fps } = useRouter();
   const hasHandledInitialRoute = useRef(false);
-  useKieAIPoller();
   const showWelcome =
     // Phones always show their home screen (the old Skip on startup switch was for the web welcome).
     ["welcome", "templates", "recent"].includes(route) && (phone || !skipWelcomeScreen);

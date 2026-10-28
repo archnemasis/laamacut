@@ -1,13 +1,11 @@
 /**
  * Cloudflare Pages Function: API proxy for third-party services.
  *
- * Routes requests from the browser to ElevenLabs, OpenAI, and Anthropic
- * so that API keys never leave the same origin in production.
+ * Routes text-to-speech requests from the browser to ElevenLabs so that
+ * API keys never leave the same origin in production.
  *
  * URL pattern: /api/proxy/<service>/<path>
  *   e.g. POST /api/proxy/elevenlabs/text-to-speech/abc123
- *        POST /api/proxy/openai/chat/completions
- *        POST /api/proxy/anthropic/messages
  *
  * The API key is passed via the `x-proxy-api-key` header and translated
  * to the correct service-specific header before forwarding.
@@ -25,19 +23,6 @@ const SERVICE_CONFIG: Record<string, ServiceConfig> = {
     allowedPaths: /^(voices|models|text-to-speech\/[\w-]+)$/,
     authHeaders: (key) => ({ "xi-api-key": key }),
   },
-  openai: {
-    baseUrl: "https://api.openai.com/v1",
-    allowedPaths: /^(chat\/completions|models)$/,
-    authHeaders: (key) => ({ Authorization: `Bearer ${key}` }),
-  },
-  anthropic: {
-    baseUrl: "https://api.anthropic.com/v1",
-    allowedPaths: /^(messages)$/,
-    authHeaders: (key) => ({
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-    }),
-  },
 };
 
 const ALLOWED_ORIGINS = [
@@ -47,7 +32,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:4173",
 ];
 
-const MAX_REQUEST_BODY_BYTES = 8_388_608; // 8 MB (agent tool/state payloads)
+const MAX_REQUEST_BODY_BYTES = 1_048_576; // 1 MB (text-to-speech requests)
 const UPSTREAM_TIMEOUT_MS = 120_000;
 
 class BodyTooLargeError extends Error {}

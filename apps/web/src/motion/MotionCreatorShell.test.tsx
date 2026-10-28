@@ -161,7 +161,7 @@ describe("MotionCreatorShell layout", () => {
   it("organizes motion creation around start and workflow groups", () => {
     renderShell();
 
-    for (const label of ["Start", "Layers", "Media", "Kits", "Scenes"]) {
+    for (const label of ["Start", "Layers", "Media", "Kits"]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
 

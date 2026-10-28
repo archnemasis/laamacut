@@ -6,11 +6,19 @@ import { pruneFontsPlugin } from "./vite-plugins/prune-fonts";
 
 const isDesktop = process.env.OPENREEL_DESKTOP === "1";
 
-function desktopHtmlPlugin() {
+function indexHtmlPlugin() {
   return {
     name: "openreel-desktop-html",
     transformIndexHtml(html: string) {
-      if (!isDesktop) return html;
+      // The interface fonts ship with the app, so opening it never contacts Google.
+      if (!isDesktop) {
+        return html
+          .replace(/<link rel="preconnect"[^>]*>\s*/g, "")
+          .replace(
+            /<link href="https:\/\/fonts\.googleapis\.com[^>]*>\s*/g,
+            '<link href="/fonts/google-fonts.css" rel="stylesheet" />',
+          );
+      }
       let out = html
         .replace(/href="\/favicon\.svg"/g, 'href="./favicon.svg"')
         .replace(/href="\/manifest\.json"/g, 'href="./manifest.json"')
@@ -30,7 +38,7 @@ function desktopHtmlPlugin() {
 
 export default defineConfig({
   base: isDesktop ? "./" : "/",
-  plugins: [react(), desktopHtmlPlugin(), stripFfmpegPlugin(isDesktop), pruneFontsPlugin(isDesktop)],
+  plugins: [react(), indexHtmlPlugin(), stripFfmpegPlugin(isDesktop), pruneFontsPlugin(isDesktop)],
   assetsInclude: ["**/*.wasm"],
   resolve: {
     dedupe: ["react", "react-dom"],
@@ -39,7 +47,6 @@ export default defineConfig({
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
       "@": path.resolve(__dirname, "./src"),
       "@openreel/core": path.resolve(__dirname, "../../packages/core/src"),
-      "@openreel/agent": path.resolve(__dirname, "../../packages/agent/src"),
       "@openreel/ui": path.resolve(__dirname, "../../packages/ui/src"),
     },
   },

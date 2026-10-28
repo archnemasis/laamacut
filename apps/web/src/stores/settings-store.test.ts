@@ -4,57 +4,33 @@ import { useSettingsStore } from "./settings-store";
 describe("settings store migrations", () => {
   afterEach(() => {
     localStorage.clear();
-    useSettingsStore.setState({
-      autoSave: true,
-      defaultLlmProvider: null,
-      llmBaseUrl: "",
-      llmModel: "",
-    });
+    useSettingsStore.setState({ autoSave: true, configuredServices: [] });
   });
 
-  it("removes legacy preset selections without discarding other preferences", async () => {
+  it("drops settings left over from the removed AI features and keeps the rest", async () => {
     localStorage.setItem(
       "openreel-settings",
       JSON.stringify({
-        version: 5,
+        version: 7,
         state: {
           autoSave: false,
-          defaultLlmProvider: "openai",
-          llmModel: "previously-preselected-model",
-        },
-      }),
-    );
-
-    await useSettingsStore.persist.rehydrate();
-
-    expect(useSettingsStore.getState()).toMatchObject({
-      autoSave: false,
-      defaultLlmProvider: null,
-      llmBaseUrl: "",
-      llmModel: "",
-    });
-  });
-
-  it("migrates an explicitly configured compatible endpoint", async () => {
-    localStorage.setItem(
-      "openreel-settings",
-      JSON.stringify({
-        version: 6,
-        state: {
+          elevenLabsModel: "eleven_v3",
           defaultLlmProvider: "openai-compatible",
-          llmModel: "ignored-preset-model",
-          openaiCompatibleBaseUrl: "http://localhost:11434/v1",
-          openaiCompatibleModel: "qwen-tool-model",
+          llmBaseUrl: "http://localhost:11434/v1",
+          llmModel: "qwen",
+          defaultAggregator: "kie-ai",
+          mcpAutoAllowTrustedLocal: true,
+          configuredServices: ["elevenlabs", "openai-compatible", "kie-ai"],
         },
       }),
     );
 
     await useSettingsStore.persist.rehydrate();
 
-    expect(useSettingsStore.getState()).toMatchObject({
-      defaultLlmProvider: "openai-compatible",
-      llmBaseUrl: "http://localhost:11434/v1",
-      llmModel: "qwen-tool-model",
-    });
+    const state = useSettingsStore.getState() as unknown as Record<string, unknown>;
+    expect(state).toMatchObject({ autoSave: false, elevenLabsModel: "eleven_v3", configuredServices: ["elevenlabs"] });
+    for (const key of ["defaultLlmProvider", "llmBaseUrl", "llmModel", "defaultAggregator", "mcpAutoAllowTrustedLocal"]) {
+      expect(state[key]).toBeUndefined();
+    }
   });
 });

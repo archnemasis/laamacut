@@ -19,8 +19,6 @@ import {
   MotionTrackingSection,
   NestedSequenceSection,
   AdjustmentLayerSection,
-  BackgroundRemovalSection,
-  BehindSubjectSection,
 } from "../";
 import { InspectorSection } from "../shell/InspectorSection";
 import { MockToggle } from "../shell/InspectorControls";
@@ -44,7 +42,6 @@ export interface EffectsTabProps {
   selectedTimelineClip: Clip | null;
   showVideoControls: boolean;
   showVideoEffects: boolean;
-  showTextSection: boolean;
   appliedEditingTemplates: AppliedEditingTemplate[];
   getEditingTemplate: (templateId: string) => EditingTemplate | undefined;
   removeEditingTemplateApplication: (
@@ -99,7 +96,6 @@ export const EffectsTab: React.FC<EffectsTabProps> = ({
   selectedTimelineClip,
   showVideoControls,
   showVideoEffects,
-  showTextSection,
   appliedEditingTemplates,
   getEditingTemplate,
   removeEditingTemplateApplication,
@@ -288,12 +284,6 @@ export const EffectsTab: React.FC<EffectsTabProps> = ({
         </InspectorSection>
       )}
 
-      {clipType === "video" && (
-        <InspectorSection title="Background Removal" sectionId="background-removal" defaultOpen={false}>
-          <BackgroundRemovalSection clipId={clipId} />
-        </InspectorSection>
-      )}
-
       {/* Particle Effects - Visual particle systems */}
       {(clipType === "video" ||
         clipType === "image" ||
@@ -414,16 +404,6 @@ export const EffectsTab: React.FC<EffectsTabProps> = ({
       {showVideoControls && (
         <InspectorSection title="Adjustment Layers" defaultOpen={false}>
           <AdjustmentLayerSection clipId={clipId} />
-        </InspectorSection>
-      )}
-
-      {showTextSection && (
-        <InspectorSection
-          title="Text Behind Subject"
-          sectionId="text-behind-subject"
-          defaultOpen={false}
-        >
-          <BehindSubjectSection clipId={clipId} />
         </InspectorSection>
       )}
     </>

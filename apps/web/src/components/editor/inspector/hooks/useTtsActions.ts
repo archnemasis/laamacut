@@ -6,27 +6,21 @@ import type { ElevenLabsVoice } from "../tts-types";
 interface UseTtsActionsOptions {
   selectedVoice: string;
   text: string;
-  enhanceText: boolean;
-  enhancedPreview: string | null;
   allVoices: ElevenLabsVoice[];
   favoriteVoices: Array<{ voiceId: string; name: string; previewUrl?: string }>;
   generateWithElevenLabs: (text: string, voiceId: string, signal?: AbortSignal) => Promise<Blob>;
-  enhanceViaLlm: (text: string, signal?: AbortSignal) => Promise<string>;
   setText: (text: string) => void;
   setError: (error: string | null) => void;
-  setEnhancedPreview: (preview: string | null) => void;
 }
 
 interface UseTtsActionsReturn {
   isGenerating: boolean;
   isPlaying: boolean;
-  isEnhancing: boolean;
   generatedAudio: Blob | null;
   hasUnsavedAudio: boolean;
   successMsg: string | null;
   audioRef: React.RefObject<HTMLAudioElement | null>;
   getSelectedVoiceName: () => string;
-  handleEnhance: () => Promise<void>;
   generateSpeech: () => Promise<void>;
   togglePlayback: () => void;
   handleAudioEnded: () => void;
@@ -40,15 +34,11 @@ export function useTtsActions(options: UseTtsActionsOptions): UseTtsActionsRetur
   const {
     selectedVoice,
     text,
-    enhanceText,
-    enhancedPreview,
     allVoices,
     favoriteVoices,
     generateWithElevenLabs,
-    enhanceViaLlm,
     setText,
     setError,
-    setEnhancedPreview,
   } = options;
 
   const importMedia = useProjectStore((state) => state.importMedia);
@@ -64,7 +54,6 @@ export function useTtsActions(options: UseTtsActionsOptions): UseTtsActionsRetur
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -119,32 +108,8 @@ export function useTtsActions(options: UseTtsActionsOptions): UseTtsActionsRetur
     return "TTS";
   }, [selectedVoice, favoriteVoices, allVoices]);
 
-  const handleEnhance = useCallback(async () => {
-    if (!text.trim()) {
-      setError("Please enter some text");
-      return;
-    }
-
-    generateAbortRef.current?.abort();
-    const controller = new AbortController();
-    generateAbortRef.current = controller;
-
-    setIsEnhancing(true);
-    setError(null);
-
-    try {
-      const result = await enhanceViaLlm(text.trim(), controller.signal);
-      setEnhancedPreview(result);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Failed to enhance text");
-    } finally {
-      setIsEnhancing(false);
-    }
-  }, [text, enhanceViaLlm, setError, setEnhancedPreview]);
-
   const generateSpeech = useCallback(async () => {
-    if (!text.trim() && !enhancedPreview) {
+    if (!text.trim()) {
       setError("Please enter some text");
       return;
     }
@@ -157,9 +122,7 @@ export function useTtsActions(options: UseTtsActionsOptions): UseTtsActionsRetur
     setError(null);
 
     try {
-      const finalText = (enhanceText && enhancedPreview) ? enhancedPreview : text.trim();
-
-      const blob = await generateWithElevenLabs(finalText, selectedVoice, controller.signal);
+      const blob = await generateWithElevenLabs(text.trim(), selectedVoice, controller.signal);
 
       storeSetAudio(blob);
 
@@ -173,7 +136,7 @@ export function useTtsActions(options: UseTtsActionsOptions): UseTtsActionsRetur
     } finally {
       setIsGenerating(false);
     }
-  }, [text, enhancedPreview, enhanceText, selectedVoice, generateWithElevenLabs, setError, storeSetAudio]);
+  }, [text, selectedVoice, generateWithElevenLabs, setError, storeSetAudio]);
 
   const togglePlayback = useCallback(() => {
     if (!audioRef.current || !audioUrl) return;
@@ -272,13 +235,11 @@ export function useTtsActions(options: UseTtsActionsOptions): UseTtsActionsRetur
   return {
     isGenerating,
     isPlaying,
-    isEnhancing,
     generatedAudio,
     hasUnsavedAudio,
     successMsg,
     audioRef,
     getSelectedVoiceName,
-    handleEnhance,
     generateSpeech,
     togglePlayback,
     handleAudioEnded,

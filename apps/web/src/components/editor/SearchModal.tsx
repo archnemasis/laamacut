@@ -125,16 +125,6 @@ const SEARCHABLE_EFFECTS: SearchItem[] = [
     clipTypes: ["video", "image"],
   },
   {
-    id: "background-removal",
-    name: "Background Removal",
-    category: "Video",
-    keywords: ["background", "remove", "ai", "mask", "cutout", "person"],
-    icon: Wand2,
-    description: "AI-powered background removal",
-    sectionId: "background-removal",
-    clipTypes: ["video", "image"],
-  },
-  {
     id: "masking",
     name: "Masking",
     category: "Video",

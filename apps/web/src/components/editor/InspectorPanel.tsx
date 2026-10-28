@@ -929,7 +929,6 @@ export const InspectorPanel: React.FC<{ only?: InspectorTabId }> = ({ only }) =>
                   selectedTimelineClip={selectedTimelineClip}
                   showVideoControls={showVideoControls}
                   showVideoEffects={showVideoEffects}
-                  showTextSection={showTextSection}
                   appliedEditingTemplates={appliedEditingTemplates}
                   getEditingTemplate={getEditingTemplate}
                   removeEditingTemplateApplication={removeEditingTemplateApplication}

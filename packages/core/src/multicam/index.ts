@@ -3,7 +3,7 @@ export * from "./manifest";
 export * from "./drift";
 export * from "./bleed-calibration";
 export * from "./orma";
-export * from "./silero-vad";
+export * from "./voice-activity";
 export * from "./shot-planner";
 export * from "./cut-review";
 export * from "./otio";

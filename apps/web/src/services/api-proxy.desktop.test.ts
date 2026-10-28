@@ -22,12 +22,12 @@ afterEach(() => {
 
 describe("apiFetch desktop branch", () => {
   it("routes through window.openreel.cloud.fetch and ignores the passed key", async () => {
-    const res = await apiFetch("openai", "/chat/completions", "IGNORED", {
+    const res = await apiFetch("elevenlabs", "/text-to-speech/voice", "IGNORED", {
       method: "POST",
       body: "{}",
     });
 
-    expect(cloudFetch).toHaveBeenCalledWith("openai", "/chat/completions", {
+    expect(cloudFetch).toHaveBeenCalledWith("elevenlabs", "/text-to-speech/voice", {
       method: "POST",
       headers: undefined,
       body: "{}",
@@ -47,37 +47,4 @@ describe("apiFetch desktop branch", () => {
     });
   });
 
-  it("forwards a custom base URL for desktop-compatible endpoints", async () => {
-    await apiFetch("openai-compatible", "/chat/completions", "", {
-      method: "POST",
-      baseUrl: "http://localhost:11434/v1",
-      body: "{}",
-    });
-    expect(cloudFetch).toHaveBeenCalledWith(
-      "openai-compatible",
-      "/chat/completions",
-      {
-        method: "POST",
-        headers: undefined,
-        body: "{}",
-        baseUrl: "http://localhost:11434/v1",
-      },
-    );
-  });
-
-  it("forwards Anthropic-compatible model discovery", async () => {
-    await apiFetch("anthropic-compatible", "/models", "", {
-      baseUrl: "https://gateway.example/v1",
-    });
-    expect(cloudFetch).toHaveBeenCalledWith(
-      "anthropic-compatible",
-      "/models",
-      {
-        method: undefined,
-        headers: undefined,
-        body: undefined,
-        baseUrl: "https://gateway.example/v1",
-      },
-    );
-  });
 });

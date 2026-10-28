@@ -50,7 +50,6 @@ import {
 import { ToolcraftClickableCard, ToolcraftText } from "@openreel/ui";
 import { useProjectStore } from "../../stores/project-store";
 import { useMotionStore } from "../stores/motion-store";
-import { GenerateShaderBox } from "./GenerateShaderBox";
 import { ShaderPreviewBrowser } from "../../components/shaders/ShaderPreviewBrowser";
 import { MotionEffectPreview } from "./MotionEffectPreview";
 import {
@@ -583,12 +582,6 @@ export function EffectsPanel({ composition, embedded = false }: EffectsPanelProp
             sample="effect"
             label="Effect previews"
           />
-          <div className="mt-2">
-            <GenerateShaderBox
-              category="effect"
-              onGenerated={(def) => addShaderEffect(def.id)}
-            />
-          </div>
         </Section>
 
         <Section title="Expression controls" icon={SlidersHorizontal}>

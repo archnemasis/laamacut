@@ -280,10 +280,6 @@ export interface ProjectState {
     clipId: string,
     transform: Partial<Transform>,
   ) => TextClip | null;
-  updateTextBehindSubject: (
-    clipId: string,
-    behindSubject: boolean,
-  ) => TextClip | null;
   updateText3D: (
     clipId: string,
     text3d: import("@openreel/core").Text3DSettings | undefined,

@@ -98,7 +98,7 @@ describe("analyzeMulticamActivity", () => {
     expect(activity.points[0]?.activeAngleIds).toEqual(["a", "b"]);
   });
 
-  it("uses Silero probabilities to reject non-speech energy", () => {
+  it("uses voice detection probabilities to reject non-speech energy", () => {
     const activity = analyzeMulticamActivity(
       [
         {

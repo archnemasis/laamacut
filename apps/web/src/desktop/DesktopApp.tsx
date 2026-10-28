@@ -10,9 +10,6 @@ import { useProjectStore } from "../stores/project-store";
 import { autoSaveManager } from "../services/auto-save";
 import { UpdateBanner } from "./UpdateBanner";
 import { installRendererCrashHandlers, reportRendererCrash } from "./crash-reporting";
-import { installMcpListener } from "../services/agent/mcp-listener";
-import { getLiveEditorHost } from "../services/agent/host-singleton";
-import { createExportJobRunner } from "../services/agent/export-job-runner";
 import { useSettingsStore } from "../stores/settings-store";
 import { useThemeStore } from "../stores/theme-store";
 import { SettingsDialog } from "../components/editor/settings/SettingsDialog";
@@ -90,15 +87,6 @@ export function DesktopApp(): JSX.Element {
   // Forward uncaught renderer errors + unhandled rejections to the native crash
   // collector so editor-side faults are captured alongside main-process crashes.
   useEffect(() => installRendererCrashHandlers(), []);
-
-  // Serve main-process MCP tool calls against the live editor so external MCP
-  // clients drive the open project through the same tool layer as the chat panel.
-  // Also back the export_* job tools with a runner that renders via the export
-  // engine and uploads the artifact to R2, returning a presigned download URL.
-  useEffect(() => {
-    getLiveEditorHost().setJobRunner(createExportJobRunner());
-    return installMcpListener();
-  }, []);
 
   // Answer the native unsaved-changes guard on window close / quit: report
   // dirty state and flush pending changes on request.

@@ -114,15 +114,6 @@ export type OpenReelAuroraSequenceSessionEvent =
       error: string;
     };
 
-export interface OpenReelMcpStatus {
-  running: boolean;
-  url: string;
-  port: number;
-  token: string;
-  shimPath: string;
-  endpointFile: string;
-}
-
 export interface OpenReelRiggingBackendProbe {
   available: boolean;
   provider: "blender";
@@ -228,18 +219,12 @@ declare global {
       };
       cloud: {
         fetch(
-          service:
-            | "elevenlabs"
-            | "openai"
-            | "anthropic"
-            | "openai-compatible"
-            | "anthropic-compatible",
+          service: "elevenlabs",
           path: string,
           options?: {
             method?: string;
             headers?: Record<string, string>;
             body?: string;
-            baseUrl?: string;
           },
         ): Promise<{ status: number; statusText: string; headers: Record<string, string>; body: ArrayBuffer }>;
       };
@@ -260,19 +245,6 @@ declare global {
       };
       crash: {
         report(payload: { message: string; stack?: string; type?: string; context?: unknown }): void;
-      };
-      mcp?: {
-        onRequest(
-          handler: (req: {
-            callId: string;
-            kind: "listTools" | "callTool";
-            name?: string;
-            args?: Record<string, unknown>;
-          }) => Promise<{ ok: boolean; result?: unknown; error?: string }>,
-        ): () => void;
-        getStatus(): Promise<OpenReelMcpStatus>;
-        rotateToken(): Promise<OpenReelMcpStatus>;
-        testConnection(): Promise<{ ok: boolean; message?: string; toolCount?: number }>;
       };
       media: {
         generateProxy(args: { srcPath: string; preset: "low" | "medium" | "high" }): Promise<{ outPath: string }>;

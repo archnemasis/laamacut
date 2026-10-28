@@ -13,7 +13,6 @@ export type Bindings = {
   SHARES_BUCKET: R2Bucket;
   /** optional: durable marketplace storage; when absent an in-memory store is used */
   ASSETS_BUCKET?: R2Bucket;
-  AI: Ai;
   ENVIRONMENT: string;
   /** secret used to verify HMAC-sealed marketplace events (§41.5) */
   EVENT_HMAC_SECRET?: string;

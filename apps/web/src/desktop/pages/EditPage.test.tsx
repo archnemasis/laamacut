@@ -1,7 +1,6 @@
 import "../../test/install-local-storage-mock";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useUIStore } from "../../stores/ui-store";
 
 vi.mock("../../components/editor/AssetsPanel", () => ({
   AssetsPanel: ({ tab }: { tab?: string }) => <div>Media panel {tab}</div>,
@@ -19,17 +18,6 @@ vi.mock("../../components/editor/Timeline", () => ({
 import { EditPage } from "./EditPage";
 
 describe("EditPage layout", () => {
-  beforeEach(() => {
-    // A layout saved while the old AI Editor dock was open must not bring it back.
-    const panels = useUIStore.getState().panels;
-    useUIStore.setState({
-      panels: {
-        ...panels,
-        agentChat: { ...panels.agentChat, visible: true },
-      },
-    });
-  });
-
   afterEach(() => {
     cleanup();
     window.localStorage.clear();

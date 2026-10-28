@@ -44,9 +44,4 @@ export const CHANNELS = {
   updaterDownload: "openreel:updater:download",
   updaterInstall: "openreel:updater:install",
   crashReport: "openreel:crash:report",
-  mcpRequest: "openreel:mcp:request",
-  mcpResponse: "openreel:mcp:response",
-  mcpGetStatus: "openreel:mcp:getStatus",
-  mcpRotateToken: "openreel:mcp:rotateToken",
-  mcpTestConnection: "openreel:mcp:testConnection",
 } as const;

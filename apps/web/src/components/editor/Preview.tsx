@@ -66,7 +66,6 @@ import {
   type Mask,
   type AdjustmentLayer,
   type BlendMode,
-  type MediaItem,
   getTrackTransitionAudioFades,
   resolveCanvasFitDimensions,
   getMediaItemCapabilities,
@@ -124,16 +123,12 @@ import {
 import { APPS_BY_RATIO, AppIcon } from "./aspect-apps";
 import { ASPECT_PRESETS } from "./canvas-presets";
 import {
-  getPersonSegmentationEngine,
-  getBackgroundRemovalEngine,
-  createMotionAwareOcclusionMask,
   getStabilizedTransform,
   getVidstabEngine,
 } from "@openreel/core";
 import type {
   GSAPMotionPathPoint,
   MotionPathConfig,
-  SegmentationResult,
 } from "@openreel/core";
 
 interface GPULayer {
@@ -197,11 +192,6 @@ const applyPreviewAdjustmentLayers = async (
 };
 
 const clipNeedsFrameProcessing = (clipId: string): boolean => {
-  const bgEngine = getBackgroundRemovalEngine();
-  if (bgEngine?.isInitialized() && bgEngine.getSettings(clipId).enabled) {
-    return true;
-  }
-
   const effectsBridge = getEffectsBridge();
   if (!effectsBridge.isInitialized()) {
     return false;
@@ -215,10 +205,6 @@ const clipNeedsFrameProcessing = (clipId: string): boolean => {
 };
 
 const clipCssFilterOnly = (clipId: string): string | null => {
-  const bgEngine = getBackgroundRemovalEngine();
-  if (bgEngine?.isInitialized() && bgEngine.getSettings(clipId).enabled) {
-    return null;
-  }
   const effectsBridge = getEffectsBridge();
   if (!effectsBridge.isInitialized()) {
     return null;
@@ -533,62 +519,6 @@ const renderAllLayersWithGPU = async (
   }
 };
 
-const hasBehindSubjectText = (textClips: TextClip[]): boolean =>
-  textClips.some((textClip) => textClip.behindSubject);
-
-const getBehindSubjectStreamId = (
-  tracks: readonly Track[],
-  time: number,
-  getMediaItem: (mediaId: string) => MediaItem | undefined,
-): string => {
-  const activeSourceIds = tracks
-    .filter((track) => !track.hidden)
-    .flatMap((track) =>
-      track.clips
-        .filter(
-          (clip) =>
-            time >= clip.startTime &&
-            time < clip.startTime + clip.duration &&
-            getMediaItemCapabilities(getMediaItem(clip.mediaId)).visual,
-        )
-        .map((clip) => clip.id),
-    )
-    .sort();
-  return `editor:text-behind-subject:${activeSourceIds.join("|") || "canvas"}`;
-};
-
-const subjectMaskRequestCache = new WeakMap<
-  ImageBitmap,
-  Map<string, Promise<SegmentationResult | null>>
->();
-const subjectOcclusionMaskCache = new WeakMap<
-  ImageBitmap,
-  WeakMap<SegmentationResult, ImageData>
->();
-
-const getSubjectMaskForFrame = (
-  subjectFrame: ImageBitmap,
-  time: number,
-  realtime: boolean,
-  streamId: string,
-): Promise<SegmentationResult | null> => {
-  let requests = subjectMaskRequestCache.get(subjectFrame);
-  if (!requests) {
-    requests = new Map();
-    subjectMaskRequestCache.set(subjectFrame, requests);
-  }
-  const key = `${streamId}:${time}:${Number(realtime)}`;
-  const cached = requests.get(key);
-  if (cached) return cached;
-  const request = getPersonSegmentationEngine().getPersonMask(subjectFrame, {
-    timestampMs: time * 1000,
-    streamId,
-    realtime,
-  });
-  requests.set(key, request);
-  return request;
-};
-
 const createTransparentCanvasSource = (
   width: number,
   height: number,
@@ -608,112 +538,6 @@ const createTransparentImageBitmap = async (
     return await createImageBitmap(createTransparentCanvasSource(width, height));
   } catch {
     return null;
-  }
-};
-
-const captureSubjectFrame = async (
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-): Promise<ImageBitmap | null> => {
-  try {
-    return await createImageBitmap(
-      ctx.canvas as HTMLCanvasElement | OffscreenCanvas,
-      0,
-      0,
-      width,
-      height,
-    );
-  } catch {
-    return null;
-  }
-};
-
-const applySubjectOcclusionMask = (
-  textCtx: CanvasRenderingContext2D,
-  subjectFrame: ImageBitmap | null,
-  canvasWidth: number,
-  canvasHeight: number,
-  maskResult: SegmentationResult | null,
-): boolean => {
-  if (!subjectFrame || !maskResult) return false;
-
-  try {
-    const maskCanvas = new OffscreenCanvas(maskResult.width, maskResult.height);
-    const maskCtx = maskCanvas.getContext("2d");
-    if (!maskCtx) return false;
-
-    let occlusionMask = subjectOcclusionMaskCache
-      .get(subjectFrame)
-      ?.get(maskResult);
-    if (!occlusionMask) {
-      occlusionMask = maskResult.mask;
-    }
-    if (
-      !subjectOcclusionMaskCache.get(subjectFrame)?.has(maskResult) &&
-      maskResult.referenceWidth > 0 &&
-      maskResult.referenceHeight > 0 &&
-      maskResult.referenceRgba.length ===
-        maskResult.referenceWidth * maskResult.referenceHeight * 4
-    ) {
-      try {
-        const currentReferenceCanvas = new OffscreenCanvas(
-          maskResult.referenceWidth,
-          maskResult.referenceHeight,
-        );
-        const currentReferenceCtx = currentReferenceCanvas.getContext("2d", {
-          willReadFrequently: true,
-        });
-        if (currentReferenceCtx) {
-          currentReferenceCtx.drawImage(
-            subjectFrame,
-            0,
-            0,
-            maskResult.referenceWidth,
-            maskResult.referenceHeight,
-          );
-          const currentRgba = currentReferenceCtx.getImageData(
-            0,
-            0,
-            maskResult.referenceWidth,
-            maskResult.referenceHeight,
-          ).data;
-          const motionAwareMaskRgba = createMotionAwareOcclusionMask(
-            maskResult.mask.data,
-            maskResult.width,
-            maskResult.height,
-            maskResult.referenceRgba,
-            currentRgba,
-            maskResult.referenceWidth,
-            maskResult.referenceHeight,
-          );
-          occlusionMask = new ImageData(maskResult.width, maskResult.height);
-          occlusionMask.data.set(motionAwareMaskRgba);
-        }
-      } catch {
-        // Keep using the exact matte if frame readback or motion estimation
-        // fails. Dropping the whole text layer here creates a visible blink.
-        occlusionMask = maskResult.mask;
-      }
-    }
-
-    let frameMasks = subjectOcclusionMaskCache.get(subjectFrame);
-    if (!frameMasks) {
-      frameMasks = new WeakMap();
-      subjectOcclusionMaskCache.set(subjectFrame, frameMasks);
-    }
-    frameMasks.set(maskResult, occlusionMask);
-
-    maskCtx.putImageData(occlusionMask, 0, 0);
-    textCtx.save();
-    textCtx.globalCompositeOperation = "destination-out";
-    textCtx.imageSmoothingEnabled = true;
-    textCtx.imageSmoothingQuality = "high";
-    textCtx.drawImage(maskCanvas, 0, 0, canvasWidth, canvasHeight);
-    textCtx.restore();
-    return true;
-  } catch {
-    return false;
   }
 };
 
@@ -790,66 +614,21 @@ const renderShapeClipWithEffects = async (
   );
 };
 
-const renderTextClipWithSubjectMask = async (
+const renderTextClipWithEffects = (
   ctx: CanvasRenderingContext2D,
   textClip: TextClip,
   canvasWidth: number,
   canvasHeight: number,
   time: number,
-  subjectFrame: ImageBitmap | null,
-  realtime = true,
-  streamId = "editor:text-behind-subject:canvas",
-): Promise<void> => {
-  let subjectMask: SegmentationResult | null = null;
-  if (textClip.behindSubject && subjectFrame) {
-    const segEngine = getPersonSegmentationEngine();
-    if (segEngine.isInitialized()) {
-      subjectMask = await getSubjectMaskForFrame(
-        subjectFrame,
-        time,
-        realtime,
-        streamId,
-      );
-    }
-    // During the worker's first realtime inference, keep the text hidden
-    // instead of flashing it in front of the subject for one or two frames.
-    if (!subjectMask && realtime) return;
-  }
-
-  const renderTextLayer = (targetCtx: CanvasRenderingContext2D) =>
-    renderOverlayLayerWithEffects(
-      targetCtx,
-      textClip.id,
-      canvasWidth,
-      canvasHeight,
-      (layerCtx, width, height) =>
-        renderTextClipToCanvas(layerCtx, textClip, width, height, time),
-    );
-
-  if (!textClip.behindSubject || !subjectFrame || !subjectMask) {
-    await renderTextLayer(ctx);
-    return;
-  }
-
-  const textLayerCanvas = document.createElement("canvas");
-  textLayerCanvas.width = canvasWidth;
-  textLayerCanvas.height = canvasHeight;
-  const textLayerCtx = textLayerCanvas.getContext("2d");
-  if (!textLayerCtx) return;
-  await renderTextLayer(textLayerCtx);
-  if (
-    !applySubjectOcclusionMask(
-      textLayerCtx,
-      subjectFrame,
-      canvasWidth,
-      canvasHeight,
-      subjectMask,
-    )
-  ) {
-    return;
-  }
-  ctx.drawImage(textLayerCanvas, 0, 0, canvasWidth, canvasHeight);
-};
+): Promise<void> =>
+  renderOverlayLayerWithEffects(
+    ctx,
+    textClip.id,
+    canvasWidth,
+    canvasHeight,
+    (layerCtx, width, height) =>
+      renderTextClipToCanvas(layerCtx, textClip, width, height, time),
+  );
 
 interface ClipWithPlaceholder {
   isPlaceholder?: boolean;
@@ -2021,13 +1800,7 @@ export const Preview: React.FC = () => {
       canvasWidth: number,
       canvasHeight: number,
       mode: "below-video" | "above-video" | "all" = "all",
-      subjectFrame: ImageBitmap | null = null,
     ) => {
-      const subjectStreamId = getBehindSubjectStreamId(
-        tracks,
-        time,
-        getMediaItem,
-      );
       const videoImageTrackIndices = tracks
         .map((t, idx) => ({ track: t, originalIndex: idx }))
         .filter(
@@ -2088,15 +1861,12 @@ export const Preview: React.FC = () => {
           (clip) => clip.trackId === track.id,
         );
         for (const textClip of trackTextClips) {
-          await renderTextClipWithSubjectMask(
+          await renderTextClipWithEffects(
             ctx,
             textClip,
             canvasWidth,
             canvasHeight,
             time,
-            subjectFrame,
-            isPlaying,
-            subjectStreamId,
           );
         }
       }
@@ -2920,7 +2690,6 @@ export const Preview: React.FC = () => {
                 canvas.width,
                 canvas.height,
                 "above-video",
-                hasBehindSubjectText(activeTextClips) ? blendedFrame : null,
               );
               if (processedA !== clipAFrame) closeOnce(processedA);
               if (processedB && processedB !== clipBFrame) closeOnce(processedB);
@@ -2988,7 +2757,6 @@ export const Preview: React.FC = () => {
               canvas.width,
               canvas.height,
               "above-video",
-              hasBehindSubjectText(activeTextClips) ? validFrame : null,
             );
             if (processed !== clipAFrame) {
               closeOnce(processed);
@@ -3034,7 +2802,6 @@ export const Preview: React.FC = () => {
               canvas.width,
               canvas.height,
               "above-video",
-              hasBehindSubjectText(activeTextClips) ? validFrame : null,
             );
             if (processed !== clipBFrame) {
               closeOnce(processed);
@@ -3079,8 +2846,6 @@ export const Preview: React.FC = () => {
         // Higher index = rendered first (appears behind), Lower index = rendered last (appears on top)
         const allRenderableTracks = getVisibleTrackRenderOrder(timelineTracks);
 
-        let subjectFrame: ImageBitmap | null = null;
-        const shouldCompositeSubject = hasBehindSubjectText(activeTextClips);
         let blurBackdropDrawn = false;
 
         for (const { track } of allRenderableTracks) {
@@ -3234,14 +2999,6 @@ export const Preview: React.FC = () => {
                     }
                   }
 
-                  if (shouldCompositeSubject) {
-                    subjectFrame?.close();
-                    subjectFrame = await captureSubjectFrame(
-                      ctx,
-                      canvas.width,
-                      canvas.height,
-                    );
-                  }
                   frame.close();
                 }
               }
@@ -3275,21 +3032,17 @@ export const Preview: React.FC = () => {
             (clip) => clip.trackId === track.id,
           );
           for (const textClip of trackTextClips) {
-            await renderTextClipWithSubjectMask(
+            await renderTextClipWithEffects(
               ctx,
               textClip,
               canvas.width,
               canvas.height,
               time,
-              subjectFrame,
-              isPlaying,
-              getBehindSubjectStreamId(timelineTracks, time, getMediaItem),
             );
 
             hasRenderedFrame = true;
           }
         }
-        subjectFrame?.close();
       }
 
       const activeSubtitles = getActiveSubtitles(allSubtitles, time);
@@ -3503,15 +3256,12 @@ export const Preview: React.FC = () => {
           (clip) => clip.trackId === track.id,
         );
         for (const textClip of trackTextClips) {
-          await renderTextClipWithSubjectMask(
+          await renderTextClipWithEffects(
             ctx,
             textClip,
             canvas.width,
             canvas.height,
             time,
-            null,
-            isPlaying,
-            getBehindSubjectStreamId(timelineTracks, time, getMediaItem),
           );
           hasRenderedContent = true;
         }
@@ -4123,26 +3873,16 @@ export const Preview: React.FC = () => {
                 activeShapeClipsTr.length > 0 ||
                 activeTextClipsTr.length > 0
               ) {
-                const transitionSubjectFrame = hasBehindSubjectText(
+                await renderOverlayClipsInTrackOrder(
+                  ctx,
+                  timelineTracksRef.current,
+                  activeShapeClipsTr,
                   activeTextClipsTr,
-                )
-                  ? await captureSubjectFrame(ctx, canvas.width, canvas.height)
-                  : null;
-                try {
-                  await renderOverlayClipsInTrackOrder(
-                    ctx,
-                    timelineTracksRef.current,
-                    activeShapeClipsTr,
-                    activeTextClipsTr,
-                    currentPlayhead,
-                    canvas.width,
-                    canvas.height,
-                    "all",
-                    transitionSubjectFrame,
-                  );
-                } finally {
-                  transitionSubjectFrame?.close();
-                }
+                  currentPlayhead,
+                  canvas.width,
+                  canvas.height,
+                  "all",
+                );
               }
 
               const activeSubtitlesTr = getActiveSubtitles(
@@ -4427,29 +4167,6 @@ export const Preview: React.FC = () => {
           currentPlayhead,
         );
 
-        const bgEngine = getBackgroundRemovalEngine();
-        const hasBgRemoval = bgEngine?.isInitialized() && bgEngine.getSettings(clip.id).enabled;
-
-        let videoFrame: HTMLVideoElement | ImageBitmap = video;
-        if (hasBgRemoval) {
-          try {
-            const rawBitmap = await createImageBitmap(video);
-            const processed = await applyEffectsToFrame(clip.id, rawBitmap);
-            if (!isActive || !nativePlaybackActiveRef.current) {
-              if (processed !== rawBitmap) {
-                processed.close();
-              }
-              rawBitmap.close();
-              return;
-            }
-            if (processed !== rawBitmap) {
-              rawBitmap.close();
-            }
-            videoFrame = processed;
-          } catch {
-            videoFrame = video;
-          }
-        }
 
         let finalTransform = transform;
         const vidstabEng = getVidstabEngine();
@@ -4469,22 +4186,15 @@ export const Preview: React.FC = () => {
           );
         }
 
-        const nativeCssFilter =
-          videoFrame === video ? clipCssFilterOnly(clip.id) : null;
+        const nativeCssFilter = clipCssFilterOnly(clip.id);
         drawFrameWithTransform(
           ctx,
-          videoFrame,
+          video,
           finalTransform,
           canvas.width,
           canvas.height,
           nativeCssFilter ?? undefined,
         );
-        if (videoFrame !== video && videoFrame instanceof ImageBitmap) {
-          videoFrame.close();
-        }
-        const subjectFrame = hasBehindSubjectText(activeTextClips)
-          ? await captureSubjectFrame(ctx, canvas.width, canvas.height)
-          : null;
 
         // Use CPU canvas2D for all overlays - more reliable than GPU compositing
         // Render all text/graphics overlays (they're above the video since backgrounds are separate)
@@ -4502,10 +4212,8 @@ export const Preview: React.FC = () => {
             canvas.width,
             canvas.height,
             "all",
-            subjectFrame,
           );
         }
-        subjectFrame?.close();
 
         const activeSubtitles = getActiveSubtitles(
           allSubtitles,
@@ -4639,7 +4347,6 @@ export const Preview: React.FC = () => {
       if (!player || !canvas || !ctx || !canvas.parentElement) return null;
       if (canvasFillModeRef.current === "blur") return null;
       if (!canUseNativeVideoPlayback(startPosition).canUse) return null;
-      if (hasBehindSubjectText(allTextClipsRef.current)) return null;
 
       const tracks = timelineTracksRef.current.filter((track) => !track.hidden);
       const transitionBridge = getTransitionBridge();
@@ -5832,43 +5539,23 @@ export const Preview: React.FC = () => {
                   );
                   ctx.drawImage(blended, 0, 0, canvas.width, canvas.height);
 
-                  const transitionSubjectFrame = hasBehindSubjectText(
-                    activeTextClips,
-                  )
-                    ? await captureSubjectFrame(
-                        ctx,
-                        canvas.width,
-                        canvas.height,
-                      )
-                    : null;
-                  try {
-                    for (const shapeClip of activeShapeClips) {
-                      await renderShapeClipWithEffects(
-                        ctx,
-                        shapeClip,
-                        canvas.width,
-                        canvas.height,
-                        currentPlayhead,
-                      );
-                    }
-                    for (const textClip of activeTextClips) {
-                      await renderTextClipWithSubjectMask(
-                        ctx,
-                        textClip,
-                        canvas.width,
-                        canvas.height,
-                        currentPlayhead,
-                        transitionSubjectFrame,
-                        true,
-                        getBehindSubjectStreamId(
-                          timelineTracksRef.current,
-                          currentPlayhead,
-                          getMediaItem,
-                        ),
-                      );
-                    }
-                  } finally {
-                    transitionSubjectFrame?.close();
+                  for (const shapeClip of activeShapeClips) {
+                    await renderShapeClipWithEffects(
+                      ctx,
+                      shapeClip,
+                      canvas.width,
+                      canvas.height,
+                      currentPlayhead,
+                    );
+                  }
+                  for (const textClip of activeTextClips) {
+                    await renderTextClipWithEffects(
+                      ctx,
+                      textClip,
+                      canvas.width,
+                      canvas.height,
+                      currentPlayhead,
+                    );
                   }
                   const activeSubtitlesTr = getActiveSubtitles(
                     allSubtitlesRef.current,
@@ -5938,9 +5625,7 @@ export const Preview: React.FC = () => {
           const sortedClips = [...activeClips].sort(
             (a, b) => b.trackIndex - a.trackIndex,
           );
-          const activeTextNeedsSubject = hasBehindSubjectText(activeTextClips);
-          const useGPUFrames =
-            rendererRef.current?.type === "webgpu" && !activeTextNeedsSubject;
+          const useGPUFrames = rendererRef.current?.type === "webgpu";
 
           const imageClipFrames: Array<{
             clip: (typeof sortedClips)[0]["clip"];
@@ -6159,7 +5844,6 @@ export const Preview: React.FC = () => {
             const useGPU =
               rendererRef.current &&
               rendererRef.current.type === "webgpu" &&
-              !activeTextNeedsSubject &&
               currentTextClips.length === 0 &&
               currentShapeClips.length === 0 &&
               !hasActiveMotionInstances(currentPlayhead) &&
@@ -6215,7 +5899,6 @@ export const Preview: React.FC = () => {
                 bitmap.close();
               }
             } else {
-              let subjectFrame: ImageBitmap | null = null;
               for (const { track, originalIndex } of allRenderableTracks) {
                 const trackFrames = validFrames.filter(
                   (frame) =>
@@ -6231,14 +5914,6 @@ export const Preview: React.FC = () => {
                     canvas.height,
                     currentPlayhead,
                   );
-                  if (activeTextNeedsSubject) {
-                    subjectFrame?.close();
-                    subjectFrame = await captureSubjectFrame(
-                      ctx,
-                      canvas.width,
-                      canvas.height,
-                    );
-                  }
                 }
                 const trackShapeClips = activeShapeClips.filter(
                   (clip) => clip.trackId === track.id,
@@ -6263,23 +5938,15 @@ export const Preview: React.FC = () => {
                   (clip) => clip.trackId === track.id,
                 );
                 for (const textClip of trackTextClips) {
-                  await renderTextClipWithSubjectMask(
+                  await renderTextClipWithEffects(
                     ctx,
                     textClip,
                     canvas.width,
                     canvas.height,
                     currentPlayhead,
-                    subjectFrame,
-                    true,
-                    getBehindSubjectStreamId(
-                      timelineTracksRef.current,
-                      currentPlayhead,
-                      getMediaItem,
-                    ),
                   );
                 }
               }
-              subjectFrame?.close();
             }
 
             for (const frame of validVideoFrames) {

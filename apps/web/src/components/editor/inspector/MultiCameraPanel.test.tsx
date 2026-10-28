@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { analyzeSileroVad, ActionExecutor, multicamEngine, type Clip } from "@openreel/core";
+import { analyzeVoiceActivity, ActionExecutor, multicamEngine, type Clip } from "@openreel/core";
 import { useProjectStore } from "../../../stores/project-store";
 import { useEngineStore } from "../../../stores/engine-store";
 import { useUIStore } from "../../../stores/ui-store";
@@ -13,7 +13,7 @@ import { loadAudioBuffer } from "../../../utils/load-audio-buffer";
 import { analyzeMulticamSyncInWorker } from "./multicam-workflow";
 vi.mock("../../../utils/load-audio-buffer", () => ({ loadAudioBuffer: vi.fn() }));
 vi.mock("../../../services/multicam-analysis-store", () => ({ saveMulticamArtifact: vi.fn().mockResolvedValue("artifact"), loadMulticamArtifact: vi.fn() }));
-vi.mock("@openreel/core", async (original) => ({ ...await original<typeof import("@openreel/core")>(), analyzeSileroVad: vi.fn() }));
+vi.mock("@openreel/core", async (original) => ({ ...await original<typeof import("@openreel/core")>(), analyzeVoiceActivity: vi.fn() }));
 vi.mock("./multicam-workflow", async (original) => ({ ...await original<typeof import("./multicam-workflow")>(), analyzeMulticamSyncInWorker: vi.fn() }));
 
 const clip = (id: string): Clip => ({
@@ -90,7 +90,7 @@ describe("multicam inspector workflow", () => {
     vi.mocked(analyzeMulticamSyncInWorker).mockImplementation(async (buffers) => ({
       results: new Map([...buffers.keys()].map((id) => [id, { offset: 0, confidence: 1, method: "audio" as const }])), drift: {},
     }));
-    vi.mocked(analyzeSileroVad).mockResolvedValue({ windowMs: 50, probabilities: new Float32Array(240).fill(0.99) });
+    vi.mocked(analyzeVoiceActivity).mockResolvedValue({ windowMs: 50, probabilities: new Float32Array(240).fill(0.99) });
     await createGroup();
     fireEvent.click(screen.getByRole("button", { name: "Auto Edit" }));
     await waitFor(() => expect(store().project.timeline.tracks.length).toBeGreaterThan(2));

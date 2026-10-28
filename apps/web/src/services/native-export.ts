@@ -106,7 +106,6 @@ function plainText(text: TextClip): boolean {
     (text.keyframes?.length ?? 0) === 0 &&
     (text.effects?.length ?? 0) === 0 &&
     !text.emphasisAnimation &&
-    !text.behindSubject &&
     !text.text3d?.enabled &&
     (!text.blendMode || text.blendMode === "normal") &&
     (text.blendOpacity === undefined || text.blendOpacity === 1)

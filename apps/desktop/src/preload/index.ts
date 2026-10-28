@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { CHANNELS } from "../shared/channels";
-import type { McpBridgeRequest } from "../shared/mcp";
 
 contextBridge.exposeInMainWorld("openreel", {
   platform: "desktop",
@@ -80,7 +79,6 @@ contextBridge.exposeInMainWorld("openreel", {
         method?: string;
         headers?: Record<string, string>;
         body?: string;
-        baseUrl?: string;
       },
     ) => ipcRenderer.invoke(CHANNELS.cloudFetch, { service, path, ...(options ?? {}) }),
   },
@@ -116,40 +114,11 @@ contextBridge.exposeInMainWorld("openreel", {
   },
   crash: {
     // Fire-and-forget renderer error reporting; the main process attaches app
-    // version/platform and forwards to the cloud crash collector.
+    // version/platform and appends it to the local crash.log (nothing is uploaded).
     report: (payload: { message: string; stack?: string; type?: string; context?: unknown }) =>
       ipcRenderer.send(CHANNELS.crashReport, payload),
   },
-  mcp: {
-    // The main-process MCP server pushes tool-call / list-tool requests here; the
-    // renderer runs them against the live editor and replies on the result
-    // channel, correlated by callId so concurrent calls don't cross-wire.
-    onRequest: (
-      handler: (
-        req: McpBridgeRequest,
-      ) => Promise<{ ok: boolean; result?: unknown; error?: string }>,
-    ) => {
-      const listener = (_event: unknown, req: McpBridgeRequest) => {
-        void Promise.resolve()
-          .then(() => handler(req))
-          .then((res) =>
-            ipcRenderer.send(CHANNELS.mcpResponse, { callId: req.callId, ...res }),
-          )
-          .catch((error) =>
-            ipcRenderer.send(CHANNELS.mcpResponse, {
-              callId: req.callId,
-              ok: false,
-              error: error instanceof Error ? error.message : String(error),
-            }),
-          );
-      };
-      ipcRenderer.on(CHANNELS.mcpRequest, listener);
-      return () => ipcRenderer.removeListener(CHANNELS.mcpRequest, listener);
-    },
-    getStatus: () => ipcRenderer.invoke(CHANNELS.mcpGetStatus, undefined),
-    rotateToken: () => ipcRenderer.invoke(CHANNELS.mcpRotateToken, undefined),
-    testConnection: () => ipcRenderer.invoke(CHANNELS.mcpTestConnection, undefined),
-  },
+
   lifecycle: {
     // The main process asks (on window close / quit) whether there are unsaved
     // changes; the renderer answers synchronously from its dirty state.

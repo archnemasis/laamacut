@@ -7,7 +7,6 @@ asar: true
 # The MCP stdio shim must be a real on-disk file so external clients (Claude
 # Desktop / Cursor / Cline) can spawn it with `node`; unpack it from the asar.
 asarUnpack:
-  - dist/mcp-shim/**
 directories:
   output: release
 # Laamacut has no update feed; don't embed OpenReel's.

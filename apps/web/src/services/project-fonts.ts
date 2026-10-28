@@ -3,34 +3,11 @@ import { BUNDLED_FONTS, GOOGLE_FONT_SPECS } from "./font-catalog";
 import { initCustomFonts } from "../components/editor/inspector/font-options";
 
 const initialFamilies = new Set(["Geist", "Geist Mono", "Inter"]);
-const pendingStylesheets = new Map<string, Promise<void>>();
 const pendingBundled = new Map<string, Promise<void>>();
 export interface ProjectFont { family: string; weight: string; sample: string }
 
-function loadStylesheet(family: string): Promise<void> {
-  const spec = GOOGLE_FONT_SPECS[family];
-  if (!spec || initialFamilies.has(family) || window.openreel?.platform === "desktop") return Promise.resolve();
-  const pending = pendingStylesheets.get(family);
-  if (pending) return pending;
-  const promise = new Promise<void>((resolve, reject) => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.dataset.openreelFont = family;
-    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(spec).replace(/%20/g, "+")}&display=swap`;
-    const finish = (error?: Error) => {
-      clearTimeout(timeout);
-      link.onload = null; link.onerror = null;
-      if (error) { link.remove(); pendingStylesheets.delete(family); reject(error); }
-      else resolve();
-    };
-    const timeout = setTimeout(() => finish(new Error(`Could not load ${family}. Check your connection or choose a system font.`)), 10_000);
-    link.onload = () => finish();
-    link.onerror = () => finish(new Error(`Could not load ${family}. Check your connection or choose a system font.`));
-    document.head.appendChild(link);
-  });
-  pendingStylesheets.set(family, promise);
-  return promise;
-}
+// Catalogue fonts are declared by the bundled fonts/google-fonts.css that
+// index.html loads, so they come from the app itself, never from Google.
 
 /** Add a font shipped with the app to the page, once. */
 function loadBundled(family: string): Promise<void> {
@@ -59,7 +36,6 @@ export async function ensureFontFamily(family: string, weight: string | number =
   else if (!GOOGLE_FONT_SPECS[family] && !initialFamilies.has(family)) {
     await Promise.race([initCustomFonts().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 3000))]);
   }
-  await loadStylesheet(family);
   const fontWeight = typeof weight === "number" || /^\d+$/.test(weight) ? String(weight) : weight === "bold" ? "700" : "400";
   await document.fonts.load(`${fontWeight} 48px ${JSON.stringify(family)}`, sample || "OpenReel");
 }

@@ -68,12 +68,10 @@ export interface MediaItem {
   readonly originalUrl?: string;
   /** File hint stored in JSON for cross-session/cross-machine asset matching */
   readonly sourceFile?: { name: string; size: number; lastModified: number; folder?: string };
-  /** True while a background KieAI generation task is in progress */
+  /** Set on images from a generation feature older versions had; still shown so they can be deleted */
   readonly isPending?: boolean;
-  /** True when polling exhausted all retries — shows manual retry button */
+  /** Set when that older generation failed */
   readonly kieaiError?: boolean;
-  /** KieAI task ID used to poll for completion */
-  readonly kieaiTaskId?: string;
 }
 
 /** Thumbnail for filmstrip display in timeline */

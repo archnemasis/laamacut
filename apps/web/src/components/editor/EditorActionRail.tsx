@@ -131,12 +131,6 @@ export const EditorActionRail: React.FC = () => {
         active={Boolean(panels.audioMixer?.visible)}
       />
       <RailButton
-        label="AI Editor chat"
-        icon="bubble.left.and.text.bubble.right"
-        onClick={() => togglePanel("agentChat")}
-        active={Boolean(panels.agentChat?.visible)}
-      />
-      <RailButton
         label="Project JSON / Comments"
         icon="curlybraces"
         onClick={() => openModal("scriptView")}

@@ -10,7 +10,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
-  Box,
   ChevronLeft,
   ChevronRight,
   Diamond,
@@ -34,7 +33,6 @@ import { toast } from "../stores/notification-store";
 import { useUIStore } from "../stores/ui-store";
 import { AnimationPresetsPanel } from "./components/AnimationPresetsPanel";
 import { AssetPanel } from "./components/AssetPanel";
-import { CreationWorkspacePanel } from "./components/CreationWorkspacePanel";
 import { DeformPanel } from "./components/DeformPanel";
 import { EffectsPanel } from "./components/EffectsPanel";
 import { LayerPanel } from "./components/LayerPanel";
@@ -68,7 +66,6 @@ const LEFT_TABS: Array<{ id: MotionLeftTab; label: string; icon: LucideIcon }> =
   { id: "layers", label: "Layers", icon: Layers },
   { id: "assets", label: "Media", icon: Library },
   { id: "templates", label: "Kits", icon: Sparkles },
-  { id: "creation", label: "Scenes", icon: Box },
 ];
 
 type InspectorGroupId = "edit" | "animate" | "assist" | "deliver";
@@ -852,8 +849,7 @@ export function MotionCreatorShell({
                 {leftTab === "start" ? (
                   <MotionStartPanel composition={composition} />
                 ) : null}
-                {leftTab === "layers" ? <LayerPanel composition={composition} /> : null}
-                {leftTab === "creation" ? <CreationWorkspacePanel /> : null}
+                {leftTab === "layers" || leftTab === "creation" ? <LayerPanel composition={composition} /> : null}
                 {leftTab === "assets" ? <AssetPanel composition={composition} /> : null}
                 {leftTab === "templates" ? <MotionTemplateBrowser /> : null}
               </div>

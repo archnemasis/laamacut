@@ -30,13 +30,6 @@ import { initAutoUpdater } from "./updater";
 import { initCrashReporter, reportError } from "./crash-reporter";
 import { migrateGpuCacheOnUpgrade } from "./gpu-cache-migration";
 import {
-  startMcpServer,
-  stopMcpServer,
-  getMcpStatus,
-  rotateMcpToken,
-  testMcpConnection,
-} from "./mcp/server";
-import {
   fileWriters,
   showSaveDialog,
   showOpenDialog,
@@ -88,7 +81,7 @@ import type {
 registerAppSchemePrivileges();
 
 // Register crash/error reporting as early as possible so main-process faults and
-// process-gone events during startup are captured (POST to the cloud worker).
+// process-gone events during startup are logged to crash.log.
 initCrashReporter();
 
 // Drop regenerable GPU/shader/code caches when the app version changes — before
@@ -277,18 +270,8 @@ app.whenReady().then(() => {
       context: payload.context,
     });
   });
-  handle(CHANNELS.mcpGetStatus, z.undefined(), () => getMcpStatus());
-  handle(CHANNELS.mcpRotateToken, z.undefined(), () => rotateMcpToken());
-  handle(CHANNELS.mcpTestConnection, z.undefined(), () => testMcpConnection());
   createWindow();
   initAutoUpdater();
-  startMcpServer().catch((error) =>
-    reportError({
-      type: "mcp-start-failed",
-      source: "main",
-      message: error instanceof Error ? error.message : String(error),
-    }),
-  );
   installApplicationMenu(process.platform, (id) => {
     if (id === "openLicenses") {
       const dir = app.isPackaged
@@ -330,5 +313,4 @@ app.on("before-quit", () => {
 app.on("will-quit", () => {
   disposeAuroraClient();
   cancelAllExports();
-  void stopMcpServer();
 });

@@ -63,7 +63,6 @@ import {
 import { GPUCompositor, initializeGPUCompositor } from "./gpu-compositor";
 import { getRendererFactory, type Renderer } from "./renderer-factory";
 import { keyframeEngine } from "./keyframe-engine";
-import { getBackgroundRemovalEngine } from "../ai/background-removal-engine";
 import {
   type GifFrameCache,
   createGifFrameCache,
@@ -71,11 +70,6 @@ import {
   isAnimatedGif,
 } from "../media/gif-decoder";
 import { getParticleEngine } from "../effects/particle-engine";
-import {
-  createMotionAwareOcclusionMask,
-  getPersonSegmentationEngine,
-  type SegmentationResult,
-} from "../ai/person-segmentation-engine";
 import {
   MotionRenderer,
   type MotionRendererAssetResolver,
@@ -156,14 +150,6 @@ export class VideoEngine {
   private maskEngine: MaskEngine | null = null;
   private motionRenderer: MotionRenderer | null = null;
   private motionHqRenderer: MotionHighQualityRenderer | null = null;
-  private subjectMaskRequestCache = new WeakMap<
-    ImageBitmap,
-    Map<string, Promise<SegmentationResult | null>>
-  >();
-  private subjectOcclusionMaskCache = new WeakMap<
-    ImageBitmap,
-    WeakMap<SegmentationResult, ImageData>
-  >();
   private lastExportTime: number = -1;
   private exportFrameRate: number = 30;
   exportMode: boolean = false;
@@ -656,7 +642,7 @@ export class VideoEngine {
     time: number,
     targetWidth?: number,
     targetHeight?: number,
-    options: FrameRenderOptions = {},
+    _options: FrameRenderOptions = {},
   ): Promise<RenderedFrame> {
     this.ensureInitialized();
 
@@ -711,26 +697,6 @@ export class VideoEngine {
       }
     }
 
-    let subjectFrame: ImageBitmap | null = null;
-    const activeTextNeedsSubject = activeTextClips.some(
-      (clip) => clip.behindSubject,
-    );
-    const subjectStreamId = `video-engine:text-behind-subject:${allRenderableTracks
-      .flatMap(({ track }) =>
-        track.clips
-          .filter(
-            (clip) =>
-              time >= clip.startTime &&
-              time < clip.startTime + clip.duration &&
-              getMediaItemCapabilities(
-                mediaLibrary.items.find((item) => item.id === clip.mediaId),
-              ).visual,
-          )
-          .map((clip) => clip.id),
-      )
-      .sort()
-      .join("|") || "canvas"}`;
-
     await this.renderMotionInstancesToCanvasCtx(
       ctx,
       project,
@@ -757,11 +723,6 @@ export class VideoEngine {
           height,
           ctx,
         );
-
-        if (activeTextNeedsSubject && renderedTransitionClips.size > 0) {
-          subjectFrame?.close();
-          subjectFrame = await this.captureSubjectFrame(ctx, width, height);
-        }
 
         const clips = this.getClipsAtTime(track, time).filter((clip) =>
           getMediaItemCapabilities(
@@ -972,28 +933,6 @@ export class VideoEngine {
 
             let processedBitmap = bitmap;
 
-            const bgEngine = getBackgroundRemovalEngine();
-            if (bgEngine && bgEngine.isInitialized()) {
-              const bgSettings = bgEngine.getSettings(clip.id);
-              if (bgSettings.enabled) {
-                try {
-                  const bgResult = await bgEngine.processFrame(
-                    clip.id,
-                    processedBitmap,
-                    processedBitmap.width,
-                    processedBitmap.height,
-                    time * 1000,
-                  );
-                  if (bgResult && bgResult !== processedBitmap) {
-                    if (processedBitmap !== bitmap) {
-                      processedBitmap.close();
-                    }
-                    processedBitmap = bgResult;
-                  }
-                } catch {}
-              }
-            }
-
             processedBitmap = await this.applyClipVideoProcessing(
               clip.id,
               processedBitmap,
@@ -1029,11 +968,6 @@ export class VideoEngine {
               (project.masks ?? []).filter((mask) => mask.clipId === clip.id),
               time,
             );
-
-            if (activeTextNeedsSubject) {
-              subjectFrame?.close();
-              subjectFrame = await this.captureSubjectFrame(ctx, width, height);
-            }
 
             if (processedBitmap !== bitmap) {
               processedBitmap.close();
@@ -1085,7 +1019,7 @@ export class VideoEngine {
       for (const textClip of activeTextClips.filter(
         (clip) => clip.trackId === track.id,
       )) {
-        await this.renderTextClipWithSubjectMask(
+        await this.renderTextClipToCanvasCtx(
           ctx,
           textClip,
           time,
@@ -1093,14 +1027,9 @@ export class VideoEngine {
           height,
           settings.width,
           settings.height,
-          subjectFrame,
-          options.realtime ?? false,
-          subjectStreamId,
         );
       }
     }
-    subjectFrame?.close();
-
     this.renderParticlesToContext(ctx, time, width, height);
 
     for (const subtitle of activeSubtitles) {
@@ -1580,208 +1509,6 @@ export class VideoEngine {
         // already released
       }
     }
-  }
-
-  private async captureSubjectFrame(
-    ctx: OffscreenCanvasRenderingContext2D,
-    width: number,
-    height: number,
-  ): Promise<ImageBitmap | null> {
-    try {
-      return await createImageBitmap(ctx.canvas, 0, 0, width, height);
-    } catch {
-      return null;
-    }
-  }
-
-  private async getSubjectMaskForFrame(
-    subjectFrame: ImageBitmap,
-    time: number,
-    realtime: boolean,
-    streamId: string,
-  ): Promise<SegmentationResult | null> {
-    let requests = this.subjectMaskRequestCache.get(subjectFrame);
-    if (!requests) {
-      requests = new Map();
-      this.subjectMaskRequestCache.set(subjectFrame, requests);
-    }
-    const key = `${streamId}:${time}:${Number(realtime)}`;
-    const cached = requests.get(key);
-    if (cached) return cached;
-
-    const request = (async () => {
-      const segEngine = getPersonSegmentationEngine();
-      if (!segEngine.isInitialized()) await segEngine.initialize();
-      return segEngine.getPersonMask(subjectFrame, {
-        timestampMs: time * 1000,
-        streamId,
-        realtime,
-      });
-    })();
-    requests.set(key, request);
-    return request;
-  }
-
-  private applySubjectOcclusionMask(
-    textCtx: OffscreenCanvasRenderingContext2D,
-    subjectFrame: ImageBitmap | null,
-    width: number,
-    height: number,
-    maskResult: SegmentationResult | null,
-  ): boolean {
-    if (!subjectFrame || !maskResult) return false;
-
-    try {
-      const maskCanvas = new OffscreenCanvas(
-        maskResult.width,
-        maskResult.height,
-      );
-      const maskCtx = maskCanvas.getContext("2d");
-      if (!maskCtx) return false;
-
-      let occlusionMask = this.subjectOcclusionMaskCache
-        .get(subjectFrame)
-        ?.get(maskResult);
-      if (!occlusionMask) {
-        occlusionMask = maskResult.mask;
-      }
-      if (
-        !this.subjectOcclusionMaskCache.get(subjectFrame)?.has(maskResult) &&
-        maskResult.referenceWidth > 0 &&
-        maskResult.referenceHeight > 0 &&
-        maskResult.referenceRgba.length ===
-          maskResult.referenceWidth * maskResult.referenceHeight * 4
-      ) {
-        try {
-          const currentReferenceCanvas = new OffscreenCanvas(
-            maskResult.referenceWidth,
-            maskResult.referenceHeight,
-          );
-          const currentReferenceCtx = currentReferenceCanvas.getContext("2d", {
-            willReadFrequently: true,
-          });
-          if (currentReferenceCtx) {
-            currentReferenceCtx.drawImage(
-              subjectFrame,
-              0,
-              0,
-              maskResult.referenceWidth,
-              maskResult.referenceHeight,
-            );
-            const currentRgba = currentReferenceCtx.getImageData(
-              0,
-              0,
-              maskResult.referenceWidth,
-              maskResult.referenceHeight,
-            ).data;
-            const motionAwareMaskRgba = createMotionAwareOcclusionMask(
-              maskResult.mask.data,
-              maskResult.width,
-              maskResult.height,
-              maskResult.referenceRgba,
-              currentRgba,
-              maskResult.referenceWidth,
-              maskResult.referenceHeight,
-            );
-            occlusionMask = new ImageData(
-              maskResult.width,
-              maskResult.height,
-            );
-            occlusionMask.data.set(motionAwareMaskRgba);
-          }
-        } catch {
-          // A transient readback/flow failure must not remove the text layer.
-          // The exact model matte is still a safe occlusion fallback.
-          occlusionMask = maskResult.mask;
-        }
-      }
-
-      let frameMasks = this.subjectOcclusionMaskCache.get(subjectFrame);
-      if (!frameMasks) {
-        frameMasks = new WeakMap();
-        this.subjectOcclusionMaskCache.set(subjectFrame, frameMasks);
-      }
-      frameMasks.set(maskResult, occlusionMask);
-
-      maskCtx.putImageData(occlusionMask, 0, 0);
-      textCtx.save();
-      textCtx.globalCompositeOperation = "destination-out";
-      textCtx.imageSmoothingEnabled = true;
-      textCtx.imageSmoothingQuality = "high";
-      textCtx.drawImage(maskCanvas, 0, 0, width, height);
-      textCtx.restore();
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private async renderTextClipWithSubjectMask(
-    ctx: OffscreenCanvasRenderingContext2D,
-    textClip: TextClip,
-    time: number,
-    width: number,
-    height: number,
-    projectWidth: number,
-    projectHeight: number,
-    subjectFrame: ImageBitmap | null,
-    realtime: boolean,
-    streamId: string,
-  ): Promise<void> {
-    let subjectMask: SegmentationResult | null = null;
-    if (textClip.behindSubject && subjectFrame) {
-      try {
-        subjectMask = await this.getSubjectMaskForFrame(
-          subjectFrame,
-          time,
-          realtime,
-          streamId,
-        );
-      } catch {
-        subjectMask = null;
-      }
-      // During the worker's first realtime inference the matte is not ready
-      // yet; skipping this frame beats flashing text in front of the subject.
-      if (!subjectMask && realtime) return;
-    }
-
-    if (!textClip.behindSubject || !subjectFrame || !subjectMask) {
-      await this.renderTextClipToCanvasCtx(
-        ctx,
-        textClip,
-        time,
-        width,
-        height,
-        projectWidth,
-        projectHeight,
-      );
-      return;
-    }
-
-    const textLayerCanvas = new OffscreenCanvas(width, height);
-    const textLayerCtx = textLayerCanvas.getContext("2d");
-    if (!textLayerCtx) return;
-    await this.renderTextClipToCanvasCtx(
-      textLayerCtx,
-      textClip,
-      time,
-      width,
-      height,
-      projectWidth,
-      projectHeight,
-    );
-    if (
-      !this.applySubjectOcclusionMask(
-        textLayerCtx,
-        subjectFrame,
-        width,
-        height,
-        subjectMask,
-      )
-    ) {
-      return;
-    }
-    ctx.drawImage(textLayerCanvas, 0, 0, width, height);
   }
 
   private getActiveTextClips(timeline: Timeline, time: number): TextClip[] {

@@ -140,7 +140,7 @@ export const AiTab: React.FC<AiTabProps> = ({
           <div className="space-y-2">
             {showVideoControls && (
               <Button
-                label="Remove Background"
+                label="Key Out Green Screen"
                 onClick={handleRemoveBackground}
                 isDisabled={isApplyingSelectedClipEffect}
                 variant="secondary"

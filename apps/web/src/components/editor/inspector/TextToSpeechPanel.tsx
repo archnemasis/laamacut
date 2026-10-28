@@ -4,7 +4,6 @@ import {
   Loader2,
   Volume2,
   Settings,
-  Sparkles,
   AlertTriangle,
 } from "@/icons/lucide-compat";
 import { ToolcraftButton as Button } from "@openreel/ui";
@@ -12,20 +11,15 @@ import { ToolcraftCard as Card } from "@openreel/ui";
 import { ToolcraftIconButton as IconButton } from "@openreel/ui";
 import { ToolcraftText as Text } from "@openreel/ui";
 import { ToolcraftTextAreaControl } from "@openreel/ui";
-import { MockToggle } from "./shell/InspectorControls";
 import { useSettingsStore } from "../../../stores/settings-store";
 import { useElevenLabsApi } from "./hooks/useElevenLabsApi";
 import { useTtsActions } from "./hooks/useTtsActions";
 import { VoiceBrowser } from "./VoiceBrowser";
 import { ModelSelector } from "./ModelSelector";
-import { EnhancedTextPreview } from "./EnhancedTextPreview";
 import { AudioResult } from "./AudioResult";
 
 export const TextToSpeechPanel: React.FC = () => {
   const {
-    defaultLlmProvider,
-    llmBaseUrl,
-    llmModel,
     openSettings,
     settingsOpen,
     configuredServices,
@@ -40,8 +34,6 @@ export const TextToSpeechPanel: React.FC = () => {
     favoriteVoices.length > 0 ? favoriteVoices[0].voiceId : "",
   );
   const [error, setError] = useState<string | null>(null);
-  const [enhanceText, setEnhanceText] = useState(false);
-  const [enhancedPreview, setEnhancedPreview] = useState<string | null>(null);
 
   const {
     allVoices,
@@ -49,26 +41,20 @@ export const TextToSpeechPanel: React.FC = () => {
     isLoadingVoices,
     isLoadingModels,
     generateWithElevenLabs,
-    enhanceViaLlm,
   } = useElevenLabsApi({
     hasElevenLabsKey,
     settingsOpen,
     elevenLabsModel,
-    defaultLlmProvider,
-    llmBaseUrl,
-    llmModel,
   });
 
   const {
     isGenerating,
     isPlaying,
-    isEnhancing,
     generatedAudio,
     hasUnsavedAudio,
     successMsg,
     audioRef,
     getSelectedVoiceName,
-    handleEnhance,
     generateSpeech,
     togglePlayback,
     handleAudioEnded,
@@ -78,15 +64,11 @@ export const TextToSpeechPanel: React.FC = () => {
   } = useTtsActions({
     selectedVoice,
     text,
-    enhanceText,
-    enhancedPreview,
     allVoices,
     favoriteVoices,
     generateWithElevenLabs,
-    enhanceViaLlm,
     setText,
     setError,
-    setEnhancedPreview,
   });
 
   const getSelectedModelName = (): string => {
@@ -144,32 +126,13 @@ export const TextToSpeechPanel: React.FC = () => {
         <ToolcraftTextAreaControl
           label="Text"
           value={text}
-          onChange={(value) => {
-            setText(value);
-            setEnhancedPreview(null);
-          }}
+          onChange={setText}
           placeholder="Enter the text you want to convert to speech..."
           maxLength={maxChars}
           rows={4}
           width="100%"
         />
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <MockToggle
-              ariaLabel="Enhance for TTS"
-              checked={enhanceText}
-              onChange={setEnhanceText}
-            />
-            <Text
-              type="supporting"
-              color="secondary"
-              className="flex items-center gap-1 text-[9px] cursor-pointer"
-              onClick={() => setEnhanceText(!enhanceText)}
-            >
-              <Sparkles size={10} className={enhanceText ? "text-amber-400" : ""} aria-hidden />
-              Enhance for TTS
-            </Text>
-          </div>
+        <div className="flex justify-end">
           <Text
             type="supporting"
             className={`text-[9px] ${charCount > maxChars * 0.9 ? "text-red-400" : "text-fg-3"}`}
@@ -178,13 +141,6 @@ export const TextToSpeechPanel: React.FC = () => {
           </Text>
         </div>
 
-        {enhancedPreview && enhanceText && (
-          <EnhancedTextPreview
-            enhancedPreview={enhancedPreview}
-            onUpdate={setEnhancedPreview}
-            onDiscard={() => setEnhancedPreview(null)}
-          />
-        )}
       </div>
 
       <VoiceBrowser
@@ -223,25 +179,6 @@ export const TextToSpeechPanel: React.FC = () => {
         </Card>
       )}
 
-      {enhanceText && !enhancedPreview && (
-        <Button
-          label={isEnhancing ? "Enhancing..." : "Enhance Text"}
-          icon={
-            isEnhancing ? (
-              <Loader2 size={14} className="animate-spin" aria-hidden />
-            ) : (
-              <Sparkles size={14} aria-hidden />
-            )
-          }
-          variant="primary"
-          size="md"
-          onClick={handleEnhance}
-          isDisabled={isEnhancing || !text.trim()}
-          isLoading={isEnhancing}
-          className="w-full"
-        />
-      )}
-
       <Button
         label={isGenerating ? "Generating..." : "Generate Speech"}
         icon={
@@ -254,7 +191,7 @@ export const TextToSpeechPanel: React.FC = () => {
         variant="primary"
         size="md"
         onClick={generateSpeech}
-        isDisabled={isGenerating || !hasElevenLabsKey || !text.trim() || !selectedVoice || (enhanceText && !enhancedPreview)}
+        isDisabled={isGenerating || !hasElevenLabsKey || !text.trim() || !selectedVoice}
         isLoading={isGenerating}
         className="w-full"
       />

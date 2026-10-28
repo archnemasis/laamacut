@@ -185,7 +185,6 @@ import {
   IconButton,
 } from "./primitives";
 import { Scene3DInspector } from "./inspector/Scene3DInspector";
-import { GenerateShaderBox } from "./GenerateShaderBox";
 import { ShapeContentsSection } from "./ShapeContentsSection";
 import { ShaderPreviewBrowser } from "../../components/shaders/ShaderPreviewBrowser";
 
@@ -2584,7 +2583,6 @@ function ShaderFillControls({
             </Field>
           ))
         : null}
-      <GenerateShaderBox category="fill" onGenerated={(next) => selectShader(next.id)} />
     </div>
   );
 }
@@ -2771,7 +2769,6 @@ function TextShaderAnimatorControls({
             );
           })
         : null}
-      <GenerateShaderBox category="text" onGenerated={(next) => selectShader(next.id)} />
     </div>
   );
 }

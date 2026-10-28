@@ -8,7 +8,6 @@ import {
   type Subtitle,
   renderAnimatedCaption,
   type WordSegment,
-  getBackgroundRemovalEngine,
   AnimationEngine,
   type Keyframe,
   type EmphasisAnimation,
@@ -1773,24 +1772,6 @@ export const applyEffectsToFrame = async (
   try {
     let processedFrame = frame;
 
-    const bgEngine = getBackgroundRemovalEngine();
-    if (bgEngine && bgEngine.isInitialized()) {
-      const settings = bgEngine.getSettings(clipId);
-      if (settings.enabled) {
-        try {
-          const bgResult = await bgEngine.processFrame(
-            clipId,
-            processedFrame,
-            processedFrame.width,
-            processedFrame.height,
-          );
-          if (bgResult && bgResult.width > 0 && bgResult.height > 0) {
-            processedFrame = bgResult;
-          }
-        } catch {}
-      }
-    }
-
     const effectsBridge = getEffectsBridge();
     const isInit = effectsBridge.isInitialized();
     if (!isInit) {
@@ -1851,15 +1832,6 @@ export const applyEffectsToFrameCanvas = async (
   clipId: string,
   frame: ImageBitmap,
 ): Promise<OffscreenCanvas | null> => {
-  const bgEngine = getBackgroundRemovalEngine();
-  if (
-    bgEngine &&
-    bgEngine.isInitialized() &&
-    bgEngine.getSettings(clipId).enabled
-  ) {
-    return null;
-  }
-
   const effectsBridge = getEffectsBridge();
   if (!effectsBridge.isInitialized()) {
     return null;

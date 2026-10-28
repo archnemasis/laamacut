@@ -25,11 +25,10 @@ import { toast } from "../../../stores/notification-store";
 import { loadAudioBuffer } from "../../../utils/load-audio-buffer";
 import {
   analyzeMulticamActivity,
-  analyzeSileroVad,
+  analyzeVoiceActivity,
   calibrateMulticamBleed,
   createOrmaArtifact,
   extractMulticamSocialClips,
-  incorporateMulticamReactionCues,
   MULTICAM_POLICY_PRESETS,
   planMulticamShots,
   parseMulticamManifest,
@@ -47,7 +46,6 @@ import {
   saveMulticamArtifact,
 } from "../../../services/multicam-analysis-store";
 import { transcribeMulticamChannels } from "../../../services/multicam-transcription";
-import { analyzeMulticamFaceReactions } from "../../../services/multicam-face-reactions";
 import {
   createMulticamApplyEditAction,
   createMulticamApplyTracksAction,
@@ -395,7 +393,6 @@ export const MultiCameraPanel: React.FC<MultiCameraPanelProps> = () => {
   const [minShotSeconds, setMinShotSeconds] = useState(1.8);
   const [maxShotSeconds, setMaxShotSeconds] = useState(30);
   const [includeTranscripts, setIncludeTranscripts] = useState(false);
-  const [includeVisualReactions, setIncludeVisualReactions] = useState(false);
   const [policyPreset, setPolicyPreset] = useState("custom");
   const [multiCamEngine, setMultiCamEngine] =
     useState<import("@openreel/core").MultiCamEngine | null>(null);
@@ -699,13 +696,13 @@ export const MultiCameraPanel: React.FC<MultiCameraPanelProps> = () => {
           throw new Error("The camera recordings do not have enough overlapping audio.");
         }
 
-        setStatus(groupId, "Running local Silero voice detection…");
+        setStatus(groupId, "Detecting who is speaking…");
         const vadTracks = new Map<string, import("@openreel/core").MulticamVadTrack>();
         for (const source of alignedSources) {
           const buffer = buffers.get(source.angle.id);
           if (!buffer) continue;
           const vadAudio = prepareMulticamAnalysisAudio(buffer, 16_000);
-          const vad = await analyzeSileroVad(vadAudio.samples, vadAudio.sampleRate, {
+          const vad = await analyzeVoiceActivity(vadAudio.samples, vadAudio.sampleRate, {
             onProgress: (completed, total) => {
               if (completed === total || completed % 100 === 0) {
                 setStatus(
@@ -765,22 +762,10 @@ export const MultiCameraPanel: React.FC<MultiCameraPanelProps> = () => {
           max_shot_ms: Math.max(editPolicy.minShotMs, editPolicy.maxShotMs),
         };
         liveGroup.manifest = manifest;
-        const reactions = includeVisualReactions
-          ? await analyzeMulticamFaceReactions(
-              alignedSources,
-              manifest,
-              duration,
-              { onProgress: (message) => setStatus(groupId, message) },
-            )
-          : [];
-        const shotPlan = incorporateMulticamReactionCues(
-          planMulticamShots(activity, manifest, {
-            strategy: overlapStrategy,
-            escalateTo: overlapEscalation,
-          }),
-          manifest,
-          reactions,
-        );
+        const shotPlan = planMulticamShots(activity, manifest, {
+          strategy: overlapStrategy,
+          escalateTo: overlapEscalation,
+        });
         if (shotPlan.shots.length === 0) {
           throw new Error("No usable speaker activity was detected.");
         }
@@ -811,7 +796,6 @@ export const MultiCameraPanel: React.FC<MultiCameraPanelProps> = () => {
           activity,
           drift,
           calibration,
-          reactions,
           transcripts: includeTranscripts
             ? await transcribeMulticamChannels(buffers, {
                 onStatus: (angleId, message) => {
@@ -881,7 +865,6 @@ export const MultiCameraPanel: React.FC<MultiCameraPanelProps> = () => {
       syncBeforeAutoEdit,
       editPolicy,
       includeTranscripts,
-      includeVisualReactions,
       multiCamEngine,
       overlapEscalation,
       overlapStrategy,
@@ -1344,14 +1327,6 @@ export const MultiCameraPanel: React.FC<MultiCameraPanelProps> = () => {
             onChange={(event) => setIncludeTranscripts(event.target.checked)}
           />
           Add per-channel local Whisper transcripts to the .orma artifact
-        </label>
-        <label className="flex items-center gap-2 text-[9px] text-fg-2">
-          <input
-            type="checkbox"
-            checked={includeVisualReactions}
-            onChange={(event) => setIncludeVisualReactions(event.target.checked)}
-          />
-          Add local MediaPipe face/reaction cues (slower)
         </label>
       </details>
       <Text type="supporting" color="secondary" className="text-[9px] text-fg-3 text-center">

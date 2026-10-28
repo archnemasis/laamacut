@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image as ImageIcon, Film, Music, Plus, Upload, Trash2,
   Square, Circle, Triangle, Star, ArrowRight, Hexagon, FileCode, AlertTriangle,
-  RefreshCw, Palette, Sparkles, Video,
+  RefreshCw, Palette, Video,
   Type, Shapes, Wand2, LayoutTemplate, Zap, Shuffle,
 } from "@/icons/lucide-compat";
 import {
@@ -28,9 +28,6 @@ import { ToolcraftButton as Button } from "@openreel/ui";
 import { ToolcraftIconButton as IconButton } from "@openreel/ui";
 import { ToolcraftSelectableCard as SelectableCard } from "@openreel/ui";
 import { ToolcraftText as Text } from "@openreel/ui";
-import { KieAIImageDialog } from "./kieai/KieAIImageDialog";
-import { loadMediaBlob } from "../../services/media-storage";
-import { useKieAIStore } from "../../stores/kieai-store";
 import { StickerPickerPanel } from "./inspector/StickerPickerPanel";
 import { insertTimelineOverlay } from "../../stores/project/insert-timeline-overlay";
 import { PreviewProxyBadge, PreviewProxyControls } from "./PreviewProxyControls";
@@ -241,8 +238,6 @@ const MediaThumbnail: React.FC<{
   onReplace: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onAddToTimeline: () => void;
-  onKieAI?: () => void;
-  onRetryKieAI?: () => void;
 }> = ({
   item,
   isSelected,
@@ -252,8 +247,6 @@ const MediaThumbnail: React.FC<{
   onReplace,
   onDragStart,
   onAddToTimeline,
-  onKieAI,
-  onRetryKieAI,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -306,13 +299,13 @@ const MediaThumbnail: React.FC<{
     <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center gap-2 animate-in fade-in duration-200">
       {item.kieaiError ? (
         <PanelIconButton
-          label="Retry generation"
-          icon={<RefreshCw size={14} className="text-red-400" />}
-          onClick={(e) => { e.stopPropagation(); onRetryKieAI?.(); }}
+          label="Delete"
+          icon={<Trash2 size={14} className="text-red-400" />}
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
           className="p-2 bg-red-500/20 rounded-full hover:bg-red-500/40 backdrop-blur-sm transition-colors"
         />
       ) : item.isPending ? (
-        <div title="KieAI generation in progress…" className="p-2">
+        <div title="Generating…" className="p-2">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : item.isPlaceholder ? (
@@ -332,14 +325,6 @@ const MediaThumbnail: React.FC<{
         </>
       ) : (
         <>
-          {item.type === "image" && onKieAI && (
-            <PanelIconButton
-              label="Create with KieAI"
-              icon={<Sparkles size={14} className="text-primary" />}
-              onClick={(e) => { e.stopPropagation(); onKieAI(); }}
-              className="p-2 bg-primary/20 rounded-full hover:bg-primary/40 backdrop-blur-sm transition-colors"
-            />
-          )}
           <PanelIconButton
             label="Add to timeline"
             icon={<Plus size={14} className="text-primary" />}
@@ -417,9 +402,9 @@ const MediaThumbnail: React.FC<{
           <div className="flex items-center gap-1 flex-shrink-0">
             {item.kieaiError ? (
               <PanelIconButton
-                label="Retry generation"
-                icon={<RefreshCw size={12} className="text-red-400" />}
-                onClick={(e) => { e.stopPropagation(); onRetryKieAI?.(); }}
+                label="Delete"
+                icon={<Trash2 size={12} className="text-red-400" />}
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 className="p-1 bg-red-500/20 rounded hover:bg-red-500/40 transition-colors"
               />
             ) : item.isPending ? (
@@ -443,14 +428,6 @@ const MediaThumbnail: React.FC<{
               </>
             ) : (
               <>
-                {item.type === "image" && onKieAI && (
-                  <PanelIconButton
-                    label="Create with KieAI"
-                    icon={<Sparkles size={12} className="text-primary" />}
-                    onClick={(e) => { e.stopPropagation(); onKieAI(); }}
-                    className="p-1 bg-primary/20 rounded hover:bg-primary/40 transition-colors"
-                  />
-                )}
                 <PanelIconButton
                   label="Add to timeline"
                   icon={<Plus size={12} className="text-primary" />}
@@ -520,7 +497,7 @@ const MediaThumbnail: React.FC<{
           </div>
         )}
 
-        {/* KieAI Error Badge */}
+        {/* Failed generation badge (older projects) */}
         {item.kieaiError && (
           <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-red-500 rounded text-[8px] text-white font-bold flex items-center gap-1">
             <AlertTriangle size={8} />
@@ -528,7 +505,7 @@ const MediaThumbnail: React.FC<{
           </div>
         )}
 
-        {/* Pending KieAI Badge */}
+        {/* Pending generation badge (older projects) */}
         {!item.kieaiError && item.isPending && (
           <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-primary rounded text-[8px] text-primary-foreground font-bold flex items-center gap-1">
             <div className="h-2 w-2 animate-spin rounded-full border border-white border-t-transparent" />
@@ -638,9 +615,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
     "all" | "solid" | "gradient" | "pattern" | "mesh"
   >("all");
 
-  // KieAI image generation dialog
-  const [kieaiDialog, setKieaiDialog] = useState<{ file: File; previewUrl: string | null } | null>(null);
-
   // Project store
   const {
     project,
@@ -648,12 +622,8 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
     deleteMedia,
     replaceMediaAsset,
     updateSettings,
-    setKieAIItemState,
   } = useProjectStore();
   const mediaItems = project.mediaLibrary.items;
-
-  // KieAI store
-  const { retryTask } = useKieAIStore();
 
   // UI store
   const { select, isSelected, startDrag, openModal } = useUIStore();
@@ -930,30 +900,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
       backgroundCategory === "all" || preset.category === backgroundCategory,
   );
 
-  // Open KieAI dialog for an image asset
-  const handleOpenKieAI = useCallback(async (item: MediaItem) => {
-    try {
-      const blob = await loadMediaBlob(item.id);
-      if (!blob) {
-        toast.error("Asset not found", "Cannot load the image data for this asset.");
-        return;
-      }
-      const mimeType = blob.type || (item.name.match(/\.png$/i) ? "image/png" : "image/jpeg");
-      const file = new File([blob], item.name, { type: mimeType as string });
-      setKieaiDialog({ file, previewUrl: item.thumbnailUrl });
-    } catch (err) {
-      console.error("[KieAI] Failed to load media blob:", err);
-      toast.error("Failed to open KieAI", err instanceof Error ? err.message : "Unknown error");
-    }
-  }, []);
-
-  const handleRetryKieAI = useCallback((item: MediaItem) => {
-    if (!item.kieaiTaskId) return;
-    // Reset error state and re-activate polling
-    setKieAIItemState(item.id, true, false);
-    retryTask(item.kieaiTaskId);
-  }, [retryTask, setKieAIItemState]);
-
   const renderSectionContent = (tab: AssetsTab): React.ReactNode => {
     switch (tab) {
       case "media":
@@ -1085,8 +1031,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
                         onReplace={() => handleReplaceAsset(item.id)}
                         onDragStart={(e) => handleItemDragStart(e, item)}
                         onAddToTimeline={() => handleAddToTimeline(item)}
-                        onKieAI={item.type === "image" && !item.isPending && !item.kieaiError ? () => handleOpenKieAI(item) : undefined}
-                        onRetryKieAI={item.kieaiError && item.kieaiTaskId ? () => handleRetryKieAI(item) : undefined}
                       />
                     ))}
                     <div className="flex flex-col">
@@ -1545,14 +1489,6 @@ export const AssetsPanel: React.FC<{ tab?: AssetsTab; hideRail?: boolean }> = ({
         />
       )}
 
-      {kieaiDialog && (
-        <KieAIImageDialog
-          open={true}
-          onClose={() => setKieaiDialog(null)}
-          sourceFile={kieaiDialog.file}
-          previewUrl={kieaiDialog.previewUrl}
-        />
-      )}
     </div>
   );
 };

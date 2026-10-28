@@ -41,14 +41,7 @@ function mockHasProject(value: boolean): void {
 }
 
 beforeEach(() => {
-  const panels = useUIStore.getState().panels;
-  useUIStore.setState({
-    desktopPage: "edit",
-    panels: {
-      ...panels,
-      agentChat: { ...panels.agentChat, visible: false },
-    },
-  });
+  useUIStore.setState({ desktopPage: "edit" });
   useSettingsStore.setState({ settingsOpen: false, settingsTab: "general" });
   (window as unknown as { openreel: unknown }).openreel = {
     platform: "desktop",

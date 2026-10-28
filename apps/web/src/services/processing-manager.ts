@@ -1,7 +1,6 @@
 import { create } from "zustand";
 
 export type ProcessingType =
-  | "background-removal"
   | "auto-reframe"
   | "color-grading"
   | "effects";
@@ -212,7 +211,6 @@ export const useProcessingStore = create<ProcessingState>((set, get) => ({
 }));
 
 export const PROCESSING_TYPE_LABELS: Record<ProcessingType, string> = {
-  "background-removal": "Background Removal",
   "auto-reframe": "Auto Reframe",
   "color-grading": "Color Grading",
   effects: "Video Effects",

@@ -1,18 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { LlmProvider } from "../../../../stores/settings-store";
 import { useSettingsStore } from "../../../../stores/settings-store";
 import { isSessionUnlocked, getSecret } from "../../../../services/secure-storage";
 import { apiFetch } from "../../../../services/api-proxy";
 import type { ElevenLabsVoice, ElevenLabsModel } from "../tts-types";
-import { FALLBACK_MODELS, ENHANCE_SYSTEM_PROMPT } from "../tts-constants";
+import { FALLBACK_MODELS } from "../tts-constants";
 
 interface UseElevenLabsApiOptions {
   hasElevenLabsKey: boolean;
   settingsOpen: boolean;
   elevenLabsModel: string;
-  defaultLlmProvider: LlmProvider | null;
-  llmBaseUrl: string;
-  llmModel: string;
 }
 
 interface UseElevenLabsApiReturn {
@@ -21,7 +17,6 @@ interface UseElevenLabsApiReturn {
   isLoadingVoices: boolean;
   isLoadingModels: boolean;
   generateWithElevenLabs: (text: string, voiceId: string, signal?: AbortSignal) => Promise<Blob>;
-  enhanceViaLlm: (text: string, signal?: AbortSignal) => Promise<string>;
 }
 
 export function useElevenLabsApi(options: UseElevenLabsApiOptions): UseElevenLabsApiReturn {
@@ -29,9 +24,6 @@ export function useElevenLabsApi(options: UseElevenLabsApiOptions): UseElevenLab
     hasElevenLabsKey,
     settingsOpen,
     elevenLabsModel,
-    defaultLlmProvider,
-    llmBaseUrl,
-    llmModel,
   } = options;
 
   const isDesktop = typeof window !== "undefined" && window.openreel?.platform === "desktop";
@@ -39,7 +31,6 @@ export function useElevenLabsApi(options: UseElevenLabsApiOptions): UseElevenLab
   const {
     cachedElevenLabsVoices,
     cachedElevenLabsModels,
-    configuredServices,
     setCachedElevenLabsVoices,
     setCachedElevenLabsModels,
   } = useSettingsStore();
@@ -188,91 +179,11 @@ export function useElevenLabsApi(options: UseElevenLabsApiOptions): UseElevenLab
     return response.blob();
   }, [elevenLabsModel, isDesktop]);
 
-  const enhanceViaLlm = useCallback(async (inputText: string, signal?: AbortSignal): Promise<string> => {
-    const llmProvider = defaultLlmProvider;
-    const selectedModel = llmModel.trim();
-    if (!llmProvider || !llmBaseUrl.trim() || !selectedModel) {
-      throw new Error("Configure an AI endpoint and model before using text enhancement.");
-    }
-    const compatibleKeyConfigured = configuredServices.includes(llmProvider);
-
-    if (compatibleKeyConfigured && !isSessionUnlocked()) {
-      throw new Error("Session locked. Unlock in Settings > API Keys to use text enhancement.");
-    }
-
-    const apiKey =
-      isDesktop || (!compatibleKeyConfigured && !isSessionUnlocked())
-        ? ""
-        : (await getSecret(llmProvider)) ?? "";
-
-    if (llmProvider === "anthropic-compatible") {
-      const response = await apiFetch(llmProvider, "/messages", apiKey, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: selectedModel,
-          max_tokens: 2048,
-          system: ENHANCE_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: inputText }],
-        }),
-        baseUrl: llmBaseUrl,
-        signal,
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error((err as Record<string, unknown>).error
-          ? String((err as Record<string, unknown>).error)
-          : `Anthropic error (${response.status})`);
-      }
-
-      const data = await response.json();
-      const content = (data as { content: Array<{ type: string; text: string }> }).content;
-      return content?.[0]?.text ?? inputText;
-    }
-
-    const response = await apiFetch(
-      llmProvider,
-      "/chat/completions",
-      apiKey,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            { role: "system", content: ENHANCE_SYSTEM_PROMPT },
-            { role: "user", content: inputText },
-          ],
-        }),
-        baseUrl: llmBaseUrl,
-        signal,
-      },
-    );
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      const msg = (err as Record<string, unknown>).error;
-      throw new Error(msg ? String((msg as Record<string, unknown>).message ?? msg) : `OpenAI error (${response.status})`);
-    }
-
-    const data = await response.json();
-    const choices = (data as { choices: Array<{ message: { content: string } }> }).choices;
-    return choices?.[0]?.message?.content ?? inputText;
-  }, [
-    configuredServices,
-    defaultLlmProvider,
-    isDesktop,
-    llmBaseUrl,
-    llmModel,
-  ]);
-
   return {
     allVoices,
     allModels,
     isLoadingVoices,
     isLoadingModels,
     generateWithElevenLabs,
-    enhanceViaLlm,
   };
 }

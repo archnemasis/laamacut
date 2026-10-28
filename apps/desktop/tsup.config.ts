@@ -7,7 +7,6 @@ export default defineConfig({
     "aurora-host/index": "src/aurora-host/index.ts",
     // Standalone stdio->HTTP MCP shim spawned by external clients (Claude
     // Desktop / Cursor / Cline). Electron-free so it runs under plain node.
-    "mcp-shim/index": "src/mcp-shim/index.ts",
   },
   format: ["cjs"],
   platform: "node",

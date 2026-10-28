@@ -8,9 +8,6 @@
       "custom_domain": true
     }
   ],
-  "ai": {
-    "binding": "AI"
-  },
   "r2_buckets": [
     {
       "binding": "TEMPLATES_BUCKET",

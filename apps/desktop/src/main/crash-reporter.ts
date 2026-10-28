@@ -1,9 +1,15 @@
 import { app } from "electron";
+import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 
-const CRASH_ENDPOINT =
-  process.env.OPENREEL_CRASH_ENDPOINT ?? "https://api.openreel.video/crash";
-const REPORT_TIMEOUT_MS = 4000;
+/**
+ * Crash reports stay on this computer: they're appended to crash.log in the
+ * app's logs folder and never uploaded. Someone reporting a bug can attach it.
+ */
+const LOG_NAME = "crash.log";
+/** Past this size the log starts again, so it can't grow forever. */
+const MAX_LOG_BYTES = 2 * 1024 * 1024;
 
 export interface CrashReportInput {
   type: string;
@@ -42,9 +48,13 @@ export function describeError(value: unknown): { message: string; stack?: string
   return { message: String(value) };
 }
 
-async function send(report: CrashReportInput): Promise<void> {
+function crashLogPath(): string {
+  return path.join(app.getPath("logs"), LOG_NAME);
+}
+
+function write(report: CrashReportInput): void {
   try {
-    const payload = {
+    const entry = {
       ...report,
       message: report.message?.slice(0, 8000) ?? "unknown",
       stack: report.stack?.slice(0, 16000),
@@ -55,25 +65,17 @@ async function send(report: CrashReportInput): Promise<void> {
       electronVersion: process.versions.electron,
       timestamp: new Date().toISOString(),
     };
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REPORT_TIMEOUT_MS);
-    try {
-      await fetch(CRASH_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timer);
-    }
+    const file = crashLogPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (fs.existsSync(file) && fs.statSync(file).size > MAX_LOG_BYTES) fs.rmSync(file);
+    fs.appendFileSync(file, JSON.stringify(entry) + "\n");
   } catch {
     // The reporter must never throw — a failed report cannot escalate a crash.
   }
 }
 
 export function reportError(report: CrashReportInput): void {
-  void send(report);
+  write(report);
 }
 
 export function initCrashReporter(): void {
