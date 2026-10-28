@@ -15,6 +15,14 @@ vi.mock("../editor/settings/GeneralPanel", () => ({ GeneralPanel: () => <div>Set
 
 import { PhoneHome } from "./PhoneHome";
 import { takePhoneMediaPickerRequest } from "../../services/phone-media";
+import { DONATE_URL, LICENSE_TEXT } from "../../services/support-links";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+it("ships the repository's licence word for word", () => {
+  const license = readFileSync(resolve(__dirname, "../../../../../LICENSE"), "utf8").replace(/\r\n/g, "\n");
+  expect(LICENSE_TEXT.replace(/\s+/g, " ").trim()).toBe(license.replace(/\s+/g, " ").trim());
+});
 
 describe("PhoneHome", () => {
   afterEach(() => {
@@ -27,6 +35,20 @@ describe("PhoneHome", () => {
     fireEvent.click(screen.getByRole("button", { name: "Me" }));
     expect(screen.getByText("Settings panel")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Me" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("links to donations and shows the licence on the Me tab", () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    render(<PhoneHome />);
+    fireEvent.click(screen.getByRole("button", { name: "Me" }));
+    fireEvent.click(screen.getByRole("button", { name: /Support Laamacut/ }));
+    expect(open).toHaveBeenCalledWith(DONATE_URL, "_blank");
+
+    fireEvent.click(screen.getByRole("button", { name: /About and licence/ }));
+    expect(screen.getByText(/Augustus Otu and Contributors/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByText("Settings panel")).toBeTruthy();
+    open.mockRestore();
   });
 
   it("starts a new project straight into the media picker", () => {

@@ -109,6 +109,18 @@ import { captureNativeVideoFrame } from "./preview/video-frame";
 import { resolvePlaybackLoop, resolvePlaybackStart } from "../../utils/playback-loop";
 import { ProcessingOverlay } from "./ProcessingOverlay";
 import { editingFrameDurationMs } from "./editing-frame-rate";
+import { getTransitionBridge } from "../../bridges/transition-bridge";
+import { galleryOriginalUri } from "../../services/gallery-originals";
+import {
+  backgroundBehind,
+  clearAncestorBackgrounds,
+  clipPlaysNatively,
+  driftCorrection,
+  getPreviewPlayer,
+  nativeTimelineTime,
+  planNativePreview,
+  planSeekTarget,
+} from "../../services/native-preview";
 import { APPS_BY_RATIO, AppIcon } from "./aspect-apps";
 import { ASPECT_PRESETS } from "./canvas-presets";
 import {
@@ -4598,6 +4610,293 @@ export const Preview: React.FC = () => {
     ],
   );
 
+  /** Hands the screen back from the phone's player once the web preview has repainted. */
+  const phoneNativeTeardownRef = useRef<{
+    timer: number;
+    run: () => void;
+    /** The clips the paused player still has loaded, so a quick resume can reuse it. */
+    key: string;
+    restoreBackgrounds: () => void;
+  } | null>(null);
+
+  /**
+   * On the Android app, play plain clips with the phone's own video player
+   * (PreviewPlayerPlugin) behind a transparent canvas, like CapCut: the
+   * original videos are decoded in hardware, nothing is copied into the
+   * canvas, and the canvas only draws the background around the video and the
+   * text, stickers and captions on top. Null when this timeline needs the web
+   * renderer (effects, transitions, keyframes, overlapping clips...).
+   */
+  const startPhoneNativePlayback = useCallback(
+    async (
+      startPosition: number,
+      onEnd: () => void,
+      shouldContinue: () => boolean,
+    ): Promise<(() => void) | null> => {
+      const player = getPreviewPlayer();
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!player || !canvas || !ctx || !canvas.parentElement) return null;
+      if (canvasFillModeRef.current === "blur") return null;
+      if (!canUseNativeVideoPlayback(startPosition).canUse) return null;
+      if (hasBehindSubjectText(allTextClipsRef.current)) return null;
+
+      const tracks = timelineTracksRef.current.filter((track) => !track.hidden);
+      const transitionBridge = getTransitionBridge();
+      if (
+        transitionBridge.isInitialized() &&
+        tracks.some((track) => transitionBridge.getTransitionsForTrack(track.id).length > 0)
+      ) {
+        return null;
+      }
+
+      const videoClips: Array<(typeof tracks)[0]["clips"][0]> = [];
+      for (const track of tracks) {
+        for (const clip of track.clips) {
+          if (clip.startTime + clip.duration <= startPosition) continue;
+          const type = getMediaItem(clip.mediaId)?.type;
+          if (type === "image") return null;
+          if (type !== "video") continue;
+          if (
+            !clipPlaysNatively(clip) ||
+            clipNeedsFrameProcessing(clip.id) ||
+            clipCssFilterOnly(clip.id) !== null ||
+            getVidstabEngine().hasStabilized(clip.id)
+          ) {
+            return null;
+          }
+          videoClips.push(clip);
+        }
+      }
+      const plan = planNativePreview(videoClips, startPosition, galleryOriginalUri);
+      // Every video still to come has to be in the player's run of clips.
+      if (!plan || plan.clips.length !== videoClips.length) return null;
+      const sizeOf = videoClips
+        .sort((a, b) => a.startTime - b.startTime)
+        .map((clip) => getMediaItem(clip.mediaId)?.metadata);
+
+      const key = JSON.stringify(plan.clips);
+      const pending = phoneNativeTeardownRef.current;
+      phoneNativeTeardownRef.current = null;
+      if (pending) window.clearTimeout(pending.timer);
+      const reuse = pending?.key === key ? pending : null;
+      if (pending && !reuse) pending.run();
+      player.debug?.({ message: `start at ${startPosition.toFixed(2)}${reuse ? " (reusing player)" : ""}` }).catch(() => {});
+
+      const box = () => {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        return {
+          x: Math.round(rect.left * dpr),
+          y: Math.round(rect.top * dpr),
+          width: Math.round(rect.width * dpr),
+          height: Math.round(rect.height * dpr),
+        };
+      };
+      try {
+        if (reuse) {
+          await player.seek(planSeekTarget(plan, startPosition));
+        } else {
+          await player.show({ ...box(), background: backgroundBehind(canvas.parentElement) });
+          await Promise.race([
+            player.load({ clips: plan.clips, index: 0, positionMs: plan.positionMs }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out")), 4000)),
+          ]);
+        }
+      } catch (error) {
+        console.warn("[Preview] Phone player couldn't start, using the web preview:", error);
+        player.debug?.({ message: `couldn't start: ${error instanceof Error ? error.message : String(error)}` }).catch(() => {});
+        player.release().catch(() => {});
+        reuse?.restoreBackgrounds();
+        return null;
+      }
+      if (!shouldContinue()) {
+        player.debug?.({ message: "superseded while loading" }).catch(() => {});
+        player.release().catch(() => {});
+        reuse?.restoreBackgrounds();
+        return () => {};
+      }
+
+      let isActive = true;
+      let rafId: number | null = null;
+      let videoShown = true;
+      let speed = 1;
+      let checkingDrift = false;
+      let lastSeek = 0;
+      const restoreBackgrounds = reuse?.restoreBackgrounds ?? clearAncestorBackgrounds(canvas);
+      const handBack = () => {
+        player.release().catch(() => {});
+        restoreBackgrounds();
+      };
+      nativePlaybackActiveRef.current = true;
+
+      const masterClock = getMasterClock();
+      masterClock.setDuration(actualEndTime);
+      masterClock.seek(startPosition);
+      if (!audioGraphRef.current) audioGraphRef.current = getRealtimeAudioGraph();
+      const audioGraph = audioGraphRef.current;
+      audioGraph.setPreviewMuted(isMuted);
+      for (const audioTrack of tracks.filter((track) => trackHasAudioItems(project, track.id))) {
+        audioGraph.createTrack({
+          trackId: audioTrack.id,
+          volume: 1,
+          pan: 0,
+          muted: audioTrack.muted || false,
+          solo: audioTrack.solo || false,
+          effects: [],
+        });
+      }
+      await audioGraph.resume();
+      audioGraph.seekTo(startPosition);
+
+      const cleanup = (preserveCaches = false) => {
+        if (!isActive) return;
+        player.debug?.({ message: `stop at ${masterClock.currentTime.toFixed(2)} (clock ${masterClock.isPlaying ? "playing" : "stopped"}, current ${shouldContinue()})` }).catch(() => {});
+        isActive = false;
+        nativePlaybackActiveRef.current = false;
+        if (rafId) cancelAnimationFrame(rafId);
+        if (preserveCaches) masterClock.pause();
+        else masterClock.stop();
+        audioGraph.stopScheduler();
+        // Keep the paused picture up until the web preview has drawn its own.
+        player.pause().catch(() => {});
+        if (videoShown) {
+          const teardown = { timer: 0, run: handBack, key, restoreBackgrounds };
+          teardown.timer = window.setTimeout(() => {
+            handBack();
+            if (phoneNativeTeardownRef.current === teardown) phoneNativeTeardownRef.current = null;
+          }, 600);
+          phoneNativeTeardownRef.current = teardown;
+        }
+      };
+
+      const keepInStep = () => {
+        if (checkingDrift || !isActive) return;
+        checkingDrift = true;
+        player
+          .position()
+          .then(({ index, positionMs }) => {
+            if (!isActive) return;
+            const nativeTime = nativeTimelineTime(plan, index, positionMs);
+            if (nativeTime === null) return;
+            const now = masterClock.currentTime;
+            const correction = driftCorrection(nativeTime - now);
+            if ("seek" in correction) {
+              // A seek takes the player a moment to settle; don't judge it again straight away.
+              if (performance.now() - lastSeek < 1500) return;
+              lastSeek = performance.now();
+              player.debug?.({ message: `drift ${(nativeTime - now).toFixed(2)}s, seeking` }).catch(() => {});
+              return player.seek(planSeekTarget(plan, now + 0.1));
+            }
+            if (correction.speed !== speed) {
+              speed = correction.speed;
+              return player.setSpeed({ speed });
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            checkingDrift = false;
+          });
+      };
+      let lastDriftCheck = 0;
+
+      const drawFrame = async () => {
+        if (!isActive) return;
+        const now = masterClock.currentTime;
+        if (now >= actualEndTime) {
+          cleanup();
+          setPlayheadPosition(0);
+          startPositionRef.current = 0;
+          onEnd();
+          return;
+        }
+        if (!masterClock.isPlaying || !shouldContinue()) {
+          cleanup();
+          if (!isScrubbingRef.current) onEnd();
+          return;
+        }
+        const nowMs = performance.now();
+        if (nowMs - lastPlayheadUpdateRef.current >= editingFrameDuration) {
+          lastPlayheadUpdateRef.current = nowMs;
+          setPlayheadPosition(now);
+        }
+
+        fillPreviewBackground(ctx, now, canvas.width, canvas.height);
+        if (now < plan.end) {
+          // Leave a hole where the phone's player shows the video.
+          const { index } = planSeekTarget(plan, now);
+          const size = sizeOf[index];
+          const { width, height } = size?.width && size.height
+            ? resolveCanvasFitDimensions("contain", size.width, size.height, canvas.width, canvas.height)
+            : { width: canvas.width, height: canvas.height };
+          ctx.clearRect((canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+          if (nowMs - lastDriftCheck > 500) {
+            lastDriftCheck = nowMs;
+            keepInStep();
+          }
+        } else if (videoShown) {
+          videoShown = false;
+          handBack();
+        }
+
+        const activeShapeClips = getActiveShapeClips(allShapeClipsRef.current, now);
+        const activeTextClips = getActiveTextClips(allTextClipsRef.current, now);
+        if (activeShapeClips.length > 0 || activeTextClips.length > 0 || hasActiveMotionInstances(now)) {
+          await renderOverlayClipsInTrackOrder(
+            ctx,
+            timelineTracksRef.current,
+            activeShapeClips,
+            activeTextClips,
+            now,
+            canvas.width,
+            canvas.height,
+            "all",
+          );
+        }
+        for (const subtitle of getActiveSubtitles(allSubtitles, now)) {
+          renderSubtitleToCanvas(ctx, subtitle, canvas.width, canvas.height, now);
+        }
+        if (isActive) rafId = requestAnimationFrame(() => void drawFrame());
+      };
+
+      await player.play();
+      await masterClock.play();
+      if (!isActive || !shouldContinue()) {
+        cleanup(true);
+        return () => {};
+      }
+      audioGraph.startScheduler(getAudioClipsForScheduler);
+      rafId = requestAnimationFrame(() => void drawFrame());
+      return cleanup;
+    },
+    [
+      actualEndTime,
+      editingFrameDuration,
+      allSubtitles,
+      getMediaItem,
+      getAudioClipsForScheduler,
+      isMuted,
+      hasActiveMotionInstances,
+      renderOverlayClipsInTrackOrder,
+      fillPreviewBackground,
+      setPlayheadPosition,
+      project,
+      canUseNativeVideoPlayback,
+    ],
+  );
+
+  useEffect(
+    () => () => {
+      const pending = phoneNativeTeardownRef.current;
+      if (pending) {
+        window.clearTimeout(pending.timer);
+        pending.run();
+      }
+      getPreviewPlayer()?.release().catch(() => {});
+    },
+    [],
+  );
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
@@ -6149,6 +6448,20 @@ export const Preview: React.FC = () => {
     };
 
     const startPlayback = async () => {
+      const shouldContinue = () =>
+        isActive && previewProxyCache.store.getState().revision === proxySourceRevision;
+      if (isPhone) {
+        const phoneCleanup = await startPhoneNativePlayback(
+          playbackStartPosition,
+          () => pause(),
+          shouldContinue,
+        );
+        if (phoneCleanup) {
+          nativeCleanup = phoneCleanup;
+          return nativeCleanup;
+        }
+        if (!isActive) return;
+      }
       const nativeCheck = canUseNativeVideoPlayback(playbackStartPosition);
 
       if (nativeCheck.canUse && nativeCheck.clips.length > 0) {
@@ -6209,6 +6522,8 @@ export const Preview: React.FC = () => {
     isPlaying,
     canUseNativeVideoPlayback,
     startNativeVideoPlayback,
+    startPhoneNativePlayback,
+    isPhone,
     actualEndTime,
     setPlayheadPosition,
     pause,

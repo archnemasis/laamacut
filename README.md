@@ -6,10 +6,10 @@
 
 ### Edit fast. Export smooth.
 
-A simple, friendly video editor for Windows. Download, install, edit.<br>
-Cut clips, add captions, mix audio, and export up to 120fps with no watermark.
+A free video editor for Android and Windows. No watermark, no account, no ads.<br>
+Cut clips, add captions, text to speech, mix audio, and export up to 120fps.
 
-**[⬇ Download for Windows](https://github.com/archnemasis/laamacut/releases/latest)** &nbsp;·&nbsp; **[Report a problem](https://github.com/archnemasis/laamacut/issues)**
+**[⬇ Download for Android or Windows](https://github.com/archnemasis/laamacut/releases/latest)** &nbsp;·&nbsp; **[☕ Support Laamacut](https://ko-fi.com/laamacut)** &nbsp;·&nbsp; **[Report a problem](https://github.com/archnemasis/laamacut/issues)**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-9333EA?style=flat-square)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/archnemasis/laamacut?include_prereleases&label=Release&style=flat-square&color=9333EA)](https://github.com/archnemasis/laamacut/releases/latest)
@@ -58,14 +58,21 @@ On PC, exports use your graphics card's hardware encoder when it can, so they fi
 
 ## Install
 
+### Android
+
+1. On your phone, open [Releases](https://github.com/archnemasis/laamacut/releases/latest) and download **`Laamacut-….apk`**.
+2. Open it. If Android asks, let your browser install apps.
+3. Tap **New video** and pick clips from your gallery.
+
+Needs Android 6 or newer.
+
+### Windows
+
 1. Go to [Releases](https://github.com/archnemasis/laamacut/releases/latest) and download **`Laamacut-…-x64.exe`**.
 2. Run it. Laamacut installs and opens straight away, and adds itself to the Start menu.
 3. If Windows SmartScreen warns you, choose **More info → Run anyway**. The installer isn't code-signed yet.
 
 Needs Windows 10 or 11 (64-bit). Larger projects and 4K footage run best with plenty of memory and a decent graphics card. Laamacut is in **alpha**, so expect a few rough edges.
-
-<sub>There's also an Android version (`Laamacut-….apk`) on the same Releases page.</sub>
-
 ---
 
 ## Build it yourself
@@ -108,6 +115,10 @@ cd apps/android && pnpm run apk
 Built with React, TypeScript, Electron, Capacitor, MediaBunny, WebCodecs, WebGPU, and Web Audio.
 
 </details>
+
+## Keep it free
+
+Laamacut has no ads, no watermark and no paid tier. If it saved you time, you can [buy me a coffee on Ko-fi](https://ko-fi.com/laamacut). Starring the repo and sharing it helps too.
 
 ## Found a bug?
 

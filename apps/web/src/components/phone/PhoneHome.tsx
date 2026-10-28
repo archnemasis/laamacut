@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { Film, Plus, Scissors, Trash2, User, type LucideIcon } from "@/icons/lucide-compat";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Film,
+  Heart,
+  Plus,
+  Scissors,
+  Trash2,
+  User,
+  type LucideIcon,
+} from "@/icons/lucide-compat";
 import { OpenReelMark } from "../../desktop/brand/OpenReelMark";
 import {
   deleteRecentProject,
@@ -9,6 +20,7 @@ import {
   type RecentEntry,
 } from "../../desktop/start/desktop-project-actions";
 import { requestPhoneMediaPicker } from "../../services/phone-media";
+import { DONATE_URL, LICENSE_TEXT, RELEASES_URL, SOURCE_URL, UPSTREAM_URL, openLink } from "../../services/support-links";
 import { useRouter } from "../../hooks/use-router";
 import { GeneralPanel } from "../editor/settings/GeneralPanel";
 import "../editor/phone-editor.css";
@@ -117,14 +129,50 @@ function EditTab() {
   );
 }
 
+function AboutPage({ onBack }: { onBack: () => void }) {
+  return (
+    <>
+      <header className="flex h-14 shrink-0 items-center gap-1 px-2">
+        <button type="button" aria-label="Back" onClick={onBack} className="grid h-10 w-10 place-items-center rounded-full">
+          <ChevronLeft size={26} aria-hidden />
+        </button>
+        <span className="text-[18px] font-bold">About</span>
+      </header>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-6 text-[14px]">
+        <p>
+          Laamacut is a free video editor with no watermark, no account and no ads. It's built on{" "}
+          <button type="button" onClick={() => openLink(UPSTREAM_URL)} className="font-semibold text-accent">
+            OpenReel
+          </button>{" "}
+          by Augustus Otu and its contributors.
+        </p>
+        <div className="flex flex-col gap-2">
+          <button type="button" onClick={() => openLink(SOURCE_URL)} className="flex items-center justify-between rounded-xl bg-bg-2 px-4 py-3">
+            Source code <ExternalLink size={16} aria-hidden />
+          </button>
+          <button type="button" onClick={() => openLink(RELEASES_URL)} className="flex items-center justify-between rounded-xl bg-bg-2 px-4 py-3">
+            Check for updates <ExternalLink size={16} aria-hidden />
+          </button>
+        </div>
+        <section>
+          <h2 className="mb-2 text-[15px] font-semibold">Licence</h2>
+          <pre className="whitespace-pre-wrap rounded-xl bg-bg-2 p-3 font-mono text-[11px] leading-relaxed text-fg-3">{LICENSE_TEXT}</pre>
+        </section>
+      </div>
+    </>
+  );
+}
+
 function MeTab() {
+  const [about, setAbout] = useState(false);
+  if (about) return <AboutPage onBack={() => setAbout(false)} />;
   return (
     <>
       <header className="flex h-14 shrink-0 items-center px-4">
         <span className="text-[20px] font-bold">Me</span>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-        <div className="mb-5 flex items-center gap-3 rounded-2xl bg-bg-2 p-4">
+        <div className="mb-3 flex items-center gap-3 rounded-2xl bg-bg-2 p-4">
           <span className="grid h-12 w-12 place-items-center rounded-full bg-bg-3">
             <OpenReelMark size={26} className="text-accent" />
           </span>
@@ -133,6 +181,25 @@ function MeTab() {
             <span className="block text-[12px] text-fg-3">Everything stays on your phone</span>
           </span>
         </div>
+        <button
+          type="button"
+          onClick={() => openLink(DONATE_URL)}
+          className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-accent bg-bg-2 p-4 text-left active:scale-[0.99]"
+        >
+          <Heart size={24} className="shrink-0 text-accent" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">Support Laamacut</span>
+            <span className="block text-[12px] text-fg-3">Free forever, no watermark. Tips keep it that way.</span>
+          </span>
+          <ExternalLink size={16} className="shrink-0 text-fg-3" aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbout(true)}
+          className="mb-5 flex w-full items-center justify-between rounded-2xl bg-bg-2 px-4 py-3 text-[15px]"
+        >
+          About and licence <ChevronRight size={20} className="text-fg-3" aria-hidden />
+        </button>
         <GeneralPanel showProjectSettings={false} />
       </div>
     </>

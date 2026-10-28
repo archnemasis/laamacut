@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, Play, Plus, Settings2 } from "@/icons/lucide-compat";
+import { ChevronLeft, Heart, Play, Plus, Settings2 } from "@/icons/lucide-compat";
+import { DONATE_URL, openLink } from "../../services/support-links";
 
 export type PhoneExportStatus = "naming" | "exporting" | "saved" | "error";
 
@@ -226,7 +227,14 @@ export function PhoneExportScreen({ status, progress, label, still, videoUrl, lo
               </span>
               Export options
             </button>
+            <button type="button" onClick={() => openLink(DONATE_URL)} className="flex flex-col items-center gap-2 text-center text-[13px] text-fg-2">
+              <span className="grid h-16 w-full place-items-center rounded-xl bg-white/10">
+                <Heart size={24} aria-hidden />
+              </span>
+              Support us
+            </button>
           </div>
+          <p className="mt-6 text-center text-[12px] text-fg-3">No watermark, no ads. If Laamacut saved you time, a small tip keeps it free.</p>
         </div>
       )}
 
