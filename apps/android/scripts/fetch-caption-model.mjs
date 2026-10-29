@@ -1,9 +1,9 @@
-// Puts the auto-captions model (Whisper Tiny, 8-bit) and the ONNX runtime it
-// runs on into the APK's assets, so captions work on first use and offline.
+// Puts the auto-captions model (Whisper Tiny, 8-bit) into the APK's assets, so
+// captions work on first use and offline. The ONNX runtime it runs on is
+// already part of the web build.
 // The app serves them at https://localhost/models/. Run before building the APK;
 // files already downloaded are kept.
-import { copyFile, mkdir, stat, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,11 +33,4 @@ for (const file of FILES) {
   await writeFile(target, Buffer.from(await response.arrayBuffer()));
 }
 
-// The runtime ships with the web app's transformers package.
-const require = createRequire(join(here, "..", "..", "web", "package.json"));
-const dist = dirname(require.resolve("@huggingface/transformers"));
-await mkdir(join(out, "ort"), { recursive: true });
-for (const file of ["ort-wasm-simd-threaded.jsep.mjs", "ort-wasm-simd-threaded.jsep.wasm"]) {
-  await copyFile(join(dist, file), join(out, "ort", file));
-}
 console.log(`Caption model ready in ${out}`);

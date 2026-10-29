@@ -1,4 +1,4 @@
-import { titleEngine, type Clip, type MediaItem, type Project, type TextClip, type Track, type VideoExportSettings } from "@openreel/core";
+import { calculateProjectDuration, titleEngine, type Clip, type MediaItem, type Project, type TextClip, type Track, type VideoExportSettings } from "@openreel/core";
 import { galleryOriginalUri } from "./gallery-originals";
 import { ensureProjectFonts } from "./project-fonts";
 import { findMainTrack } from "./phone-media";
@@ -170,6 +170,9 @@ export function planNativeExport(project: Project): NativeExportPlan | { reason:
     at = clip.startTime + clip.duration;
   }
   const duration = at;
+  // The editor and the web export run to the end of the last layer, so a
+  // video that stopped where the main track ends would come out shorter.
+  if (calculateProjectDuration(project) > duration + 0.001) return { reason: "layers past the end of the video" };
 
   const audio: NativeClip[][] = [];
   for (const track of timeline.tracks) {
@@ -203,7 +206,7 @@ function audioLane(
     if (clip.startTime < at - 0.001) return { reason: "overlapping audio" };
     const media = mediaById.get(clip.mediaId)!;
     const speed = clip.speed ?? 1;
-    // Sound past the end of the video is cut, like the web export.
+    // Nothing runs past the video (see planNativeExport); this only guards rounding.
     const duration = Math.min(clip.duration, end - clip.startTime);
     const native: NativeClip = {
       uri: "",

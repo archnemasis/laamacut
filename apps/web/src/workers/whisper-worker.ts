@@ -15,6 +15,10 @@ env.allowRemoteModels = true;
 env.remoteHost = MODEL_HOST;
 env.remotePathTemplate = "{model}/resolve/{revision}/";
 env.useBrowserCache = true;
+// Transformers.js fetches the ONNX runtime from jsDelivr by default. Clearing
+// the path makes it use the copy Vite bundles with this worker instead, so
+// captions need no CDN and the Android app carries one copy, not two.
+if (env.backends.onnx.wasm) env.backends.onnx.wasm.wasmPaths = undefined;
 
 interface WhisperOutput {
   text: string;
@@ -83,8 +87,6 @@ async function createWhisperModel(
     env.allowLocalModels = true;
     env.allowRemoteModels = false;
     env.localModelPath = BUNDLED_PATH;
-    const wasm = env.backends.onnx.wasm;
-    if (wasm) wasm.wasmPaths = `${BUNDLED_PATH}ort/`;
     const transcriber = await createPipeline("automatic-speech-recognition", modelId, {
       device: "wasm",
       dtype: "q8",
@@ -140,7 +142,7 @@ function loadModel(
   return modelPromise;
 }
 
-self.onmessage = async (
+const handleMessage = async (
   event: MessageEvent<{
     requestId: string;
     type: "load" | "transcribe";
@@ -186,5 +188,9 @@ self.onmessage = async (
     });
   }
 };
+
+// The ONNX runtime starts its helper threads from this same file (named
+// "em-pthread") and sets their message handler itself, so leave theirs alone.
+if (!self.name.startsWith("em-pthread")) self.onmessage = handleMessage;
 
 export {};

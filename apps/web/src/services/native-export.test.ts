@@ -46,7 +46,7 @@ describe("planNativeExport", () => {
       project(
         [
           track("main", [clip("a", "v1", 0, 2, { speed: 2, volume: 0.5 }), clip("b", "img", 2, 3), clip("c", "v2", 5, 1)]),
-          track("music", [clip("m", "song", 1, 10)]),
+          track("music", [clip("m", "song", 1, 5)]),
         ],
         [media("v1", "video"), media("v2", "video"), media("img", "image"), media("song", "audio")],
       ),
@@ -55,7 +55,7 @@ describe("planNativeExport", () => {
     expect(plan.duration).toBe(6);
     expect(plan.main[0]).toMatchObject({ uri: "content://media/1", inUs: 1_000_000, outUs: 5_000_000, durationUs: 2_000_000, speed: 2, volume: 0.5 });
     expect(plan.main[1]).toMatchObject({ kind: "image", durationUs: 3_000_000, mime: "image/png" });
-    // Music starts after a 1s gap and is cut where the video ends.
+    // Music starts after a 1s gap.
     expect(plan.audio[0][0]).toMatchObject({ gapBeforeUs: 1_000_000, durationUs: 5_000_000 });
     expect(plan.pending.map((p) => p.media.id)).toEqual(["img", "song"]);
   });
@@ -88,5 +88,16 @@ describe("planNativeExport", () => {
       project(tracks, items, { textClips: [{ ...text, animation: { preset: "fade", params: {}, inDuration: 0.5, outDuration: 0 } }] as never }),
     );
     expect(animated).toEqual({ reason: "text animations" });
+  });
+
+  it("uses the web export when text or music runs past the end of the video", () => {
+    const tracks = [track("main", [clip("a", "v1", 0, 2)])];
+    const text = { id: "x", trackId: "tt", startTime: 1, duration: 1.5, text: "Hi", style: {}, transform, keyframes: [] };
+    const longText = planNativeExport(project(tracks, [media("v1", "video")], { textClips: [text] as never }));
+    expect(longText).toEqual({ reason: "layers past the end of the video" });
+    const longMusic = planNativeExport(
+      project([...tracks, track("music", [clip("m", "song", 0, 3)])], [media("v1", "video"), media("song", "audio")]),
+    );
+    expect(longMusic).toEqual({ reason: "layers past the end of the video" });
   });
 });

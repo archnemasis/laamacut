@@ -59,8 +59,7 @@ jobs:
           models=apps/android/android/app/src/models/public/models
           for file in onnx-community/whisper-tiny/config.json \
                       onnx-community/whisper-tiny/onnx/encoder_model_quantized.onnx \
-                      onnx-community/whisper-tiny/onnx/decoder_model_merged_quantized.onnx \
-                      ort/ort-wasm-simd-threaded.jsep.wasm; do
+                      onnx-community/whisper-tiny/onnx/decoder_model_merged_quantized.onnx; do
             test -s "$models/$file" || { echo "Missing $file"; exit 1; }
           done
 
