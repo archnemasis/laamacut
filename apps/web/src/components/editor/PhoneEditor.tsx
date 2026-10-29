@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AudioLines,
   Blend,
@@ -103,11 +103,55 @@ function ToolButton({ tool }: { tool: Tool }) {
       type="button"
       onClick={tool.onClick}
       disabled={tool.disabled}
-      className="flex h-full w-[64px] shrink-0 flex-col items-center justify-center gap-1.5 text-fg disabled:opacity-35"
+      className="flex h-full w-[60px] shrink-0 flex-col items-center justify-center gap-1.5 text-fg disabled:opacity-35"
     >
       <Icon size={22} strokeWidth={1.5} aria-hidden />
       <span className="text-[11px] leading-tight">{tool.label}</span>
     </button>
+  );
+}
+
+// Wide enough that the next tool peeks in, dimmed rather than hidden.
+const FADE = "48px";
+const FADED = "rgba(0,0,0,0.3)";
+
+/**
+ * The tool row scrolls sideways once it holds more tools than fit. Fade the
+ * edge that has more tools behind it, so it is clear there are more to see.
+ */
+function ToolStrip({ tools }: { tools: Tool[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdges((prev) => (prev.left === left && prev.right === right ? prev : { left, right }));
+  }, []);
+  useEffect(() => {
+    measure();
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, tools.length]);
+  const mask = `linear-gradient(to right, ${edges.left ? FADED : "#000"}, #000 ${FADE}, #000 calc(100% - ${FADE}), ${edges.right ? FADED : "#000"})`;
+  return (
+    <div
+      ref={ref}
+      data-testid="phone-tool-strip"
+      data-more-left={edges.left || undefined}
+      data-more-right={edges.right || undefined}
+      onScroll={measure}
+      className="scrollbar-none flex min-w-0 flex-1 overflow-x-auto"
+      style={{ maskImage: mask, WebkitMaskImage: mask }}
+    >
+      {tools.map((tool) => (
+        <ToolButton key={tool.label} tool={tool} />
+      ))}
+    </div>
   );
 }
 
@@ -559,11 +603,7 @@ export const PhoneEditor: React.FC = () => {
               <ChevronLeft size={22} aria-hidden />
             </button>
           )}
-          <div className="scrollbar-none flex min-w-0 flex-1 overflow-x-auto">
-            {tools.map((tool) => (
-              <ToolButton key={tool.label} tool={tool} />
-            ))}
-          </div>
+          <ToolStrip tools={tools} />
         </nav>
 
         <input ref={soundInput} type="file" accept="audio/*" multiple hidden onChange={(e) => void addAtPlayhead(e.target.files).finally(() => (e.target.value = ""))} />

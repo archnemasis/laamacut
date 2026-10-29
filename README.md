@@ -51,7 +51,7 @@ On PC, exports use your graphics card's hardware encoder when it can, so they fi
 
 ## Your footage stays yours
 
-- **Everything happens on your device.** Nothing is uploaded to a server.
+- **Editing and exports stay on your device.** Online features (like ElevenLabs text-to-speech) send data only when you use them.
 - **No watermark.** Your finished video is yours.
 - **Auto-save.** Your projects save as you work and show up in Recent projects with a preview.
 - **Free and open source,** under the MIT licence.
@@ -64,7 +64,7 @@ On PC, exports use your graphics card's hardware encoder when it can, so they fi
 2. Open it. If Android asks, let your browser install apps.
 3. Tap **New video** and pick clips from your gallery.
 
-Needs Android 6 or newer.
+Needs Android 6 or newer on a 64-bit phone.
 
 ### Windows
 

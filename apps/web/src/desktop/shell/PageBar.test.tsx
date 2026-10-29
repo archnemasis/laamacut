@@ -26,4 +26,10 @@ describe("PageBar", () => {
     expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Deliver" })).toBeDisabled();
   });
+
+  it("disables only Deliver while the timeline is empty", () => {
+    render(<PageBar hasProject canDeliver={false} onHome={() => {}} onDeliver={() => {}} onSettings={() => {}} />);
+    expect(screen.getByRole("button", { name: "Edit" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Deliver" })).toBeDisabled();
+  });
 });

@@ -43,6 +43,45 @@ export class FileWriterRegistry {
 
 export const fileWriters = new FileWriterRegistry();
 
+/**
+ * Paths the renderer may touch: ones the user picked in a file dialog this
+ * session, and temp files main made. The renderer cannot name any other file,
+ * so a compromised page cannot read or overwrite the rest of the disk.
+ */
+export class PathGrants {
+  private granted = new Set<string>();
+
+  private key(p: string): string {
+    const resolved = path.resolve(p);
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  }
+
+  grant(p: string): string {
+    this.granted.add(this.key(p));
+    return p;
+  }
+
+  has(p: string): boolean {
+    return typeof p === "string" && path.isAbsolute(p) && this.granted.has(this.key(p));
+  }
+
+  require(p: string): string {
+    if (!this.has(p)) throw new Error("[fs] path was not chosen by the user");
+    return p;
+  }
+}
+
+export const pathGrants = new PathGrants();
+
+/** Project files can be reopened from Recent projects after a restart, so these extensions stay allowed. */
+const PROJECT_EXTENSIONS = new Set([".oreel", ".json"]);
+
+export function requireProjectPath(p: string): string {
+  if (pathGrants.has(p)) return p;
+  if (path.isAbsolute(p) && PROJECT_EXTENSIONS.has(path.extname(p).toLowerCase())) return p;
+  throw new Error("[fs] not a project file the user chose");
+}
+
 export async function showSaveDialog(args: {
   defaultPath: string;
   filters: { name: string; extensions: string[] }[];
@@ -52,7 +91,7 @@ export async function showSaveDialog(args: {
     defaultPath: args.defaultPath,
     filters: args.filters,
   });
-  return res.canceled || !res.filePath ? null : res.filePath;
+  return res.canceled || !res.filePath ? null : pathGrants.grant(res.filePath);
 }
 
 export async function showOpenDialog(args: {
@@ -63,27 +102,27 @@ export async function showOpenDialog(args: {
     filters: args.filters,
     properties: ["openFile"],
   });
-  return res.canceled || res.filePaths.length === 0 ? null : res.filePaths[0];
+  return res.canceled || res.filePaths.length === 0 ? null : pathGrants.grant(res.filePaths[0]);
 }
 
 export async function readTextFile(args: { path: string }): Promise<string> {
-  return fs.readFile(args.path, "utf8");
+  return fs.readFile(requireProjectPath(args.path), "utf8");
 }
 
 export async function readFileBytes(args: { path: string }): Promise<ArrayBuffer> {
-  const buf = await fs.readFile(args.path);
+  const buf = await fs.readFile(pathGrants.require(args.path));
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 }
 
 export async function writeTextFile(args: { path: string; data: string }): Promise<void> {
-  await fs.writeFile(args.path, args.data, "utf8");
+  await fs.writeFile(requireProjectPath(args.path), args.data, "utf8");
 }
 
 export async function revealInFolder(args: { path: string }): Promise<void> {
-  shell.showItemInFolder(args.path);
+  shell.showItemInFolder(pathGrants.require(args.path));
 }
 
 export async function tempFilePath(args: { ext: string }): Promise<string> {
   const safeExt = args.ext.replace(/[^a-zA-Z0-9]/g, "") || "bin";
-  return path.join(os.tmpdir(), `openreel-mat-${randomUUID()}.${safeExt}`);
+  return pathGrants.grant(path.join(os.tmpdir(), `openreel-mat-${randomUUID()}.${safeExt}`));
 }

@@ -28,6 +28,7 @@ function detectPlatform(): string {
 export function DesktopApp(): JSX.Element {
   const platform = detectPlatform();
   const hasProject = useProjectStore((state) => state.hasOpenProject);
+  const hasTimelineContent = useProjectStore((state) => (state.project?.timeline?.duration ?? 0) > 0);
 
   // Home, like Resolve's project manager: save the open project, then show
   // the project list. The project reopens from Recent projects.
@@ -133,6 +134,7 @@ export function DesktopApp(): JSX.Element {
       <UpdateBanner />
       <PageBar
         hasProject={hasProject}
+        canDeliver={hasProject && hasTimelineContent}
         onHome={() => void goHome()}
         onDeliver={() => window.dispatchEvent(new CustomEvent("openreel:menu:export"))}
         onSettings={() => useSettingsStore.getState().openSettings()}

@@ -43,6 +43,7 @@ function shouldUseWebCodecs(settings: VideoExportSettings): boolean {
 export function DesktopExportButton(): JSX.Element {
   const project = useProjectStore((state) => state.project);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const hasTimelineContent = (project?.timeline?.duration ?? 0) > 0;
 
   const {
     state,
@@ -56,7 +57,10 @@ export function DesktopExportButton(): JSX.Element {
   } = useExportRunner({ project });
 
   useEffect(() => {
-    const open = () => setIsDialogOpen(true);
+    // The menu and the Deliver page can ask for export; there is nothing to export on an empty timeline.
+    const open = () => {
+      if ((useProjectStore.getState().project?.timeline?.duration ?? 0) > 0) setIsDialogOpen(true);
+    };
     window.addEventListener("openreel:menu:export", open);
     return () => window.removeEventListener("openreel:menu:export", open);
   }, []);
@@ -180,6 +184,8 @@ export function DesktopExportButton(): JSX.Element {
         icon={<Icon name="square.and.arrow.up" size={15} ariaHidden />}
         style={NO_DRAG}
         onClick={() => setIsDialogOpen(true)}
+        isDisabled={!hasTimelineContent}
+        title={hasTimelineContent ? "Choose export settings" : "Add media or text to the timeline to export"}
         className="mr-2"
       />
 

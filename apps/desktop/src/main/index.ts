@@ -3,7 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import { registerAppSchemePrivileges, handleAppScheme, APP_INDEX } from "./protocol";
 import { installNavigationGuard } from "./nav-guard";
-import { handle } from "./ipc";
+import { handle, assertTrustedSender } from "./ipc";
 import { CHANNELS } from "../shared/ipc-contract";
 import { collectHardwareInfo } from "./ipc/hardware";
 import {
@@ -38,6 +38,7 @@ import {
   writeTextFile,
   revealInFolder,
   tempFilePath,
+  pathGrants,
 } from "./ipc/fs";
 import {
   generateProxy,
@@ -160,7 +161,9 @@ app.whenReady().then(() => {
   handle(CHANNELS.fsShowOpenDialog, openDialogArgsSchema, showOpenDialog);
   handle(CHANNELS.fsReadFile, readFileArgsSchema, readTextFile);
   handle(CHANNELS.fsWriteFile, writeFileArgsSchema, writeTextFile);
-  handle(CHANNELS.fsOpenWrite, z.object({ path: z.string() }), ({ path }) => fileWriters.open(path));
+  handle(CHANNELS.fsOpenWrite, z.object({ path: z.string() }), ({ path }) =>
+    fileWriters.open(pathGrants.require(path)),
+  );
   handle(
     CHANNELS.fsWriteChunk,
     z.object({
@@ -229,7 +232,11 @@ app.whenReady().then(() => {
   );
   handle(CHANNELS.keychainDelete, z.object({ id: z.string() }), ({ id }) => getKeyStore().delete(id));
   handle(CHANNELS.cloudFetch, cloudFetchArgsSchema, cloudFetch);
-  ipcMain.handle(CHANNELS.exportStart, (e, raw) => startExport(e.sender, raw));
+  ipcMain.handle(CHANNELS.exportStart, (e, raw) => {
+    assertTrustedSender(e);
+    pathGrants.require((raw as { outputPath?: unknown })?.outputPath as string);
+    return startExport(e.sender, raw);
+  });
   handle(
     CHANNELS.exportWriteAudioWav,
     z.object({ jobId: z.string(), wav: z.instanceof(ArrayBuffer) }),

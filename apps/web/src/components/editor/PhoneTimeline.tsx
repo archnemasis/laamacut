@@ -553,11 +553,14 @@ export function PhoneTimeline({
         e.stopPropagation();
         onClick();
       }}
-      className="absolute inset-y-1 left-0 flex items-center gap-2 rounded-md bg-bg-2 px-3 text-[13px] text-fg-2"
+      // The whole lane is the tap target; the pill inside is just how it looks.
+      className="absolute inset-y-0 left-0 flex py-1 text-[13px] text-fg-2"
       style={{ width: Math.max(contentWidth, width * 0.6) }}
     >
-      <Plus size={16} aria-hidden />
-      {label}
+      <span className="flex flex-1 items-center gap-2 rounded-md bg-bg-2 px-3">
+        <Plus size={16} aria-hidden />
+        {label}
+      </span>
     </button>
   );
 

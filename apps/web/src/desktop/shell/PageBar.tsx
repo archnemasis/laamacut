@@ -46,11 +46,14 @@ const PAGES: { page: DesktopPage; label: string; icon: LucideIcon }[] = [
  */
 export function PageBar({
   hasProject,
+  canDeliver = hasProject,
   onHome,
   onDeliver,
   onSettings,
 }: {
   hasProject: boolean;
+  /** False while the timeline is empty, so there is nothing to deliver. */
+  canDeliver?: boolean;
   onHome(): void;
   onDeliver(): void;
   onSettings(): void;
@@ -82,7 +85,7 @@ export function PageBar({
             onClick={() => setPage(tab.page)}
           />
         ))}
-        <PageTab label="Deliver" icon={Rocket} disabled={!hasProject} onClick={onDeliver} />
+        <PageTab label="Deliver" icon={Rocket} disabled={!canDeliver} onClick={onDeliver} />
       </div>
       <div className="flex justify-end">
         <button

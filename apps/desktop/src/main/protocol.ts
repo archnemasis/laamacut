@@ -4,6 +4,26 @@ import { pathToFileURL } from "node:url";
 
 const SCHEME = "app";
 
+/**
+ * The renderer only runs scripts bundled with the app. 'unsafe-eval' stays
+ * because keyframe expressions compile with new Function, and online
+ * features (text-to-speech, model downloads) need https connections.
+ */
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' blob:",
+  "worker-src 'self' blob:",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' data: blob: https:",
+  "connect-src 'self' data: blob: https: wss:",
+  "object-src 'none'",
+  "frame-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join("; ");
+
 export function registerAppSchemePrivileges(): void {
   protocol.registerSchemesAsPrivileged([
     {
@@ -44,6 +64,7 @@ export function handleAppScheme(rendererRoot: string): void {
     headers.set("Cross-Origin-Opener-Policy", "same-origin");
     headers.set("Cross-Origin-Embedder-Policy", "require-corp");
     headers.set("Cross-Origin-Resource-Policy", "same-origin");
+    headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,

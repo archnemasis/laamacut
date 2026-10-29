@@ -25,11 +25,14 @@ import {
   extractAudioWav,
   probeAudioStreams,
 } from "../src/main/ipc/media";
+import { pathGrants } from "../src/main/ipc/fs";
 
 const run = promisify(execFile);
 const stamp = Date.now();
 const src = path.join(tmpdir(), `openreel-media-src-${stamp}.mp4`);
 const created: string[] = [src];
+// In the app, sources are temp files main hands out; grant this one the same way.
+pathGrants.grant(src);
 
 function ffprobePathFor(ffmpeg: string): string {
   return path.join(path.dirname(ffmpeg), process.platform === "win32" ? "ffprobe.exe" : "ffprobe");

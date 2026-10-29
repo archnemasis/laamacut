@@ -13,7 +13,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { useUIStore } from "../../stores/ui-store";
 import { NEW_PROJECT_SETTINGS, newProjectName } from "../../services/new-project";
 import { useRouter } from "../../hooks/use-router";
-import { useEditorPreload } from "../../hooks/useEditorPreload";
+import { editorPreloadProps } from "../../hooks/useEditorPreload";
 import { useAnalytics, AnalyticsEvents } from "../../hooks/useAnalytics";
 import llamaUrl from "../../assets/laamacut-llama.png?url";
 
@@ -29,6 +29,8 @@ const LoadingView = () => <div role="status" className="p-6 text-center text-tex
 const OpenReelLogo: React.FC<{ className?: string }> = ({ className = "" }) => (
   <img src={llamaUrl} alt="" className={className} draggable={false} />
 );
+
+const isDesktopApp = typeof window !== "undefined" && window.openreel?.platform === "desktop";
 
 type ViewMode = "home" | "templates" | "recent";
 
@@ -46,8 +48,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
   const { track } = useAnalytics();
 
   const [viewMode, setViewMode] = useState<ViewMode>(initialTab ?? "home");
-
-  useEditorPreload(true);
 
   const handleCreateProject = useCallback(() => {
     createNewProject(newProjectName(), NEW_PROJECT_SETTINGS);
@@ -156,7 +156,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
               From idea to export.
             </Text>
             <Text display="block" type="supporting" color="secondary" className="text-xl text-text-secondary mb-8">
-              In your browser.
+              {isDesktopApp ? "On your PC." : "In your browser."}
             </Text>
             <Text display="block" type="supporting" color="secondary" className="text-base text-text-muted max-w-md">
               Pick the ratio in the editor. Name, quality, frame rate and bitrate are set when you export.
@@ -167,6 +167,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
             <button
               type="button"
               onClick={handleCreateProject}
+              {...editorPreloadProps}
               className="group flex h-40 w-full max-w-xl items-center justify-center gap-4 rounded-2xl border border-border bg-bg-1 text-fg transition-colors hover:border-accent hover:bg-accent-soft focus-visible:border-accent focus-visible:outline-none"
             >
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-fg transition-transform group-hover:scale-105">
@@ -192,6 +193,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ initialTab }) => {
               className="rounded-xl"
             />
             <Button
+              {...editorPreloadProps}
               label="Open editor"
               variant="secondary"
               icon={<FolderOpen size={16} aria-hidden />}

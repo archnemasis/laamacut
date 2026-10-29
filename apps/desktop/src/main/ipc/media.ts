@@ -10,9 +10,10 @@ import {
   type TranscodeContainer,
 } from "../sidecar/media-job";
 import { probeAudioStreams as probe, type AudioStreamInfo } from "../sidecar/probe-streams";
+import { pathGrants } from "./fs";
 
 function tmpPath(ext: string): string {
-  return path.join(os.tmpdir(), `openreel-${randomUUID()}.${ext}`);
+  return pathGrants.grant(path.join(os.tmpdir(), `openreel-${randomUUID()}.${ext}`));
 }
 
 export async function generateProxy(args: {
@@ -20,7 +21,7 @@ export async function generateProxy(args: {
   preset: ProxyPreset;
 }): Promise<{ outPath: string }> {
   const outPath = tmpPath("mp4");
-  await new MediaJob(buildProxyArgs(args.srcPath, outPath, args.preset)).run();
+  await new MediaJob(buildProxyArgs(pathGrants.require(args.srcPath), outPath, args.preset)).run();
   return { outPath };
 }
 
@@ -32,7 +33,7 @@ export async function transcode(args: {
 }): Promise<{ outPath: string }> {
   const outPath = tmpPath(args.container);
   await new MediaJob(
-    buildTranscodeArgs(args.srcPath, outPath, {
+    buildTranscodeArgs(pathGrants.require(args.srcPath), outPath, {
       container: args.container,
       videoBitrateKbps: args.videoBitrateKbps,
       audioBitrateKbps: args.audioBitrateKbps,
@@ -46,12 +47,12 @@ export async function extractAudioWav(args: {
   streamIndex?: number;
 }): Promise<{ outPath: string }> {
   const outPath = tmpPath("wav");
-  await new MediaJob(buildExtractAudioArgs(args.srcPath, outPath, args.streamIndex)).run();
+  await new MediaJob(buildExtractAudioArgs(pathGrants.require(args.srcPath), outPath, args.streamIndex)).run();
   return { outPath };
 }
 
 export async function probeAudioStreams(args: {
   srcPath: string;
 }): Promise<{ streams: AudioStreamInfo[] }> {
-  return { streams: await probe(args.srcPath) };
+  return { streams: await probe(pathGrants.require(args.srcPath)) };
 }

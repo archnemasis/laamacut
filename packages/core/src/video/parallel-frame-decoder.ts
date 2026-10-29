@@ -3,7 +3,7 @@ import type {
   DecodeResponse,
   WorkerResponse,
 } from "./decode-worker";
-import { createDecodeWorkerUrl } from "./decode-worker";
+import { createDecodeWorker } from "./decode-worker";
 
 export interface FrameDecodeRequest {
   clipId: string;
@@ -48,7 +48,6 @@ export interface ParallelDecoderStats {
 
 export class ParallelFrameDecoder {
   private workers: WorkerState[] = [];
-  private workerUrls: string[] = [];
   private requestQueue: Array<{
     request: FrameDecodeRequest;
     resolve: (result: FrameDecodeResult) => void;
@@ -97,10 +96,7 @@ export class ParallelFrameDecoder {
 
   private async createWorker(index: number): Promise<WorkerState> {
     return new Promise((resolve, reject) => {
-      const workerUrl = createDecodeWorkerUrl();
-      this.workerUrls.push(workerUrl);
-
-      const worker = new Worker(workerUrl, { type: "module" });
+      const worker = createDecodeWorker();
 
       const state: WorkerState = {
         worker,
@@ -399,11 +395,6 @@ export class ParallelFrameDecoder {
       worker.worker.terminate();
     }
     this.workers = [];
-
-    for (const url of this.workerUrls) {
-      URL.revokeObjectURL(url);
-    }
-    this.workerUrls = [];
 
     this.clearCache();
 

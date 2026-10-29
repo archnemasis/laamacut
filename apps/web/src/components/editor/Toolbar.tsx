@@ -738,7 +738,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
                 <DropdownMenuItem
                   icon={<Settings size={18} aria-hidden />}
                   label="Custom export..."
-                  description="Full settings with AI upscaling"
+                  description="Full settings, including upscaling"
                   endContent={<MoreHorizontal size={14} className="text-fg-muted" aria-hidden />}
                   onClick={openExportDialog}
                 />
