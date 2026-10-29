@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Music, Pencil, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
+import { ArrowLeftRight, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Music, Pencil, Plus, Type, Volume2, VolumeX } from "@/icons/lucide-compat";
+import { animationSpans } from "./phone-keyframes";
 import { getProjectPreview, setProjectCover } from "../../services/project-previews";
 import { PhoneCoverScreen } from "./PhoneCoverScreen";
 import { reorderTrackClips } from "../../services/phone-media";
+import { haptic } from "../../services/haptics";
 import { ensureFilmstrip } from "../../services/filmstrip";
 import { toast } from "../../stores/notification-store";
 import type { Clip, MediaItem } from "@openreel/core";
@@ -27,6 +29,33 @@ const finite = (value: number | undefined): number => (Number.isFinite(value) ? 
 type LaneItem = { id: string; start: number; duration: number; label: string; kind?: "text-clip" | "shape-clip"; clip?: Clip };
 type TrimDraft = { id: string; side: "start" | "end"; delta: number };
 type TrimSide = TrimDraft["side"];
+
+/**
+ * Like CapCut, the part of a clip an animation covers is shaded, with arrows
+ * pointing the way it plays: in at the start, out at the end, both for combo.
+ */
+function AnimationBands({ clip, pps, offset = 0 }: { clip: Clip; pps: number; offset?: number }) {
+  return (
+    <>
+      {animationSpans(clip.keyframes).map((span) => {
+        const Arrow = span.kind === "out" ? ChevronsLeft : span.kind === "in" ? ChevronsRight : ArrowLeftRight;
+        return (
+          <span
+            key={span.kind}
+            data-testid={`animation-${span.kind}`}
+            aria-hidden
+            className={`pointer-events-none absolute inset-y-0 flex items-center overflow-hidden bg-black/45 text-white ${
+              span.kind === "out" ? "justify-start border-l border-white/70 pl-0.5" : span.kind === "in" ? "justify-end border-r border-white/70 pr-0.5" : "justify-center"
+            }`}
+            style={{ left: (span.start - offset) * pps, width: Math.max(2, (span.end - span.start) * pps) }}
+          >
+            <Arrow size={14} strokeWidth={2.5} className="shrink-0" />
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 /** CapCut's white trim handle, stuck to the side of the selected block with an arrow on it. */
 function TrimHandle({ side, value, onPointerDown }: { side: TrimSide; value: number; onPointerDown: (e: React.PointerEvent) => void }) {
@@ -317,7 +346,7 @@ export function PhoneTimeline({
 
   /** Show the guide line, with a tiny buzz as it clicks onto a new edge. */
   const showSnap = (time: number | null) => {
-    if (time !== null && time !== lastSnap.current) navigator.vibrate?.(8);
+    if (time !== null && time !== lastSnap.current) haptic("tick");
     lastSnap.current = time;
     setSnapLine(time);
   };
@@ -405,7 +434,7 @@ export function PhoneTimeline({
     window.addEventListener("pointercancel", cleanup);
     pressTimer.current = window.setTimeout(() => {
       cleanup();
-      navigator.vibrate?.(15);
+      haptic("heavy");
       onBegin?.();
       dragRef.current = { id, x0, dx: 0 };
       setDrag({ id, dx: 0 });
@@ -511,6 +540,11 @@ export function PhoneTimeline({
         >
           {selected ? `${place.duration.toFixed(1)}s · ${item.label}` : item.label}
         </button>
+        {item.clip && (
+          <span className={`pointer-events-none absolute inset-0 overflow-hidden ${selected ? "" : "rounded-md"}`}>
+            <AnimationBands clip={item.clip} pps={pps} offset={place.startDelta} />
+          </span>
+        )}
         {target && (
           <>
             <TrimHandle side="start" value={place.start} onPointerDown={beginTrim(target, "start")} />
@@ -694,7 +728,7 @@ export function PhoneTimeline({
                     }`}
                     style={{ left, width: clipWidth, translate: drag?.id === clip.id ? `${drag.dx}px 0` : undefined }}
                   >
-                    <div className={`flex h-full overflow-hidden bg-bg-3 ${selected ? "rounded-none" : "rounded-md"}`}>
+                    <div className={`relative flex h-full overflow-hidden bg-bg-3 ${selected ? "rounded-none" : "rounded-md"}`}>
                       {Array.from({ length: tiles }, (_, i) => {
                         const url = thumbnailAt(media, inPoint + ((i + 0.5) * MAIN_LANE_H) / pps);
                         return (
@@ -705,6 +739,7 @@ export function PhoneTimeline({
                           />
                         );
                       })}
+                      <AnimationBands clip={clip} pps={pps} offset={place.startDelta} />
                     </div>
                     {selected && (
                       <>

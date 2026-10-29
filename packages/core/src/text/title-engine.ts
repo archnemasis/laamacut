@@ -54,8 +54,21 @@ export function getCaptionWrapWidth(
   return Math.max(1, canvasWidth * 0.9 / scale - 20);
 }
 
+// Bumped whenever a font finishes loading, so text drawn in a fallback font
+// is drawn again once the real one arrives.
+let fontGeneration = 0;
+if (typeof document !== "undefined" && typeof document.fonts?.addEventListener === "function") {
+  document.fonts.addEventListener("loadingdone", () => {
+    fontGeneration++;
+  });
+}
+
+/** Rendered text kept per clip; each entry holds a full-frame canvas. */
+const RENDER_CACHE_SIZE = 12;
+
 export class TitleEngine {
   private textClips: Map<string, TextClip> = new Map();
+  private renderCache = new Map<string, { key: string; result: TextRenderResult }>();
   private canvas: HTMLCanvasElement | OffscreenCanvas | null = null;
   private ctx:
     | CanvasRenderingContext2D
@@ -228,22 +241,6 @@ export class TitleEngine {
     time: number = 0,
     contentScale: { x: number; y: number } = { x: 1, y: 1 },
   ): TextRenderResult {
-    let canvas: HTMLCanvasElement | OffscreenCanvas;
-    let ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-
-    if (typeof OffscreenCanvas !== "undefined") {
-      canvas = new OffscreenCanvas(width, height);
-    } else {
-      canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-    }
-    ctx = canvas.getContext("2d") as
-      | CanvasRenderingContext2D
-      | OffscreenCanvasRenderingContext2D;
-
-    ctx.clearRect(0, 0, width, height);
-
     const animatedState = textAnimationEngine.getAnimatedState(clip, time);
     let { opacity, transform, style, visibleText, characterStates } =
       animatedState;
@@ -268,18 +265,52 @@ export class TitleEngine {
       };
     }
 
+    const captionWrapWidth = getCaptionWrapWidth(
+      { ...clip, transform }, width, contentScale.x,
+    );
+
+    // Most text looks the same from one frame to the next (captions, titles
+    // between animations), so the last picture is reused while nothing that
+    // shapes it has changed. Shaders animate with time, so they always redraw.
+    const cacheKey = style.shader
+      ? null
+      : JSON.stringify([
+          width, height, contentScale.x, contentScale.y, opacity, transform,
+          style, visibleText, characterStates, captionWrapWidth, fontGeneration,
+        ]);
+    const cached = cacheKey === null ? undefined : this.renderCache.get(clip.id);
+    if (cached && cached.key === cacheKey) return cached.result;
+    const remember = (result: TextRenderResult): TextRenderResult => {
+      if (cacheKey === null) return result;
+      this.renderCache.delete(clip.id);
+      this.renderCache.set(clip.id, { key: cacheKey, result });
+      if (this.renderCache.size > RENDER_CACHE_SIZE) {
+        this.renderCache.delete(this.renderCache.keys().next().value as string);
+      }
+      return result;
+    };
+
+    let canvas: HTMLCanvasElement | OffscreenCanvas;
+    if (typeof OffscreenCanvas !== "undefined") {
+      canvas = new OffscreenCanvas(width, height);
+    } else {
+      canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+    }
+    const ctx = canvas.getContext("2d") as
+      | CanvasRenderingContext2D
+      | OffscreenCanvasRenderingContext2D;
+
     if (opacity <= 0 || visibleText.length === 0) {
-      return {
+      return remember({
         canvas,
         width,
         height,
         textMetrics: this.measureText("", clip.style, width),
-      };
+      });
     }
 
-    const captionWrapWidth = getCaptionWrapWidth(
-      { ...clip, transform }, width, contentScale.x,
-    );
     const metrics = this.measureText(visibleText, style, captionWrapWidth ?? width);
 
     ctx.save();
@@ -410,12 +441,12 @@ export class TitleEngine {
 
     this.applyTextShader(canvas, ctx, style.shader, time, width, height);
 
-    return {
+    return remember({
       canvas,
       width,
       height,
       textMetrics: metrics,
-    };
+    });
   }
 
   measureText(text: string, style: TextStyle, maxWidth?: number): TextMetrics {

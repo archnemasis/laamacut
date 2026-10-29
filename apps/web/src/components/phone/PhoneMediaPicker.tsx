@@ -199,7 +199,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
   const openFiles = () => (tab === "video" ? videoInput : photoInput).current?.click();
 
   return (
-    <div role="dialog" aria-label="Add media" className="fixed inset-0 z-[200] flex flex-col bg-bg text-fg">
+    <div role="dialog" aria-label="Add media" className="fixed inset-0 z-[200] flex flex-col bg-bg text-fg animate-in fade-in slide-in-from-bottom-4 duration-200 motion-reduce:animate-none">
       <header className="flex h-14 shrink-0 items-center px-2">
         <button type="button" aria-label="Close" onClick={() => onClose()} className="grid h-11 w-11 place-items-center rounded-full">
           <X size={26} aria-hidden />

@@ -47,7 +47,6 @@ import {
   probeAudioStreams,
 } from "./ipc/media";
 import { fetchUrl } from "./ipc/fetch-url";
-import { probeRiggingBackend, rigHumanoidModel } from "./sidecar/rigging-backend";
 import { disposeAuroraClient } from "./aurora/client";
 import {
   saveDialogArgsSchema,
@@ -67,9 +66,6 @@ import {
   auroraSequenceSessionStartResultSchema,
   auroraRenderPreviewArgsSchema,
   auroraRenderPreviewResultSchema,
-  riggingBackendProbeSchema,
-  rigHumanoidModelArgsSchema,
-  rigHumanoidModelResultSchema,
   cloudFetchArgsSchema,
   windowControlArgsSchema,
 } from "../shared/ipc-contract";
@@ -220,12 +216,6 @@ app.whenReady().then(() => {
     const { sessionId } = auroraSequenceSessionCancelArgsSchema.parse(raw);
     await cancelAuroraSequenceSession(sessionId, event.sender);
   });
-  handle(CHANNELS.riggingProbeBackend, z.undefined(), async () =>
-    riggingBackendProbeSchema.parse(await probeRiggingBackend()),
-  );
-  handle(CHANNELS.riggingRigHumanoidModel, rigHumanoidModelArgsSchema, async (args) =>
-    rigHumanoidModelResultSchema.parse(await rigHumanoidModel(args)),
-  );
   handle(CHANNELS.keychainGet, z.object({ id: z.string() }), ({ id }) => getKeyStore().get(id));
   handle(CHANNELS.keychainSet, z.object({ id: z.string(), value: z.string() }), ({ id, value }) =>
     getKeyStore().set(id, value),

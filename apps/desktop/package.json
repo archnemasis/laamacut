@@ -4,12 +4,11 @@
   "version": "1.0.0-alpha.29",
   "type": "commonjs",
   "main": "dist/main/index.js",
-  "homepage": "https://openreel.video",
+  "homepage": "https://github.com/archnemasis/laamacut",
   "author": {
-    "name": "Laamacut",
-    "email": "support@openreel.video"
+    "name": "Laamacut"
   },
-  "description": "OpenReel — open-source professional video editor",
+  "description": "Laamacut — free video editor",
   "scripts": {
     "build:main": "node scripts/prepare-aurora-native.mjs && tsup",
     "build:renderer": "node scripts/build-renderer.mjs",

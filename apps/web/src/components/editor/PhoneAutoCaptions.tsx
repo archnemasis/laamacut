@@ -8,6 +8,7 @@ import { CAPTION_LOOKS, DEFAULT_CAPTION_LOOK, captionFontSize, captionLookById }
 import { addCaptionEmoji, removeFillerWords } from "../../services/caption-text";
 import { CaptionLookPreview, CaptionPreviewKeyframes, useCaptionPreviewTick } from "./inspector/CaptionLookPreview";
 import { useCaptionTranscriber } from "./inspector/use-caption-transcriber";
+import { useSheet } from "../../hooks/useSheet";
 
 /** Where the speech comes from: the videos' own sound, the audio clips (voiceovers, music, extracted sound), or both. */
 type Source = "both" | "video" | "audio";
@@ -175,6 +176,7 @@ export function PhoneAutoCaptions({ onClose }: { onClose: () => void }) {
   const { progress, progressMessage, selectedModel, transcribeClip } = useCaptionTranscriber();
   const tick = useCaptionPreviewTick();
   const previewBottom = usePreviewBottom();
+  const sheet = useSheet<HTMLElement>(onClose);
   const [source, setSource] = useState<Source>("both");
   const [language, setLanguage] = useState("auto");
   const [translate, setTranslate] = useState("none");
@@ -259,15 +261,16 @@ export function PhoneAutoCaptions({ onClose }: { onClose: () => void }) {
 
   return (
     <section
+      ref={sheet.ref}
       role="dialog"
       aria-label="Auto captions"
-      className="fixed inset-x-0 bottom-0 z-[120] flex flex-col rounded-t-2xl bg-[#1f1f1f] text-white"
+      className="phone-sheet-in fixed inset-x-0 bottom-0 z-[120] flex flex-col rounded-t-2xl bg-[#1f1f1f] text-white"
       style={{ top: previewBottom ?? "50%" }}
     >
       <CaptionPreviewKeyframes />
-      <header className="relative flex h-14 shrink-0 items-center justify-center border-b border-white/10">
+      <header {...sheet.handle} className="relative flex h-14 shrink-0 items-center justify-center border-b border-white/10">
         <span className="text-[17px] font-semibold">Auto captions</span>
-        <button type="button" aria-label="Close" onClick={onClose} className="absolute right-3 grid h-10 w-10 place-items-center">
+        <button type="button" aria-label="Close" onClick={sheet.close} className="absolute right-3 grid h-10 w-10 place-items-center">
           <X size={22} aria-hidden />
         </button>
       </header>

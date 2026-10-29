@@ -28,6 +28,7 @@ import {
 } from "./PhoneExportPanel";
 import { PhoneExportScreen, capturePreviewStill, type PhoneExportStatus } from "./PhoneExportScreen";
 import { prepareNativeExport } from "../../services/native-export";
+import { haptic } from "../../services/haptics";
 import { captureProjectPreview, getProjectPreview } from "../../services/project-previews";
 import { getAndroidSaver, saveBlobOnAndroid } from "../../services/android-downloads";
 import { startNewProject } from "../../desktop/start/desktop-project-actions";
@@ -432,10 +433,12 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
     if (phoneRun?.status !== "exporting") return;
     if (exportState.complete) {
       setPhoneRun({ ...phoneRun, status: "saved" });
+      haptic("success");
       // Saved with the export, not only when you leave the editor.
       void useProjectStore.getState().forceSave();
     } else if (exportState.error) {
       setPhoneRun({ ...phoneRun, status: "error", error: exportState.error });
+      haptic("error");
       resetError();
     }
   }, [phoneRun, exportState.complete, exportState.error, resetError]);

@@ -147,3 +147,23 @@ export function toggleKeyframe(visual: SelectedVisual, time: number): void {
   if (visual.kind === "media") store.updateClipKeyframes(visual.id, keyframes);
   else store.updateTextClipKeyframes(visual.id, keyframes);
 }
+
+export type AnimationSpan = { kind: "in" | "out" | "combo"; start: number; end: number };
+
+/**
+ * The stretch of a clip each of its In, Out and Combo animations covers, in
+ * seconds from the clip's start. Animation keyframe ids start with the part
+ * they belong to ("motion-in-…").
+ */
+export function animationSpans(keyframes: readonly Keyframe[] | undefined): AnimationSpan[] {
+  const spans: AnimationSpan[] = [];
+  for (const [kind, prefix] of [
+    ["in", "motion-in-"],
+    ["out", "motion-out-"],
+    ["combo", "motion-emphasis-"],
+  ] as const) {
+    const times = (keyframes ?? []).filter((k) => k.id.startsWith(prefix)).map((k) => k.time);
+    if (times.length > 0) spans.push({ kind, start: Math.min(...times), end: Math.max(...times) });
+  }
+  return spans;
+}

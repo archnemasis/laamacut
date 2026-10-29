@@ -110,7 +110,7 @@ export function PhoneCoverScreen({
   const strip = Array.from({ length: STRIP_FRAMES }, (_, i) => thumbAt(((i + 0.5) / STRIP_FRAMES) * duration));
 
   return createPortal(
-    <div role="dialog" aria-label="Cover" className="phone-editor fixed inset-0 z-[400] flex flex-col bg-bg text-fg">
+    <div role="dialog" aria-label="Cover" className="phone-editor fixed inset-0 z-[400] flex flex-col bg-bg text-fg animate-in fade-in slide-in-from-bottom-4 duration-200 motion-reduce:animate-none">
       <header className="flex h-14 shrink-0 items-center px-2">
         <button type="button" aria-label="Close" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full">
           <X size={24} aria-hidden />

@@ -169,14 +169,19 @@ function App() {
         <Suspense fallback={<LoadingSpinner message="Loading shared video..." />}>
           <SharePage shareId={params.shareId!} />
         </Suspense>
-      ) : showWelcome ? (
-        phone ? <PhoneHome /> : <WelcomeScreen initialTab={initialTab} />
-      ) : !hasOpenProject || route === "new" ? (
-        <LoadingSpinner message={isChecking ? "Checking for saved projects..." : showDialog ? "Choose a saved project or start fresh..." : "Opening project..."} />
       ) : (
-        <Suspense fallback={<LoadingSpinner message="Loading editor..." />}>
-          <EditorInterface />
-        </Suspense>
+        // Each screen fades in briefly as it replaces the last one.
+        <div key={showWelcome ? "home" : !hasOpenProject || route === "new" ? "opening" : "editor"} className="h-full w-full animate-in fade-in duration-200 motion-reduce:animate-none">
+          {showWelcome ? (
+            phone ? <PhoneHome /> : <WelcomeScreen initialTab={initialTab} />
+          ) : !hasOpenProject || route === "new" ? (
+            <LoadingSpinner message={isChecking ? "Checking for saved projects..." : showDialog ? "Choose a saved project or start fresh..." : "Opening project..."} />
+          ) : (
+            <Suspense fallback={<LoadingSpinner message="Loading editor..." />}>
+              <EditorInterface />
+            </Suspense>
+          )}
+        </div>
       )}
       <ToastContainer />
       <Suspense fallback={null}>

@@ -3,6 +3,7 @@ import { AudioLines, ExternalLink, KeyRound, X } from "@/icons/lucide-compat";
 import { useProjectStore } from "../../stores/project-store";
 import { useTimelineStore } from "../../stores/timeline-store";
 import { toast } from "../../stores/notification-store";
+import { useSheet } from "../../hooks/useSheet";
 import {
   DEFAULT_PHONE_VOICE,
   ELEVENLABS_KEYS_URL,
@@ -37,6 +38,7 @@ function usePreviewBottom(): number | null {
  */
 export function PhoneTextToSpeech({ onClose }: { onClose: () => void }) {
   const previewBottom = usePreviewBottom();
+  const sheet = useSheet<HTMLElement>(onClose);
   /** undefined while the saved key is being read. */
   const [apiKey, setApiKey] = useState<string | null | undefined>(undefined);
   const [keyDraft, setKeyDraft] = useState("");
@@ -98,14 +100,15 @@ export function PhoneTextToSpeech({ onClose }: { onClose: () => void }) {
 
   return (
     <section
+      ref={sheet.ref}
       role="dialog"
       aria-label="Text to speech"
-      className="fixed inset-x-0 bottom-0 z-[120] flex flex-col rounded-t-2xl bg-[#1f1f1f] text-white"
+      className="phone-sheet-in fixed inset-x-0 bottom-0 z-[120] flex flex-col rounded-t-2xl bg-[#1f1f1f] text-white"
       style={{ top: previewBottom ?? "45%" }}
     >
-      <header className="relative flex h-14 shrink-0 items-center justify-center border-b border-white/10">
+      <header {...sheet.handle} className="relative flex h-14 shrink-0 items-center justify-center border-b border-white/10">
         <span className="text-[17px] font-semibold">Text to speech</span>
-        <button type="button" aria-label="Close" onClick={onClose} className="absolute right-3 grid h-10 w-10 place-items-center">
+        <button type="button" aria-label="Close" onClick={sheet.close} className="absolute right-3 grid h-10 w-10 place-items-center">
           <X size={22} aria-hidden />
         </button>
       </header>

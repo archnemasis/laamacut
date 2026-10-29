@@ -25,6 +25,7 @@ import { getPresetLibrary, type MotionPreset, type PresetCategory } from "../../
 import { buildPreviewCSSKeyframes, generateKeyframesFromPreset } from "./inspector/MotionPresetsPanel";
 import { applyTransform, currentTransform, findSelectedVisual, type FlatTransform } from "./phone-keyframes";
 import { capturePreviewStill } from "./PhoneExportScreen";
+import { useSheet } from "../../hooks/useSheet";
 
 export type ClipPanel = "speed" | "volume" | "opacity" | "basic" | "adjust" | "filters" | "animations" | "effects";
 
@@ -99,14 +100,16 @@ function PanelFrame({
   fill?: boolean;
   children: React.ReactNode;
 }) {
+  const { ref, handle, close } = useSheet(onDone);
   return (
     <section
+      ref={ref}
       role="dialog"
       aria-label={title ?? tabs?.find((t) => t.id === tab)?.label}
-      className={`absolute inset-x-0 bottom-0 z-[100] flex flex-col bg-bg-1 ${fill ? "top-0" : ""}`}
+      className={`phone-sheet-in absolute inset-x-0 bottom-0 z-[100] flex flex-col bg-bg-1 ${fill ? "top-0" : ""}`}
     >
       {tabs && (
-        <header className="flex h-12 shrink-0 items-center border-b border-border/60 pl-2">
+        <header {...handle} className="flex h-12 shrink-0 items-center border-b border-border/60 pl-2">
           <div role="tablist" className="scrollbar-none flex min-w-0 flex-1 overflow-x-auto">
             {tabs.map((t) => (
               <button
@@ -122,14 +125,20 @@ function PanelFrame({
               </button>
             ))}
           </div>
-          <button type="button" aria-label="Done" onClick={onDone} className="grid h-12 w-12 shrink-0 place-items-center text-fg">
+          <button type="button" aria-label="Done" onClick={close} className="grid h-12 w-12 shrink-0 place-items-center text-fg active:opacity-50">
             <Check size={24} aria-hidden />
           </button>
         </header>
       )}
+      {tabs && (
+        // A grab bar under the tabs to pull the panel down by.
+        <div {...handle} aria-hidden className="flex h-4 shrink-0 items-center justify-center">
+          <span className="h-1 w-9 rounded-full bg-fg-3 opacity-60" />
+        </div>
+      )}
       <div className={`min-h-0 ${fill ? "flex-1 overflow-y-auto" : ""}`}>{children}</div>
       {!tabs && (
-        <footer className="relative flex h-12 shrink-0 items-center border-t border-border/60 px-2">
+        <footer {...handle} className="relative flex h-12 shrink-0 items-center border-t border-border/60 px-2">
           {onReset && (
             <button type="button" onClick={onReset} className="flex items-center gap-1.5 px-2 py-2 text-[13px] text-fg-2">
               <RotateCcw size={15} aria-hidden />
@@ -137,7 +146,7 @@ function PanelFrame({
             </button>
           )}
           <span className="pointer-events-none absolute inset-x-0 text-center text-[15px] font-semibold">{title}</span>
-          <button type="button" aria-label="Done" onClick={onDone} className="ml-auto grid h-11 w-11 place-items-center text-fg">
+          <button type="button" aria-label="Done" onClick={close} className="ml-auto grid h-11 w-11 place-items-center text-fg active:opacity-50">
             <Check size={24} aria-hidden />
           </button>
         </footer>
@@ -947,7 +956,21 @@ const durationOf = (kfs: readonly Keyframe[], prefix: string) => {
   return times.length ? Math.max(...times) - Math.min(...times) : undefined;
 };
 
-function AnimationTile({ preset, still, active, onClick }: { preset: MotionPreset; still?: string; active: boolean; onClick: () => void }) {
+/**
+ * A stand-in picture for the animation tiles, so they look the same whatever
+ * frame the playhead is on (the first frame of an animated clip is often blank).
+ */
+function AnimationPlaceholder() {
+  return (
+    <svg viewBox="0 0 40 40" aria-hidden className="h-full w-full">
+      <rect width="40" height="40" fill="#3a3f4b" />
+      <circle cx="28" cy="12" r="4.5" fill="#e8eaef" />
+      <path d="M0 40 L13 21 L22 32 L28 25 L40 40 Z" fill="#8a92a3" />
+    </svg>
+  );
+}
+
+function AnimationTile({ preset, active, onClick }: { preset: MotionPreset; active: boolean; onClick: () => void }) {
   const box = useRef<HTMLSpanElement>(null);
   // Every tile plays its animation on a loop, so it can be seen before it's picked.
   useEffect(() => {
@@ -966,8 +989,8 @@ function AnimationTile({ preset, still, active, onClick }: { preset: MotionPrese
   }, [preset]);
   return (
     <Tile label={preset.name} active={active} onClick={onClick}>
-      <span ref={box} className="block h-3/5 w-3/5 overflow-hidden rounded bg-white/25">
-        {still && <img src={still} alt="" className="h-full w-full object-cover" />}
+      <span ref={box} className="block h-3/5 w-3/5 overflow-hidden rounded">
+        <AnimationPlaceholder />
       </span>
     </Tile>
   );
@@ -975,7 +998,6 @@ function AnimationTile({ preset, still, active, onClick }: { preset: MotionPrese
 
 function AnimationsPanel({ clipId, onDone }: { clipId: string; onDone: () => void }) {
   const [tab, setTab] = useState<AnimTab>("in");
-  const [still] = useState(capturePreviewStill);
   const library = useMemo(getPresetLibrary, []);
   const visual = findSelectedVisual(clipId);
   useProjectStore((s) => s.project); // follow keyframe changes
@@ -1071,7 +1093,6 @@ function AnimationsPanel({ clipId, onDone }: { clipId: string; onDone: () => voi
           <AnimationTile
             key={p.id}
             preset={p}
-            still={still}
             active={p.id === appliedId}
             onClick={() => apply(p, Math.min(maxDuration, p.id === appliedId ? duration : p.duration))}
           />

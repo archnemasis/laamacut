@@ -1623,6 +1623,23 @@ export const Preview: React.FC = () => {
     }
   }, [isPlaying, playheadPosition]);
 
+  // The animation demos pause, seek and play in one go, which React renders
+  // as playing all along, so the effect above never sees the seek and the demo
+  // starts wherever the playhead was. Take a seek made while stopped straight
+  // from the store instead, and keep it until playback starts so stopping the
+  // previous run can't put back where that run had got to.
+  const pendingSeekRef = useRef<number | null>(null);
+  useEffect(
+    () =>
+      useTimelineStore.subscribe((state, prev) => {
+        if (state.playheadPosition !== prev.playheadPosition && state.playbackState !== "playing") {
+          startPositionRef.current = state.playheadPosition;
+          pendingSeekRef.current = state.playheadPosition;
+        }
+      }),
+    [],
+  );
+
   const cleanupPlaybackResources = useCallback(() => {
     const resources = playbackResourcesRef.current;
     for (const [, resource] of resources) {
@@ -4661,6 +4678,10 @@ export const Preview: React.FC = () => {
     let isActive = true;
     let nativeCleanup: ((preserveCaches?: boolean) => void) | null = null;
 
+    if (pendingSeekRef.current !== null) {
+      startPositionRef.current = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+    }
     const startPosition = resolvePlaybackStart(
       startPositionRef.current,
       actualEndTime,

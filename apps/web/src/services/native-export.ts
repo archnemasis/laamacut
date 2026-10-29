@@ -13,6 +13,8 @@ export interface NativeExportPlugin {
   stageAppend(options: { uri: string; data: string }): Promise<void>;
   export(options: NativeExportRequest): Promise<{ uri: string; location: string }>;
   cancel(): Promise<void>;
+  /** Asks for the progress notification while the app is still in front. */
+  requestNotifications?(): Promise<void>;
   addListener(event: "progress", listener: (event: { progress: number }) => void): Promise<{ remove: () => Promise<void> }>;
 }
 
@@ -270,28 +272,81 @@ async function textPictures(
     .filter((time) => time >= 0 && time <= duration)
     .sort((a, b) => a - b);
   const scale = { x: width / project.settings.width, y: height / project.settings.height };
+  const encoder = createPngEncoder();
   const overlays: NativeExportRequest["overlays"] = [];
-  for (let i = 0; i < cuts.length - 1; i++) {
-    const start = cuts[i];
-    const end = cuts[i + 1];
-    if (end - start < 0.0005) continue;
-    const mid = (start + end) / 2;
-    // Front-most tracks come first, so draw from the back.
-    const visible = texts
-      .filter((t) => mid >= t.startTime && mid < t.startTime + t.duration)
-      .sort((a, b) => (order.get(b.trackId) ?? 0) - (order.get(a.trackId) ?? 0));
-    if (visible.length === 0) continue;
-    const canvas = new OffscreenCanvas(width, height);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Could not draw text");
-    for (const text of visible) {
-      const { canvas: layer } = titleEngine.renderText(text, width, height, mid - text.startTime, scale);
-      ctx.drawImage(layer, 0, 0, width, height);
+  // The next picture is drawn while the last one encodes; holding more full
+  // frames than that would run a long caption track out of memory.
+  let encoding: { start: number; end: number; png: Promise<Uint8Array> } | null = null;
+  const collect = async () => {
+    if (!encoding) return;
+    const { start, end, png } = encoding;
+    encoding = null;
+    overlays.push({ startUs: us(start), endUs: us(end), png: toBase64(await png) });
+  };
+  try {
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const start = cuts[i];
+      const end = cuts[i + 1];
+      if (end - start < 0.0005) continue;
+      const mid = (start + end) / 2;
+      // Front-most tracks come first, so draw from the back.
+      const visible = texts
+        .filter((t) => mid >= t.startTime && mid < t.startTime + t.duration)
+        .sort((a, b) => (order.get(b.trackId) ?? 0) - (order.get(a.trackId) ?? 0));
+      if (visible.length === 0) continue;
+      const canvas = new OffscreenCanvas(width, height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not draw text");
+      for (const text of visible) {
+        const { canvas: layer } = titleEngine.renderText(text, width, height, mid - text.startTime, scale);
+        ctx.drawImage(layer, 0, 0, width, height);
+      }
+      const png = encoder.encode(canvas);
+      await collect();
+      encoding = { start, end, png };
     }
-    const png = new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer());
-    overlays.push({ startUs: us(start), endUs: us(end), png: toBase64(png) });
+    await collect();
+    return overlays;
+  } finally {
+    encoder.close();
   }
-  return overlays;
+}
+
+/**
+ * PNG encoding in a worker. On the main thread Chromium waits for the page to
+ * go idle before encoding, which during an export took about four seconds a picture.
+ */
+function createPngEncoder(): { encode: (canvas: OffscreenCanvas) => Promise<Uint8Array>; close: () => void } {
+  const encodeHere = async (canvas: OffscreenCanvas) => new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer());
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL("../workers/png-encoder-worker.ts", import.meta.url), { type: "module" });
+  } catch {
+    return { encode: encodeHere, close: () => undefined };
+  }
+  const waiting = new Map<number, { resolve: (png: Uint8Array) => void; reject: (error: Error) => void }>();
+  let nextId = 0;
+  worker.onmessage = (event: MessageEvent<{ id: number; buffer?: ArrayBuffer; error?: string }>) => {
+    const { id, buffer, error } = event.data;
+    const pending = waiting.get(id);
+    waiting.delete(id);
+    if (buffer) pending?.resolve(new Uint8Array(buffer));
+    else pending?.reject(new Error(error ?? "Could not encode text"));
+  };
+  worker.onerror = () => {
+    for (const pending of waiting.values()) pending.reject(new Error("The text encoder stopped"));
+    waiting.clear();
+  };
+  return {
+    encode: (canvas) =>
+      new Promise((resolve, reject) => {
+        const id = nextId++;
+        waiting.set(id, { resolve, reject });
+        const bitmap = canvas.transferToImageBitmap();
+        worker.postMessage({ id, bitmap }, [bitmap]);
+      }),
+    close: () => worker.terminate(),
+  };
 }
 
 /** Everything the phone needs for this export, or null when it can't do it natively. */

@@ -37,6 +37,8 @@ export interface SettingsState {
   autoSave: boolean;
   autoSaveInterval: number;
   language: string;
+  /** Touch feedback on the phone; off unless turned on. */
+  haptics: boolean;
 
   // Text to speech preferences
   defaultTtsProvider: TtsProvider;
@@ -57,6 +59,7 @@ export interface SettingsState {
   setAutoSave: (enabled: boolean) => void;
   setAutoSaveInterval: (minutes: number) => void;
   setLanguage: (lang: string) => void;
+  setHaptics: (enabled: boolean) => void;
   setDefaultTtsProvider: (provider: TtsProvider) => void;
   setElevenLabsModel: (model: string) => void;
   addFavoriteVoice: (voice: { voiceId: string; name: string; previewUrl?: string }) => void;
@@ -79,6 +82,7 @@ export const useSettingsStore = create<SettingsState>()(
         autoSave: true,
         autoSaveInterval: 5,
         language: "en",
+        haptics: false,
 
         defaultTtsProvider: "elevenlabs" as TtsProvider,
         elevenLabsModel: "eleven_v3",
@@ -98,6 +102,8 @@ export const useSettingsStore = create<SettingsState>()(
           set({ autoSaveInterval: Math.max(1, Math.min(30, minutes)) }),
 
         setLanguage: (lang: string) => set({ language: lang }),
+
+        setHaptics: (enabled: boolean) => set({ haptics: enabled }),
 
         setDefaultTtsProvider: (provider: TtsProvider) =>
           set({ defaultTtsProvider: provider }),
@@ -178,6 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
           autoSave: state.autoSave,
           autoSaveInterval: state.autoSaveInterval,
           language: state.language,
+          haptics: state.haptics,
           defaultTtsProvider: state.defaultTtsProvider,
           elevenLabsModel: state.elevenLabsModel,
           favoriteVoices: state.favoriteVoices,

@@ -95,11 +95,6 @@ contextBridge.exposeInMainWorld("openreel", {
     probeAudioStreams: (args: unknown) => ipcRenderer.invoke(CHANNELS.mediaProbeAudioStreams, args),
     fetchUrl: (args: unknown) => ipcRenderer.invoke(CHANNELS.mediaFetchUrl, args),
   },
-  rigging: {
-    probeBackend: () => ipcRenderer.invoke(CHANNELS.riggingProbeBackend, undefined),
-    rigHumanoidModel: (args: unknown) =>
-      ipcRenderer.invoke(CHANNELS.riggingRigHumanoidModel, args),
-  },
   updater: {
     // Auto-update status pushed from the main process (checking/available/
     // downloading/downloaded/error). The renderer surfaces an update banner and

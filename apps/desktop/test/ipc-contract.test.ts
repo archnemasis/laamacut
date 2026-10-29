@@ -11,23 +11,12 @@ import {
   auroraSequenceSessionStartArgsSchema,
   auroraSequenceSessionStartResultSchema,
   hardwareInfoSchema,
-  riggingBackendProbeSchema,
-  rigHumanoidModelArgsSchema,
-  rigHumanoidModelResultSchema,
 } from "../src/shared/ipc-contract";
 import { resolveExportArgs } from "../src/main/ipc/export";
 
 describe("ipc-contract", () => {
   it("exposes the probeHardware channel name", () => {
     expect(CHANNELS.probeHardware).toBe("openreel:probeHardware");
-  });
-
-  it("exposes the rigging backend probe channel name", () => {
-    expect(CHANNELS.riggingProbeBackend).toBe("openreel:rigging:probeBackend");
-  });
-
-  it("exposes the humanoid rigging job channel name", () => {
-    expect(CHANNELS.riggingRigHumanoidModel).toBe("openreel:rigging:rigHumanoidModel");
   });
 
   it("exposes the Aurora preview channel name", () => {
@@ -69,43 +58,6 @@ describe("ipc-contract", () => {
   it("rejects a malformed hardware info object", () => {
     const bad = hardwareInfoSchema.safeParse({ cpu: { model: 1 } });
     expect(bad.success).toBe(false);
-  });
-
-  it("validates a rigging backend probe result", () => {
-    const ok = riggingBackendProbeSchema.safeParse({
-      available: true,
-      provider: "blender",
-      mode: "system",
-      path: "/Applications/Blender.app/Contents/MacOS/Blender",
-      version: "4.3.2",
-    });
-    expect(ok.success).toBe(true);
-  });
-
-  it("validates humanoid rigging job args and result", () => {
-    const args = rigHumanoidModelArgsSchema.safeParse({
-      modelUrl: "file:///tmp/astronaut.glb",
-      outputPath: "/tmp/astronaut-rigged.glb",
-      name: "Astronaut",
-      overwriteExisting: true,
-    });
-    expect(args.success).toBe(true);
-
-    const result = rigHumanoidModelResultSchema.safeParse({
-      ok: true,
-      provider: "blender",
-      inputUrl: "file:///tmp/astronaut.glb",
-      outputUrl: "file:///tmp/astronaut-rigged.glb",
-      outputPath: "/tmp/astronaut-rigged.glb",
-      armatureName: "Astronaut Armature",
-      createdArmature: true,
-      preservedExistingArmature: false,
-      skinnedMeshCount: 1,
-      meshCount: 1,
-      boneCount: 16,
-      warnings: [],
-    });
-    expect(result.success).toBe(true);
   });
 
   it("validates the Aurora preview request/response payloads", () => {

@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.OptIn;
@@ -73,6 +74,7 @@ import java.util.UUID;
  */
 @CapacitorPlugin(name = "LaamacutExport")
 public class ExportPlugin extends Plugin {
+    private static final String TAG = "LaamacutExport";
     private static final String FOLDER = "Laamacut";
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -147,13 +149,25 @@ public class ExportPlugin extends Plugin {
      * is copied without re-encoding: faster, and no quality loss.
      */
     private boolean canPassThrough(PluginCall call) {
+        String blocker = passThroughBlocker(call);
+        Log.i(TAG, blocker == null ? "copying the clip without re-encoding" : "re-encoding: " + blocker);
+        return blocker == null;
+    }
+
+    /** Why the clip has to be re-encoded, or null when it can be copied as it is. */
+    private String passThroughBlocker(PluginCall call) {
         try {
             JSONArray clips = call.getArray("main", new JSArray());
-            if (clips.length() != 1 || call.getArray("overlays", new JSArray()).length() > 0) return false;
+            if (clips.length() != 1) return clips.length() + " clips";
+            if (call.getArray("overlays", new JSArray()).length() > 0) return "text or stickers";
+            // Media3 re-encodes the video of any composition with more than one sequence.
+            if (call.getArray("audio", new JSArray()).length() > 0) return "extra audio tracks";
             JSONObject clip = clips.getJSONObject(0);
-            if (!"video".equals(clip.optString("kind"))) return false;
-            if (Math.abs(clip.optDouble("speed", 1) - 1) > 0.001 || Math.abs(clip.optDouble("volume", 1) - 1) > 0.001) return false;
-            if (clip.optDouble("sourceFrameRate", 0) > call.getFloat("frameRate", 30f) + 0.5) return false;
+            if (!"video".equals(clip.optString("kind"))) return "not a video";
+            if (Math.abs(clip.optDouble("speed", 1) - 1) > 0.001) return "speed changed";
+            if (Math.abs(clip.optDouble("volume", 1) - 1) > 0.001) return "volume changed";
+            float frameRate = call.getFloat("frameRate", 30f);
+            if (clip.optDouble("sourceFrameRate", 0) > frameRate + 0.5) return "frame rate above " + frameRate;
             MediaMetadataRetriever retriever = new MediaMetadataRetriever();
             try {
                 retriever.setDataSource(getContext(), Uri.parse(clip.getString("uri")));
@@ -165,13 +179,26 @@ public class ExportPlugin extends Plugin {
                     w = h;
                     h = swap;
                 }
-                return w == call.getInt("width", 1080) && h == call.getInt("height", 1920);
+                int width = call.getInt("width", 1080);
+                int height = call.getInt("height", 1920);
+                if (w != width || h != height) return w + "x" + h + " clip in a " + width + "x" + height + " export";
+                return null;
             } finally {
                 retriever.release();
             }
         } catch (Exception e) {
-            return false;
+            return "could not read the clip (" + e.getMessage() + ")";
         }
+    }
+
+    /**
+     * Asked while the export screen opens: Android blocks the prompt once the
+     * app is in the background, which is exactly when an export notification matters.
+     */
+    @PluginMethod
+    public void requestNotifications(PluginCall call) {
+        main.post(this::askForNotifications);
+        call.resolve();
     }
 
     private void askForNotifications() {
@@ -196,14 +223,16 @@ public class ExportPlugin extends Plugin {
         Transformer.Builder builder = new Transformer.Builder(getContext());
         // Asking for H.264 would force a re-encode of an HEVC phone video.
         if (!passthrough) builder.setVideoMimeType(MimeTypes.VIDEO_H264);
+        DefaultEncoderFactory.Builder encoders = new DefaultEncoderFactory.Builder(getContext());
+        // Media3 re-encodes any video once encoder settings are requested, so copying must leave them unset.
+        if (!passthrough) encoders.setRequestedVideoEncoderSettings(new VideoEncoderSettings.Builder().setBitrate(bitrate).build());
         Transformer transformer = builder
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
-            .setEncoderFactory(new DefaultEncoderFactory.Builder(getContext())
-                .setRequestedVideoEncoderSettings(new VideoEncoderSettings.Builder().setBitrate(bitrate).build())
-                .build())
+            .setEncoderFactory(encoders.build())
             .addListener(new Transformer.Listener() {
                 @Override
                 public void onCompleted(Composition c, ExportResult result) {
+                    Log.i(TAG, "video " + (result.videoEncoderName == null ? "copied" : "encoded with " + result.videoEncoderName));
                     stopPolling();
                     running = null;
                     getBridge().execute(() -> {
@@ -225,6 +254,7 @@ public class ExportPlugin extends Plugin {
                     output.delete();
                     if (passthrough) {
                         // Copying didn't work for this file; do the normal export instead.
+                        Log.w(TAG, "copying failed, re-encoding instead", error);
                         getBridge().execute(() -> prepare(call, output, false));
                         return;
                     }

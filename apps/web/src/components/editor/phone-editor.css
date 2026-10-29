@@ -100,3 +100,26 @@
   box-shadow: none !important;
   --tw-ring-shadow: 0 0 #0000 !important;
 }
+
+/* Sheets rise from the bottom edge and settle without overshooting. Only the
+   start is held, so a drag can move the sheet once it has arrived. */
+@keyframes phone-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+.phone-sheet-in {
+  animation: phone-sheet-in 220ms cubic-bezier(0.2, 0, 0, 1) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .phone-sheet-in {
+    animation: none;
+  }
+}
+
+/* A sheet's header drags it down (useSheet). The browser would otherwise
+   take a vertical swipe as a page scroll and cancel the drag. */
+[data-sheet-handle],
+[data-sheet-handle] * {
+  touch-action: pan-x;
+}

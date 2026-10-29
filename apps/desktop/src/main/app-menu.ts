@@ -1,4 +1,6 @@
-import { Menu, type MenuItemConstructorOptions, type BrowserWindow } from "electron";
+import { Menu, shell, type MenuItemConstructorOptions, type BrowserWindow } from "electron";
+
+const HELP_URL = "https://github.com/archnemasis/laamacut";
 
 export interface MenuNode {
   label: string;
@@ -7,6 +9,8 @@ export interface MenuNode {
   // When set, the item dispatches this id to the renderer (via onAction) instead
   // of using a native Electron role. Used for app-level actions (undo/redo/file).
   actionId?: string;
+  /** Opens this page in the browser. */
+  url?: string;
   submenu?: MenuNode[];
 }
 
@@ -15,9 +19,9 @@ export function buildMenuTemplate(platform: string): MenuNode[] {
   const template: MenuNode[] = [];
   if (isMac) {
     template.push({
-      label: "OpenReel",
+      label: "Laamacut",
       submenu: [
-        { label: "About OpenReel", role: "about" },
+        { label: "About Laamacut", role: "about" },
         { label: "Settings…", accelerator: "Cmd+,", actionId: "settings" },
         { label: "Quit", role: "quit", accelerator: "Cmd+Q" },
       ],
@@ -67,7 +71,7 @@ export function buildMenuTemplate(platform: string): MenuNode[] {
   template.push({
     label: "Help",
     submenu: [
-      { label: "OpenReel Help" },
+      { label: "Laamacut Help", url: HELP_URL },
       { label: "Open Source Licenses", actionId: "openLicenses" },
     ],
   });
@@ -84,7 +88,9 @@ export function installApplicationMenu(platform: string, onAction: (id: string) 
     submenu: node.submenu?.map(toElectron),
     click: node.actionId
       ? () => onAction(node.actionId as string)
-      : node.role
+      : node.url
+        ? () => void shell.openExternal(node.url as string)
+        : node.role
         ? undefined
         : () => onAction(node.label),
   });

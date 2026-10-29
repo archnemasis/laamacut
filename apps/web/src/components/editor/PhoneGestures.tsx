@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useProjectStore } from "../../stores/project-store";
 import { useTimelineStore } from "../../stores/timeline-store";
+import { haptic } from "../../services/haptics";
 import { applyTransform, currentTransform, findSelectedVisual, type FlatTransform, type SelectedVisual } from "./phone-keyframes";
 
 type Point = { x: number; y: number };
@@ -61,7 +62,7 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
     const was = guidesRef.current;
     if (was.x === next.x && was.y === next.y) return;
     // A tiny buzz as it clicks into place, like CapCut.
-    if ((next.x && !was.x) || (next.y && !was.y)) navigator.vibrate?.(8);
+    if ((next.x && !was.x) || (next.y && !was.y)) haptic("tick");
     guidesRef.current = next;
     setGuides(next);
   };
@@ -131,7 +132,7 @@ export function PhoneGestures({ selectedId, onTapText }: { selectedId: string; o
         const square = Math.round(rotation / 90) * 90;
         const snapped = Math.abs(rotation - square) <= ROTATE_SNAP;
         if (snapped) rotation = square;
-        if (snapped && snappedAngle.current !== square) navigator.vibrate?.(8);
+        if (snapped && snappedAngle.current !== square) haptic("tick");
         snappedAngle.current = snapped ? square : null;
         next.rotation = rotation;
       }

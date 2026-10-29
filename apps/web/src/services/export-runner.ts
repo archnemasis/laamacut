@@ -465,7 +465,11 @@ export function warmUpExport(project: Project): void {
   void ensureProjectFonts(project).catch(() => undefined);
   // The phone's own export reads gallery files itself; loading them into the
   // web view as well would only slow its start.
-  if (getNativeExporter() && !("reason" in planNativeExport(project))) return;
+  const native = getNativeExporter();
+  if (native && !("reason" in planNativeExport(project))) {
+    void native.requestNotifications?.().catch(() => undefined);
+    return;
+  }
   void getExportEngine().initialize().catch(() => undefined);
   prefetchGalleryOriginals(project);
 }

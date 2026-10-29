@@ -51,6 +51,7 @@ import { PhoneTextEditor, type TextEditorTab } from "./PhoneTextEditor";
 import { PhoneAutoCaptions } from "./PhoneAutoCaptions";
 import { PhoneTextToSpeech } from "./PhoneTextToSpeech";
 import { useBackHandler } from "../../services/back-stack";
+import { haptic } from "../../services/haptics";
 import { PhoneGestures } from "./PhoneGestures";
 import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
@@ -60,6 +61,7 @@ import { autoSaveManager } from "../../services/auto-save";
 import { captureProjectPreview } from "../../services/project-previews";
 import { restoreGalleryPreviewCopies } from "../../services/phone-gallery";
 import { useRouter } from "../../hooks/use-router";
+import { useSheet } from "../../hooks/useSheet";
 import { AssetsPanel, DEFAULT_TITLE_STYLE, type AssetsTab } from "./AssetsPanel";
 import { InspectorPanel } from "./InspectorPanel";
 import { VoiceOverPanel } from "./inspector/VoiceOverPanel";
@@ -103,7 +105,7 @@ function ToolButton({ tool }: { tool: Tool }) {
       type="button"
       onClick={tool.onClick}
       disabled={tool.disabled}
-      className="flex h-full w-[60px] shrink-0 flex-col items-center justify-center gap-1.5 text-fg disabled:opacity-35"
+      className="flex h-full w-[60px] shrink-0 flex-col items-center justify-center gap-1.5 text-fg transition-opacity duration-100 active:opacity-50 disabled:opacity-35"
     >
       <Icon size={22} strokeWidth={1.5} aria-hidden />
       <span className="text-[11px] leading-tight">{tool.label}</span>
@@ -152,6 +154,28 @@ function ToolStrip({ tools }: { tools: Tool[] }) {
         <ToolButton key={tool.label} tool={tool} />
       ))}
     </div>
+  );
+}
+
+/** The sheet that covers the timeline for media, adjust and canvas tools. */
+function PhoneSheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const { ref, handle, close } = useSheet(onClose);
+  return (
+    <section
+      ref={ref}
+      role="dialog"
+      aria-label={title}
+      className="phone-sheet-in absolute inset-0 z-[100] flex flex-col overflow-hidden rounded-t-2xl border-t border-border bg-bg-1 shadow-lg"
+    >
+      <header {...handle} className="relative flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
+        <span aria-hidden className="absolute left-1/2 top-1.5 h-1 w-8 -translate-x-1/2 rounded-full bg-fg-3 opacity-60" />
+        <span className="text-[15px] font-semibold">{title}</span>
+        <button type="button" aria-label="Done" onClick={close} className="grid h-10 w-10 place-items-center rounded-full text-fg active:opacity-50">
+          <Check size={24} aria-hidden />
+        </button>
+      </header>
+      <div className="phone-sheet-body min-h-0 flex-1 overflow-y-auto">{children}</div>
+    </section>
   );
 }
 
@@ -280,11 +304,9 @@ export const PhoneEditor: React.FC = () => {
   const redo = useProjectStore((s) => s.redo);
   const canUndo = useProjectStore((s) => s.canUndo);
   const canRedo = useProjectStore((s) => s.canRedo);
-  // Not followed during playback: re-rendering the whole editor on every
-  // frame makes playback choppy on phones. Actions read the live playhead.
-  const playheadPosition =
-    useTimelineStore((s) => (s.playbackState === "playing" ? null : s.playheadPosition)) ??
-    useTimelineStore.getState().playheadPosition;
+  // The playhead itself is never followed here: re-rendering the whole editor
+  // on every scrub or playback frame makes it choppy on phones. Only the
+  // yes/no answers below are, and actions read the live playhead.
   const playheadNow = () => useTimelineStore.getState().playheadPosition;
   const playbackState = useTimelineStore((s) => s.playbackState);
   const togglePlayback = useTimelineStore((s) => s.togglePlayback);
@@ -326,7 +348,7 @@ export const PhoneEditor: React.FC = () => {
   const selectedText =
     selectedIds.length === 1 && (project.textClips ?? []).some((c) => c.id === selectedIds[0]) ? selectedIds[0] : null;
 
-  const canSplit = getSplittableTimelineItemIds(project, selectedIds, playheadPosition).length > 0;
+  const canSplit = useTimelineStore((s) => getSplittableTimelineItemIds(project, selectedIds, s.playheadPosition).length > 0);
 
   // The selected picture, text or graphic: what preview gestures and the keyframe button act on.
   const selectedVisual = useMemo(
@@ -335,7 +357,9 @@ export const PhoneEditor: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedIds, project],
   );
-  const keyframeHere = selectedVisual ? hasKeyframeAt(selectedVisual.keyframes, playheadPosition - selectedVisual.startTime) : false;
+  const keyframeHere = useTimelineStore((s) =>
+    selectedVisual ? hasKeyframeAt(selectedVisual.keyframes, s.playheadPosition - selectedVisual.startTime) : false,
+  );
 
   const open = (next: Sheet) => setSheet(next);
 
@@ -415,6 +439,7 @@ export const PhoneEditor: React.FC = () => {
     label: "Delete",
     icon: Trash2,
     onClick: () => {
+      haptic("click");
       const store = useProjectStore.getState();
       void (async () => {
         for (const id of selectedIds) await deleteTimelineItem(store, id);
@@ -428,6 +453,7 @@ export const PhoneEditor: React.FC = () => {
     icon: Scissors,
     disabled: !canSplit,
     onClick: () => {
+      haptic("click");
       const store = useProjectStore.getState();
       void (async () => {
         const at = playheadNow();
@@ -441,6 +467,7 @@ export const PhoneEditor: React.FC = () => {
     label: "Duplicate",
     icon: Copy,
     onClick: () => {
+      haptic("click");
       const store = useProjectStore.getState();
       void (async () => {
         for (const id of selectedIds) await duplicateTimelineItem(store, id);
@@ -572,10 +599,10 @@ export const PhoneEditor: React.FC = () => {
               {keyframeHere ? <Diamond size={20} fill="currentColor" aria-hidden /> : <DiamondPlus size={20} aria-hidden />}
             </button>
           )}
-          <button type="button" aria-label="Undo" disabled={!canUndo()} onClick={() => void undo()} className="grid h-10 w-10 place-items-center text-fg disabled:opacity-35">
+          <button type="button" aria-label="Undo" disabled={!canUndo()} onClick={() => { haptic("click"); void undo(); }} className="grid h-10 w-10 place-items-center text-fg disabled:opacity-35">
             <Undo2 size={20} aria-hidden />
           </button>
-          <button type="button" aria-label="Redo" disabled={!canRedo()} onClick={() => void redo()} className="grid h-10 w-10 place-items-center text-fg disabled:opacity-35">
+          <button type="button" aria-label="Redo" disabled={!canRedo()} onClick={() => { haptic("click"); void redo(); }} className="grid h-10 w-10 place-items-center text-fg disabled:opacity-35">
             <Redo2 size={20} aria-hidden />
           </button>
         </div>
@@ -642,18 +669,7 @@ export const PhoneEditor: React.FC = () => {
         )}
 
         {sheet && (
-          <section
-            role="dialog"
-            aria-label={sheet.title}
-            className="absolute inset-0 z-[100] flex flex-col overflow-hidden rounded-t-2xl border-t border-border bg-bg-1 shadow-lg"
-          >
-            <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-              <span className="text-[15px] font-semibold">{sheet.title}</span>
-              <button type="button" aria-label="Done" onClick={() => setSheet(null)} className="grid h-10 w-10 place-items-center rounded-full text-fg">
-                <Check size={24} aria-hidden />
-              </button>
-            </header>
-            <div className="phone-sheet-body min-h-0 flex-1 overflow-y-auto">
+          <PhoneSheet title={sheet.title} onClose={() => setSheet(null)}>
               {sheet.kind === "assets" && (
                 <PanelErrorBoundary name={sheet.title}>
                   <AssetsPanel tab={sheet.tab} hideRail />
@@ -671,8 +687,7 @@ export const PhoneEditor: React.FC = () => {
               )}
               {sheet.kind === "ratio" && <RatioSheet />}
               {sheet.kind === "background" && <BackgroundSheet />}
-            </div>
-          </section>
+          </PhoneSheet>
         )}
       </div>
     </div>

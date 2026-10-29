@@ -114,45 +114,6 @@ export type OpenReelAuroraSequenceSessionEvent =
       error: string;
     };
 
-export interface OpenReelRiggingBackendProbe {
-  available: boolean;
-  provider: "blender";
-  mode?: "configured" | "bundled" | "system";
-  path?: string;
-  version?: string;
-  error?: string;
-}
-
-export interface OpenReelRiggingWarning {
-  code: string;
-  severity: "info" | "warning" | "error";
-  message: string;
-}
-
-export interface OpenReelRigHumanoidModelArgs {
-  modelUrl: string;
-  outputPath?: string;
-  name?: string;
-  heightMeters?: number;
-  overwriteExisting?: boolean;
-}
-
-export interface OpenReelRigHumanoidModelResult {
-  ok: boolean;
-  provider: "blender";
-  inputUrl: string;
-  outputUrl?: string;
-  outputPath?: string;
-  armatureName?: string;
-  createdArmature: boolean;
-  preservedExistingArmature: boolean;
-  skinnedMeshCount: number;
-  meshCount: number;
-  boneCount: number;
-  warnings: OpenReelRiggingWarning[];
-  error?: string;
-}
-
 export type OpenReelUpdaterStatus =
   | { state: "checking" }
   | { state: "available"; version: string }
@@ -266,12 +227,6 @@ declare global {
           body: ArrayBuffer;
           error?: string;
         }>;
-      };
-      rigging?: {
-        probeBackend(): Promise<OpenReelRiggingBackendProbe>;
-        rigHumanoidModel(
-          args: OpenReelRigHumanoidModelArgs,
-        ): Promise<OpenReelRigHumanoidModelResult>;
       };
     };
   }

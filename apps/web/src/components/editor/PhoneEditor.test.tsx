@@ -1,6 +1,6 @@
 import "../../test/install-local-storage-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useUIStore } from "../../stores/ui-store";
 
 const actions = vi.hoisted(() => ({
@@ -64,7 +64,7 @@ describe("PhoneEditor", () => {
     vi.clearAllMocks();
   });
 
-  it("opens editor tools as bottom sheets", () => {
+  it("opens editor tools as bottom sheets", async () => {
     render(<PhoneEditor />);
     const tools = screen.getByRole("navigation", { name: "Editor tools" });
     expect(within(tools).queryByText(/AI/)).toBeNull();
@@ -78,8 +78,9 @@ describe("PhoneEditor", () => {
     expect(screen.getByRole("dialog", { name: "Text template" })).toBeInTheDocument();
     expect(screen.getByTestId("assets-panel")).toHaveTextContent("text");
 
+    // The sheet slides away before it closes.
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
     fireEvent.click(screen.getByRole("button", { name: "Back to all tools" }));
     expect(screen.getByRole("navigation", { name: "Editor tools" })).toBeInTheDocument();

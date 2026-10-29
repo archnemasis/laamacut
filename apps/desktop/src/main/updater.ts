@@ -10,6 +10,8 @@ export type UpdaterStatus =
   | { state: "downloaded"; version: string }
   | { state: "error"; message: string };
 
+export const UPDATE_FEED = { provider: "github", owner: "archnemasis", repo: "laamacut" } as const;
+
 let lastStatus: UpdaterStatus | null = null;
 
 function broadcast(status: UpdaterStatus): void {
@@ -32,11 +34,13 @@ function runCheckWhenLoaded(win: BrowserWindow, run: () => void): void {
 // Wires electron-updater to check GitHub releases on launch, download in the
 // background, and install on the next quit. The quit path runs the unsaved-
 // changes guard first (autoInstallOnAppQuit fires on the normal quit sequence),
-// so updates never bypass the save prompt. No-op in dev (no published feed).
+// so updates never bypass the save prompt. No-op in dev.
 export function initAutoUpdater(): void {
-  // Laamacut ships without an update feed, so never check OpenReel's.
-  const hasUpdateFeed = false;
-  if (!app.isPackaged || !hasUpdateFeed) return;
+  if (!app.isPackaged) return;
+
+  // Laamacut's releases on GitHub. Each one carries the installer and the
+  // latest.yml electron-builder writes next to it.
+  autoUpdater.setFeedURL(UPDATE_FEED);
 
   // Notify → (user-consented) download → install on quit. The download is not
   // automatic; the renderer triggers it after telling the user an update
@@ -44,12 +48,18 @@ export function initAutoUpdater(): void {
   // unsaved-changes guard first, so installing never bypasses the save prompt.
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
-  // Pre-1.0 testing: every build is a prerelease (1.0.0-alpha.N), so allow the
-  // updater to offer newer prereleases on the latest channel.
-  autoUpdater.allowPrerelease = true;
+  // Every release is published as GitHub's Latest, even though the versions
+  // are 1.0.0-alpha.N, so follow Latest rather than the newest pre-release.
+  autoUpdater.allowPrerelease = false;
 
   // Renderer-driven actions: start the download on user consent, and "install"
   // by quitting through the normal (guarded) path so the save prompt still runs.
+  // Installing on an ordinary quit is silent and leaves Laamacut closed, so
+  // after Restart & Install the installer is told to open it again.
+  let relaunchAfterInstall = false;
+  app.on("quit", () => {
+    if (relaunchAfterInstall) autoUpdater.quitAndInstall(true, true);
+  });
   ipcMain.handle(CHANNELS.updaterDownload, async () => {
     try {
       await autoUpdater.downloadUpdate();
@@ -61,6 +71,7 @@ export function initAutoUpdater(): void {
     }
   });
   ipcMain.handle(CHANNELS.updaterInstall, () => {
+    relaunchAfterInstall = true;
     app.quit();
   });
 

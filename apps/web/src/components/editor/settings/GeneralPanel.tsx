@@ -8,6 +8,7 @@ import { useProjectStore } from "../../../stores/project-store";
 import { useUIStore } from "../../../stores/ui-store";
 import { THEME_LABELS, useThemeStore, type ThemeMode } from "../../../stores/theme-store";
 import { keyboardShortcuts } from "../../../services/keyboard-shortcuts";
+import { hasHaptics } from "../../../services/haptics";
 import { EDITING_FRAME_RATE_OPTIONS } from "../editing-frame-rate";
 import type { PreviewQuality } from "../preview/preview-resolution";
 import { BACKGROUND_SWATCHES } from "../canvas-presets";
@@ -95,7 +96,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 
 /** `showProjectSettings` false leaves out the open project's settings (phone Me page). */
 export const GeneralPanel: React.FC<{ showProjectSettings?: boolean }> = ({ showProjectSettings = true }) => {
-  const { autoSave, autoSaveInterval, setAutoSave, setAutoSaveInterval } = useSettingsStore();
+  const { autoSave, autoSaveInterval, setAutoSave, setAutoSaveInterval, haptics, setHaptics } = useSettingsStore();
 
   const snapSettings = useUIStore((s) => s.snapSettings);
   const setSnapEnabled = useUIStore((s) => s.setSnapEnabled);
@@ -119,6 +120,14 @@ export const GeneralPanel: React.FC<{ showProjectSettings?: boolean }> = ({ show
       <Section title="Appearance">
         <ThemePicker />
       </Section>
+
+      {hasHaptics() && (
+        <Section title="Touch">
+          <Row label="Haptics" hint="Small vibrations when clips snap into place, tools act and exports finish">
+            <ToolcraftSwitchControl ariaLabel="Haptics" checked={haptics} onCheckedChange={setHaptics} showLabel={false} />
+          </Row>
+        </Section>
+      )}
 
       <Section title="Saving">
         <Row label="Auto-save" hint="Save your project automatically while you edit">

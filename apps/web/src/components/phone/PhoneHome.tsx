@@ -82,17 +82,33 @@ function EditTab() {
         )}
 
         <ul className="mt-5 space-y-3">
+          {projects === null &&
+            [0, 1, 2].map((i) => (
+              <li key={i} aria-hidden className="flex animate-pulse items-center gap-3 motion-reduce:animate-none">
+                <span className="h-[76px] w-[76px] shrink-0 rounded-xl bg-bg-2" />
+                <span className="flex-1 space-y-2">
+                  <span className="block h-3.5 w-2/5 rounded bg-bg-2" />
+                  <span className="block h-3 w-1/4 rounded bg-bg-2" />
+                </span>
+              </li>
+            ))}
           {projects?.map((entry) => (
             <li key={entry.projectId} className="flex items-center gap-3">
               <button
                 type="button"
                 aria-label={`Open ${entry.name}`}
                 onClick={() => void open(entry)}
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left transition-opacity duration-100 active:opacity-60"
               >
                 <span className="grid h-[76px] w-[76px] shrink-0 place-items-center overflow-hidden rounded-xl bg-bg-2">
                   {entry.preview?.image ? (
-                    <img src={entry.preview.image} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={entry.preview.image}
+                      alt=""
+                      onLoad={(e) => (e.currentTarget.style.opacity = "1")}
+                      style={{ opacity: 0 }}
+                      className="h-full w-full object-cover transition-opacity duration-200"
+                    />
                   ) : (
                     <Film size={24} className="text-fg-3" aria-hidden />
                   )}

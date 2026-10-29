@@ -54,51 +54,6 @@ export const fetchUrlArgsSchema = z.object({
   maxBytes: z.number().int().positive().optional(),
 });
 
-export const riggingBackendModeSchema = z.enum(["configured", "bundled", "system"]);
-export type RiggingBackendMode = z.infer<typeof riggingBackendModeSchema>;
-
-export const riggingBackendProbeSchema = z.object({
-  available: z.boolean(),
-  provider: z.literal("blender"),
-  mode: riggingBackendModeSchema.optional(),
-  path: z.string().optional(),
-  version: z.string().optional(),
-  error: z.string().optional(),
-});
-export type RiggingBackendProbe = z.infer<typeof riggingBackendProbeSchema>;
-
-export const riggingWarningSchema = z.object({
-  code: z.string(),
-  severity: z.enum(["info", "warning", "error"]),
-  message: z.string(),
-});
-
-export const rigHumanoidModelArgsSchema = z.object({
-  modelUrl: z.string().min(1),
-  outputPath: z.string().optional(),
-  name: z.string().optional(),
-  heightMeters: z.number().positive().optional(),
-  overwriteExisting: z.boolean().optional(),
-});
-export type RigHumanoidModelArgs = z.infer<typeof rigHumanoidModelArgsSchema>;
-
-export const rigHumanoidModelResultSchema = z.object({
-  ok: z.boolean(),
-  provider: z.literal("blender"),
-  inputUrl: z.string(),
-  outputUrl: z.string().optional(),
-  outputPath: z.string().optional(),
-  armatureName: z.string().optional(),
-  createdArmature: z.boolean(),
-  preservedExistingArmature: z.boolean(),
-  skinnedMeshCount: z.number().int().nonnegative(),
-  meshCount: z.number().int().nonnegative(),
-  boneCount: z.number().int().nonnegative(),
-  warnings: z.array(riggingWarningSchema),
-  error: z.string().optional(),
-});
-export type RigHumanoidModelResult = z.infer<typeof rigHumanoidModelResultSchema>;
-
 export const cloudFetchArgsSchema = z.object({
   service: z.enum(["elevenlabs"]),
   path: z.string(),
