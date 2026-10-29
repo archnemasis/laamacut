@@ -51,6 +51,19 @@ jobs:
             test -s "packages/core/src/wasm/$module.wasm" || { echo "Missing $module.wasm"; exit 1; }
           done
 
+      # Auto captions must work on first use and offline, so the model is
+      # built into the APK rather than downloaded by the app.
+      - name: Bundle the auto-captions model
+        run: |
+          node apps/android/scripts/fetch-caption-model.mjs
+          models=apps/android/android/app/src/models/public/models
+          for file in onnx-community/whisper-tiny/config.json \
+                      onnx-community/whisper-tiny/onnx/encoder_model_quantized.onnx \
+                      onnx-community/whisper-tiny/onnx/decoder_model_merged_quantized.onnx \
+                      ort/ort-wasm-simd-threaded.jsep.wasm; do
+            test -s "$models/$file" || { echo "Missing $file"; exit 1; }
+          done
+
       - name: Sync into the Android project
         working-directory: apps/android
         run: pnpm exec cap sync android

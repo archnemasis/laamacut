@@ -7,25 +7,17 @@ import { extname, join, relative, resolve } from "node:path";
  * fails if AI models, AI services or the removed AI editor creep back in.
  */
 const root = resolve(import.meta.dirname, "..");
-const sourceRoots = [
-  "apps/web/src",
-  "apps/web/functions",
-  "apps/web/package.json",
-  "apps/desktop/src",
-  "apps/desktop/package.json",
-  "apps/android/src",
-  "apps/android/scripts",
-  "apps/android/package.json",
-  "apps/android/android/app/src",
-  "apps/cloud/src",
-  "apps/cloud/wrangler.jsonc",
-  "packages/core/src",
-  "packages/core/package.json",
-  "packages/ui/src",
-].map((path) => join(root, path));
-const sourceExtensions = new Set([".cjs", ".java", ".js", ".json", ".jsonc", ".jsx", ".kt", ".mjs", ".ts", ".tsx"]);
-// assets/public is the Android copy of the web build, not source.
-const ignoredDirectories = new Set(["build", "dist", "node_modules", "out", "public"]);
+// Every app and package in the repo is part of Laamacut, so all of them are checked.
+const sourceRoots = ["apps", "packages", "scripts"].map((path) => join(root, path));
+const sourceExtensions = new Set([".cjs", ".html", ".java", ".js", ".json", ".jsonc", ".jsx", ".kt", ".mjs", ".ts", ".tsx"]);
+// Build output, installed packages, and generated copies (the Android copy of
+// the web build and the downloaded caption model) are not source.
+const ignoredDirectories = new Set(["build", "dist", "node_modules", "out", ".gradle", ".wrangler"]);
+const ignoredPaths = new Set([
+  "apps/android/android/app/src/main/assets/public",
+  "apps/android/android/app/src/models",
+  "apps/desktop/release",
+]);
 const forbidden = [
   /@mediapipe\//,
   /onnxruntime/,
@@ -47,25 +39,28 @@ const whisperFiles = new Set([
   "apps/web/package.json",
   "apps/android/scripts/fetch-caption-model.mjs",
 ]);
+// This file names the forbidden patterns, so it is not checked against them.
+const self = "scripts/check-no-ai.mjs";
 
 function walk(path) {
   if (!existsSync(path)) return [];
   const entries = readdirSync(path, { withFileTypes: true, recursive: false });
   return entries.flatMap((entry) => {
     const child = join(path, entry.name);
-    if (entry.isDirectory()) return ignoredDirectories.has(entry.name) ? [] : walk(child);
+    if (entry.isDirectory()) {
+      const name = relative(root, child).replaceAll("\\", "/");
+      return ignoredDirectories.has(entry.name) || ignoredPaths.has(name) ? [] : walk(child);
+    }
     return entry.isFile() && sourceExtensions.has(extname(entry.name)) ? [child] : [];
   });
 }
 
-const files = sourceRoots.flatMap((path) =>
-  extname(path) && existsSync(path) ? [path] : walk(path),
-);
+const files = sourceRoots.flatMap(walk);
 const failures = [];
 for (const file of files) {
   const name = relative(root, file).replaceAll("\\", "/");
   // Tests may name removed features to prove old settings are cleaned up.
-  if (/\.test\.tsx?$/.test(file)) continue;
+  if (/\.test\.tsx?$/.test(file) || name === self) continue;
   const contents = readFileSync(file, "utf8");
   for (const pattern of forbidden) {
     if (pattern.test(contents)) failures.push(`${name} matches ${pattern}`);
