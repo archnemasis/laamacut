@@ -25,6 +25,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ExportPlugin.class);
         registerPlugin(SecretsPlugin.class);
         registerPlugin(PreviewPlayerPlugin.class);
+        registerPlugin(WhisperPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Gallery videos are read straight from storage (see MediaServer).

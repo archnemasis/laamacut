@@ -9,7 +9,7 @@
 A free video editor for Android and Windows. No watermark, no account, no ads.<br>
 Cut clips, add captions, text to speech, mix audio, and export up to 120fps.
 
-**[⬇ Download for Android or Windows](https://github.com/archnemasis/laamacut/releases/latest)** &nbsp;·&nbsp; **[☕ Support Laamacut](https://ko-fi.com/laamacut)** &nbsp;·&nbsp; **[Report a problem](https://github.com/archnemasis/laamacut/issues)**
+**[⬇ Download for Android or Windows](https://github.com/archnemasis/laamacut/releases/latest)** &nbsp;·&nbsp; **[Report a problem](https://github.com/archnemasis/laamacut/issues)**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-9333EA?style=flat-square)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/archnemasis/laamacut?include_prereleases&label=Release&style=flat-square&color=9333EA)](https://github.com/archnemasis/laamacut/releases/latest)
@@ -118,7 +118,7 @@ Built with React, TypeScript, Electron, Capacitor, MediaBunny, WebCodecs, WebGPU
 
 ## Keep it free
 
-Laamacut has no ads, no watermark and no paid tier. If it saved you time, you can [buy me a coffee on Ko-fi](https://ko-fi.com/laamacut). Starring the repo and sharing it helps too.
+Laamacut has no ads, no watermark and no paid tier. If it saved you time, starring the repo and sharing it helps.
 
 ## Found a bug?
 

@@ -6,6 +6,8 @@ import React, {
   useCallback,
   useState,
   useMemo,
+  lazy,
+  Suspense,
 } from "react";
 import { PreviewTimecode } from "./PreviewTimecode";
 import { ExportProgressOverlay } from "./ExportProgressOverlay";
@@ -97,7 +99,6 @@ import {
   applyEmphasisAnimation,
   CropModeView,
   MotionPathOverlay,
-  ParticleRenderer,
   computePreviewResolution,
   PREVIEW_MAX_DIMENSION,
   previewQualityScale,
@@ -118,6 +119,7 @@ import {
   getPreviewPlayer,
   nativeTimelineTime,
   planNativePreview,
+  nativeFrameOf,
   planSeekTarget,
 } from "../../services/native-preview";
 import { APPS_BY_RATIO, AppIcon } from "./aspect-apps";
@@ -130,6 +132,9 @@ import type {
   GSAPMotionPathPoint,
   MotionPathConfig,
 } from "@openreel/core";
+
+// Three.js particles load only when a project uses them.
+const ParticleRenderer = lazy(() => import("./preview/ParticleRenderer"));
 
 interface GPULayer {
   bitmap: ImageBitmap;
@@ -4375,9 +4380,21 @@ export const Preview: React.FC = () => {
           videoClips.push(clip);
         }
       }
-      const plan = planNativePreview(videoClips, startPosition, galleryOriginalUri);
+      const plan = planNativePreview(videoClips, startPosition, galleryOriginalUri, (clip) => {
+        const size = getMediaItem(clip.mediaId)?.metadata;
+        if (!size?.width || !size.height) return undefined;
+        const box = resolveCanvasFitDimensions(clip.transform?.fitMode ?? "contain", size.width, size.height, canvas.width, canvas.height);
+        return nativeFrameOf(clip.transform, box, canvas);
+      });
       // Every video still to come has to be in the player's run of clips.
       if (!plan || plan.clips.length !== videoClips.length) return null;
+      // Moved or resized clips need their size to be placed exactly.
+      if (videoClips.some((clip) => {
+        const t = clip.transform;
+        const moved = t && (t.position?.x || t.position?.y || t.rotation || (t.opacity ?? 1) !== 1 || (t.scale?.x ?? 1) !== 1 || (t.scale?.y ?? 1) !== 1 || (t.fitMode ?? "contain") !== "contain");
+        const size = getMediaItem(clip.mediaId)?.metadata;
+        return moved && !(size?.width && size.height);
+      })) return null;
       const sizeOf = videoClips
         .sort((a, b) => a.startTime - b.startTime)
         .map((clip) => getMediaItem(clip.mediaId)?.metadata);
@@ -4532,11 +4549,23 @@ export const Preview: React.FC = () => {
         if (now < plan.end) {
           // Leave a hole where the phone's player shows the video.
           const { index } = planSeekTarget(plan, now);
-          const size = sizeOf[index];
-          const { width, height } = size?.width && size.height
-            ? resolveCanvasFitDimensions("contain", size.width, size.height, canvas.width, canvas.height)
-            : { width: canvas.width, height: canvas.height };
-          ctx.clearRect((canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+          const frame = plan.clips[index]?.frame;
+          if (frame) {
+            const width = frame.width * canvas.width;
+            const height = frame.height * canvas.height;
+            ctx.save();
+            ctx.translate(canvas.width / 2 + frame.x * canvas.width, canvas.height / 2 + frame.y * canvas.height);
+            ctx.rotate((frame.rotation * Math.PI) / 180);
+            ctx.scale(frame.scaleX, frame.scaleY);
+            ctx.clearRect(-width * frame.anchorX, -height * frame.anchorY, width, height);
+            ctx.restore();
+          } else {
+            const size = sizeOf[index];
+            const { width, height } = size?.width && size.height
+              ? resolveCanvasFitDimensions("contain", size.width, size.height, canvas.width, canvas.height)
+              : { width: canvas.width, height: canvas.height };
+            ctx.clearRect((canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+          }
           if (nowMs - lastDriftCheck > 500) {
             lastDriftCheck = nowMs;
             keepInStep();
@@ -7929,13 +7958,15 @@ export const Preview: React.FC = () => {
           {/* Particle Effects Renderer */}
           {particleEffects.length > 0 && (
             <div className="absolute inset-0 pointer-events-none z-20">
-              <ParticleRenderer
-                effects={particleEffects}
-                width={settings.width}
-                height={settings.height}
-                currentTime={playheadPosition}
-                isPlaying={isPlaying}
-              />
+              <Suspense fallback={null}>
+                <ParticleRenderer
+                  effects={particleEffects}
+                  width={settings.width}
+                  height={settings.height}
+                  currentTime={playheadPosition}
+                  isPlaying={isPlaying}
+                />
+              </Suspense>
             </div>
           )}
 

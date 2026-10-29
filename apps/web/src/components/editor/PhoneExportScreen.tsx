@@ -227,14 +227,18 @@ export function PhoneExportScreen({ status, progress, label, still, videoUrl, lo
               </span>
               Export options
             </button>
-            <button type="button" onClick={() => openLink(DONATE_URL)} className="flex flex-col items-center gap-2 text-center text-[13px] text-fg-2">
-              <span className="grid h-16 w-full place-items-center rounded-xl bg-white/10">
-                <Heart size={24} aria-hidden />
-              </span>
-              Support us
-            </button>
+            {DONATE_URL && (
+              <button type="button" onClick={() => openLink(DONATE_URL)} className="flex flex-col items-center gap-2 text-center text-[13px] text-fg-2">
+                <span className="grid h-16 w-full place-items-center rounded-xl bg-white/10">
+                  <Heart size={24} aria-hidden />
+                </span>
+                Support us
+              </button>
+            )}
           </div>
-          <p className="mt-6 text-center text-[12px] text-fg-3">No watermark, no ads. If Laamacut saved you time, a small tip keeps it free.</p>
+          <p className="mt-6 text-center text-[12px] text-fg-3">
+            {DONATE_URL ? "No watermark, no ads. If Laamacut saved you time, a small tip keeps it free." : "No watermark, no ads."}
+          </p>
         </div>
       )}
 

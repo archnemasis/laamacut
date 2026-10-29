@@ -1,5 +1,8 @@
-/** Where people can chip in to keep Laamacut free. */
-export const DONATE_URL = "https://ko-fi.com/laamacut";
+/**
+ * Where people can chip in to keep Laamacut free. Empty for now: no donation
+ * page is set up, so the Support buttons stay hidden until one is.
+ */
+export const DONATE_URL: string = "";
 
 export const SOURCE_URL = "https://github.com/archnemasis/laamacut";
 export const RELEASES_URL = `${SOURCE_URL}/releases`;

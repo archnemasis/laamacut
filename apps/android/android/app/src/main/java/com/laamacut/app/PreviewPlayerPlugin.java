@@ -1,6 +1,7 @@
 package com.laamacut.app;
 
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.util.Log;
 import android.view.TextureView;
@@ -43,6 +44,11 @@ public class PreviewPlayerPlugin extends Plugin {
     private TextureView surface;
     private PluginCall pendingLoad;
     private int boxX, boxY, boxWidth = 1, boxHeight = 1;
+    /** Per clip: its own speed, and where its picture sits (null = fit inside the box). */
+    private float[] clipSpeeds = new float[0];
+    private JSONObject[] clipFrames = new JSONObject[0];
+    /** The web clock's small nudge, on top of the clip's own speed. */
+    private float nudge = 1f;
 
     private void ensureViews() {
         if (layer != null) return;
@@ -81,9 +87,13 @@ public class PreviewPlayerPlugin extends Plugin {
             return;
         }
         List<MediaItem> items = new ArrayList<>();
+        float[] speeds = new float[clips.length()];
+        JSONObject[] frames = new JSONObject[clips.length()];
         try {
             for (int i = 0; i < clips.length(); i++) {
                 JSONObject clip = clips.getJSONObject(i);
+                speeds[i] = (float) clip.optDouble("speed", 1.0);
+                frames[i] = clip.optJSONObject("frame");
                 items.add(new MediaItem.Builder()
                     .setUri(Uri.parse(clip.getString("uri")))
                     .setClippingConfiguration(new MediaItem.ClippingConfiguration.Builder()
@@ -100,12 +110,22 @@ public class PreviewPlayerPlugin extends Plugin {
         getActivity().runOnUiThread(() -> {
             ensureViews();
             releasePlayer();
+            clipSpeeds = speeds;
+            clipFrames = frames;
+            nudge = 1f;
             player = new ExoPlayer.Builder(getContext()).build();
             player.setVolume(0f);
             player.setVideoTextureView(surface);
             player.setMediaItems(items, index, positionMs);
+            applySpeed();
             pendingLoad = call;
             player.addListener(new Player.Listener() {
+                @Override
+                public void onMediaItemTransition(MediaItem mediaItem, int reason) {
+                    applySpeed();
+                    layoutSurface();
+                }
+
                 @Override
                 public void onRenderedFirstFrame() {
                     if (pendingLoad == null) return;
@@ -131,9 +151,50 @@ public class PreviewPlayerPlugin extends Plugin {
         });
     }
 
-    /** Fit the video inside the preview box, centred, like the web preview's "contain". */
+    private void applySpeed() {
+        if (player == null) return;
+        int index = player.getCurrentMediaItemIndex();
+        float base = index >= 0 && index < clipSpeeds.length ? clipSpeeds[index] : 1f;
+        player.setPlaybackParameters(new PlaybackParameters(Math.max(0.05f, base * nudge)));
+    }
+
+    /**
+     * Put the picture where the web preview draws it: fit inside the box by
+     * default, or the clip's own placement (moved, scaled, rotated, filled).
+     */
     private void layoutSurface() {
         if (surface == null) return;
+        int index = player != null ? player.getCurrentMediaItemIndex() : -1;
+        JSONObject frame = index >= 0 && index < clipFrames.length ? clipFrames[index] : null;
+        WebView webView = getBridge().getWebView();
+        if (frame != null) {
+            int width = Math.max(1, (int) Math.round(frame.optDouble("width", 1) * boxWidth));
+            int height = Math.max(1, (int) Math.round(frame.optDouble("height", 1) * boxHeight));
+            float anchorX = (float) frame.optDouble("anchorX", 0.5);
+            float anchorY = (float) frame.optDouble("anchorY", 0.5);
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height);
+            // The anchor point lands on the box centre; the clip's offset moves it from there.
+            params.leftMargin = webView.getLeft() + boxX + boxWidth / 2 - Math.round(width * anchorX);
+            params.topMargin = webView.getTop() + boxY + boxHeight / 2 - Math.round(height * anchorY);
+            surface.setLayoutParams(params);
+            surface.setPivotX(width * anchorX);
+            surface.setPivotY(height * anchorY);
+            surface.setTranslationX((float) (frame.optDouble("x", 0) * boxWidth));
+            surface.setTranslationY((float) (frame.optDouble("y", 0) * boxHeight));
+            surface.setRotation((float) frame.optDouble("rotation", 0));
+            surface.setScaleX((float) frame.optDouble("scaleX", 1));
+            surface.setScaleY((float) frame.optDouble("scaleY", 1));
+            surface.setAlpha((float) Math.max(0, Math.min(1, frame.optDouble("opacity", 1))));
+            clipToBox();
+            return;
+        }
+        surface.setAlpha(1f);
+        surface.setTranslationX(0);
+        surface.setTranslationY(0);
+        surface.setRotation(0);
+        surface.setScaleX(1);
+        surface.setScaleY(1);
+        clipToBox();
         int width = boxWidth;
         int height = boxHeight;
         if (player != null) {
@@ -144,11 +205,18 @@ public class PreviewPlayerPlugin extends Plugin {
                 else width = Math.round(boxHeight * aspect);
             }
         }
-        WebView webView = getBridge().getWebView();
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(Math.max(1, width), Math.max(1, height));
         params.leftMargin = webView.getLeft() + boxX + (boxWidth - width) / 2;
         params.topMargin = webView.getTop() + boxY + (boxHeight - height) / 2;
         surface.setLayoutParams(params);
+    }
+
+    /** A zoomed-in or moved picture mustn't spill outside the preview box. */
+    private void clipToBox() {
+        WebView webView = getBridge().getWebView();
+        int left = webView.getLeft() + boxX;
+        int top = webView.getTop() + boxY;
+        layer.setClipBounds(new Rect(left, top, left + boxWidth, top + boxHeight));
     }
 
     /** The preview box, in device pixels from the WebView's top left, and the colour around it. */
@@ -204,7 +272,8 @@ public class PreviewPlayerPlugin extends Plugin {
     public void setSpeed(PluginCall call) {
         float speed = (float) call.getData().optDouble("speed", 1.0);
         getActivity().runOnUiThread(() -> {
-            if (player != null) player.setPlaybackParameters(new PlaybackParameters(speed));
+            nudge = speed;
+            applySpeed();
             call.resolve();
         });
     }

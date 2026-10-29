@@ -247,6 +247,7 @@ export const TextClipComponent: React.FC<TextClipComponentProps> = ({
           data-locked={locked}
           onClick={handleClick}
           data-timeline-clip
+          data-timeline-text-clip
           onPointerDown={touchGesture.bodyPointerDown}
           onMouseDown={handleMouseDown}
           onKeyDown={(event) => {

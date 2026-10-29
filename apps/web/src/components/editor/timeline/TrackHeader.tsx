@@ -56,6 +56,11 @@ export const TrackHeader: React.FC<TrackHeaderProps> = React.memo(function Track
   const inputRef = useRef<HTMLInputElement>(null);
 
   const trackInfo = getTrackInfo(track, index);
+  // Resolve-style code (V1, A2...): numbered among tracks of the same kind.
+  const sameKind = project.timeline.tracks.filter((t) =>
+    track.mode === "standard" ? t.mode === "standard" : t.mode !== "standard" && t.type === track.type,
+  );
+  const trackCode = getTrackInfo(track, Math.max(0, sameKind.findIndex((t) => t.id === track.id))).label;
   const isVisual = trackHasVisualItems(project, track.id);
   const isAudio = trackHasAudioItems(project, track.id);
   const hasSoloedAudioTrack = project.timeline.tracks.some(
@@ -170,6 +175,12 @@ export const TrackHeader: React.FC<TrackHeaderProps> = React.memo(function Track
           track.locked ? "bg-bg-2/50" : "bg-bg-1"
         }`}
       >
+          <span
+            data-track-code
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${trackInfo.bgLight} ${trackInfo.textColor}`}
+          >
+            {trackCode}
+          </span>
           <div className="min-w-0 flex-1">
             {isRenaming ? (
               <ToolcraftTextInputControl

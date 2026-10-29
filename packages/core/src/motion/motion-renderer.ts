@@ -32,16 +32,15 @@ import {
 } from "./motion-camera";
 import type { BlendMode } from "../video/types";
 import { getMotionCanvasBlendMode } from "./motion-blend-modes";
-import {
-  MotionThreeRenderer,
-  sampleMotionObjectMeshFrame,
-  type MotionRenderQuality,
-} from "./motion-three-renderer";
+// Three.js is loaded only when a composition has a 3D scene layer.
+import type { MotionThreeRenderer } from "./motion-three-renderer";
+import { sampleMotionObjectMeshFrame } from "./motion-mesh-frames";
+import type { MotionRenderQuality } from "./motion-render-quality";
 
 export {
   DEFAULT_MOTION_RENDER_QUALITY,
   type MotionRenderQuality,
-} from "./motion-three-renderer";
+} from "./motion-render-quality";
 import { getMotionBlurSamplePlanAtTime } from "./motion-blur";
 import {
   applyMotionPixelEffectsToBuffer,
@@ -1220,7 +1219,8 @@ export class MotionRenderer {
     }
 
     if (!this.threeRenderer) {
-      this.threeRenderer = new MotionThreeRenderer();
+      const { MotionThreeRenderer } = await import("./motion-three-renderer");
+      this.threeRenderer ??= new MotionThreeRenderer();
     }
     if (!this.threeRenderer.isAvailable()) return;
 

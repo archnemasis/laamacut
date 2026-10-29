@@ -3,7 +3,10 @@ package com.laamacut.app;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.graphics.Bitmap;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -14,6 +17,8 @@ import android.util.Base64;
 import android.util.Pair;
 
 import androidx.annotation.OptIn;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.media3.common.C;
 import androidx.media3.common.Effect;
 import androidx.media3.common.MediaItem;
@@ -73,6 +78,7 @@ public class ExportPlugin extends Plugin {
     private final Handler main = new Handler(Looper.getMainLooper());
     private Transformer running;
     private Runnable progressPoll;
+    private int notifiedPercent = -1;
 
     /** Start a file in the export's working folder (photos and music the web side holds). */
     @PluginMethod
@@ -118,18 +124,60 @@ public class ExportPlugin extends Plugin {
         }
         File output = new File(dir, UUID.randomUUID() + ".mp4");
         call.setKeepAlive(true);
-        // Building the plan decodes the text pictures; keep that off the UI thread.
-        getBridge().execute(() -> {
-            Composition composition;
-            int bitrate = call.getInt("bitrate", 12_000_000);
+        askForNotifications();
+        ExportService.start(getContext());
+        // Building the plan decodes the text pictures and reads clip sizes; keep that off the UI thread.
+        getBridge().execute(() -> prepare(call, output, canPassThrough(call)));
+    }
+
+    private void prepare(PluginCall call, File output, boolean passthrough) {
+        Composition composition;
+        int bitrate = call.getInt("bitrate", 12_000_000);
+        try {
+            composition = buildComposition(call, passthrough);
+        } catch (Exception e) {
+            finishCall(call, null, e);
+            return;
+        }
+        main.post(() -> start(call, composition, bitrate, output, passthrough));
+    }
+
+    /**
+     * One untouched video that already has the project's size and frame rate
+     * is copied without re-encoding: faster, and no quality loss.
+     */
+    private boolean canPassThrough(PluginCall call) {
+        try {
+            JSONArray clips = call.getArray("main", new JSArray());
+            if (clips.length() != 1 || call.getArray("overlays", new JSArray()).length() > 0) return false;
+            JSONObject clip = clips.getJSONObject(0);
+            if (!"video".equals(clip.optString("kind"))) return false;
+            if (Math.abs(clip.optDouble("speed", 1) - 1) > 0.001 || Math.abs(clip.optDouble("volume", 1) - 1) > 0.001) return false;
+            if (clip.optDouble("sourceFrameRate", 0) > call.getFloat("frameRate", 30f) + 0.5) return false;
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
             try {
-                composition = buildComposition(call);
-            } catch (Exception e) {
-                finishCall(call, null, e);
-                return;
+                retriever.setDataSource(getContext(), Uri.parse(clip.getString("uri")));
+                int w = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+                int h = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+                String rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+                if ("90".equals(rotation) || "270".equals(rotation)) {
+                    int swap = w;
+                    w = h;
+                    h = swap;
+                }
+                return w == call.getInt("width", 1080) && h == call.getInt("height", 1920);
+            } finally {
+                retriever.release();
             }
-            main.post(() -> start(call, composition, bitrate, output));
-        });
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void askForNotifications() {
+        if (Build.VERSION.SDK_INT < 33 || getActivity() == null) return;
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return;
+        ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.POST_NOTIFICATIONS }, 41);
     }
 
     @PluginMethod
@@ -138,14 +186,17 @@ public class ExportPlugin extends Plugin {
             if (running != null) running.cancel();
             stopPolling();
             running = null;
+            ExportService.finish(getContext(), null, null);
             call.resolve();
         });
     }
 
     @OptIn(markerClass = UnstableApi.class)
-    private void start(PluginCall call, Composition composition, int bitrate, File output) {
-        Transformer transformer = new Transformer.Builder(getContext())
-            .setVideoMimeType(MimeTypes.VIDEO_H264)
+    private void start(PluginCall call, Composition composition, int bitrate, File output, boolean passthrough) {
+        Transformer.Builder builder = new Transformer.Builder(getContext());
+        // Asking for H.264 would force a re-encode of an HEVC phone video.
+        if (!passthrough) builder.setVideoMimeType(MimeTypes.VIDEO_H264);
+        Transformer transformer = builder
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
             .setEncoderFactory(new DefaultEncoderFactory.Builder(getContext())
                 .setRequestedVideoEncoderSettings(new VideoEncoderSettings.Builder().setBitrate(bitrate).build())
@@ -172,12 +223,18 @@ public class ExportPlugin extends Plugin {
                     stopPolling();
                     running = null;
                     output.delete();
+                    if (passthrough) {
+                        // Copying didn't work for this file; do the normal export instead.
+                        getBridge().execute(() -> prepare(call, output, false));
+                        return;
+                    }
                     clearStaged();
                     finishCall(call, null, error);
                 }
             })
             .build();
         running = transformer;
+        notifiedPercent = -1;
         transformer.start(composition, output.getAbsolutePath());
         ProgressHolder holder = new ProgressHolder();
         progressPoll = new Runnable() {
@@ -188,6 +245,10 @@ public class ExportPlugin extends Plugin {
                     JSObject event = new JSObject();
                     event.put("progress", holder.progress / 100.0);
                     notifyListeners("progress", event);
+                    if (holder.progress != notifiedPercent) {
+                        notifiedPercent = holder.progress;
+                        ExportService.progress(getContext(), holder.progress / 100.0);
+                    }
                 }
                 main.postDelayed(this, 250);
             }
@@ -201,13 +262,15 @@ public class ExportPlugin extends Plugin {
     }
 
     private void finishCall(PluginCall call, JSObject result, Exception error) {
+        String failure = error == null ? null : error.getMessage() != null ? error.getMessage() : "Export failed";
+        ExportService.finish(getContext(), result != null ? result.getString("uri") : null, failure);
         if (error != null) call.reject(error.getMessage() != null ? error.getMessage() : "Export failed", error);
         else call.resolve(result);
         call.setKeepAlive(false);
     }
 
     @OptIn(markerClass = UnstableApi.class)
-    private Composition buildComposition(PluginCall call) throws Exception {
+    private Composition buildComposition(PluginCall call, boolean passthrough) throws Exception {
         int width = call.getInt("width", 1080);
         int height = call.getInt("height", 1920);
         float frameRate = call.getFloat("frameRate", 30f);
@@ -216,7 +279,7 @@ public class ExportPlugin extends Plugin {
         JSONArray mainClips = call.getArray("main", new JSArray());
         for (int i = 0; i < mainClips.length(); i++) {
             JSONObject clip = mainClips.getJSONObject(i);
-            mainItems.add(buildItem(clip, width, height, frameRate, false));
+            mainItems.add(buildItem(clip, width, height, frameRate, false, passthrough));
         }
         if (mainItems.isEmpty()) throw new IllegalArgumentException("Nothing to export");
 
@@ -232,7 +295,7 @@ public class ExportPlugin extends Plugin {
                 JSONObject clip = clips.getJSONObject(i);
                 long gapUs = clip.optLong("gapBeforeUs", 0);
                 if (gapUs > 0) sequence.addGap(gapUs);
-                sequence.addItem(buildItem(clip, width, height, frameRate, true));
+                sequence.addItem(buildItem(clip, width, height, frameRate, true, false));
                 added++;
             }
             if (added > 0) sequences.add(sequence.build());
@@ -251,7 +314,7 @@ public class ExportPlugin extends Plugin {
     }
 
     @OptIn(markerClass = UnstableApi.class)
-    private EditedMediaItem buildItem(JSONObject clip, int width, int height, float frameRate, boolean audioOnly) throws Exception {
+    private EditedMediaItem buildItem(JSONObject clip, int width, int height, float frameRate, boolean audioOnly, boolean passthrough) throws Exception {
         Uri uri = Uri.parse(clip.getString("uri"));
         boolean image = "image".equals(clip.optString("kind"));
         long inUs = clip.optLong("inUs", 0);
@@ -284,7 +347,7 @@ public class ExportPlugin extends Plugin {
             mixer.putChannelMixingMatrix(ChannelMixingMatrix.create(2, 2).scaleBy(volume));
             audio.add(mixer);
         }
-        if (!audioOnly) {
+        if (!audioOnly && !passthrough) {
             // Fit inside the project's frame with black bars, like the editor's default.
             video.add(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT));
             if (!image && clip.optDouble("sourceFrameRate", 0) > frameRate + 0.5) {

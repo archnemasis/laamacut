@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import type React from "react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ToolcraftText as Text } from "@openreel/ui";
 
 import { AssetsPanel, type AssetsTab } from "../../components/editor/AssetsPanel";
@@ -9,7 +9,10 @@ import { PanelErrorBoundary } from "../../components/ErrorBoundary";
 import { Icon } from "@/icons/Icon";
 import { useResizable } from "../editor/useResizable";
 import { useProjectStore } from "../../stores/project-store";
+import { AudioMixer } from "../../components/audio-mixer";
+import { useDesktopPage, type DesktopPage } from "../shell/desktop-page";
 import {
+  AudioLines,
   Clapperboard,
   LayoutTemplate,
   Shapes,
@@ -141,11 +144,27 @@ function RowHandle({
   );
 }
 
+/** What each page shows when it opens; the toolbar can still change it after. */
+const PAGE_LAYOUTS: Record<DesktopPage, { media: AssetsTab | null; inspector: boolean; mixer: boolean }> = {
+  media: { media: "media", inspector: false, mixer: false },
+  edit: { media: "media", inspector: true, mixer: false },
+  color: { media: "recipes", inspector: true, mixer: false },
+  audio: { media: null, inspector: false, mixer: true },
+};
+
 export function EditPage(): JSX.Element {
   const projectName = useProjectStore((s) => s.project.name);
+  const page = useDesktopPage((s) => s.page);
   // Like Resolve, each toolbar button shows or hides its panel.
   const [mediaPanel, setMediaPanel] = useState<AssetsTab | null>("media");
   const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [mixerOpen, setMixerOpen] = useState(false);
+  useEffect(() => {
+    const layout = PAGE_LAYOUTS[page];
+    setMediaPanel(layout.media);
+    setInspectorOpen(layout.inspector);
+    setMixerOpen(layout.mixer);
+  }, [page]);
   const mediaW = useResizable({
     initial: 320,
     min: 220,
@@ -171,12 +190,18 @@ export function EditPage(): JSX.Element {
     storageKey: "openreel-desktop-timeline-h",
   });
 
-  const columns = [mediaPanel && `${mediaW.value}px`, "1fr", inspectorOpen && `${inspectorW.value}px`].filter(Boolean);
-  const topAreas = [mediaPanel && "media", "stage", inspectorOpen && "inspector"].filter(Boolean);
+  // The media page is a big media pool beside a smaller viewer, with no timeline.
+  const mediaColumn = page === "media" ? "minmax(0, 3fr)" : `${mediaW.value}px`;
+  const stageColumn = page === "media" ? "minmax(0, 2fr)" : "1fr";
+  const columns = [mediaPanel && mediaColumn, stageColumn, inspectorOpen && `${inspectorW.value}px`, mixerOpen && "auto"].filter(Boolean);
+  const topAreas = [mediaPanel && "media", "stage", inspectorOpen && "inspector", mixerOpen && "mixer"].filter(Boolean);
+  const showTimeline = page !== "media";
   const gridStyle: React.CSSProperties = {
     gridTemplateColumns: columns.join(" "),
-    gridTemplateRows: `1fr ${timelineH.value}px`,
-    gridTemplateAreas: `'${topAreas.join(" ")}' '${topAreas.map(() => "timeline").join(" ")}'`,
+    gridTemplateRows: showTimeline ? `1fr ${timelineH.value}px` : "1fr",
+    gridTemplateAreas: showTimeline
+      ? `'${topAreas.join(" ")}' '${topAreas.map(() => "timeline").join(" ")}'`
+      : `'${topAreas.join(" ")}'`,
   };
   const activePanel = MEDIA_PANELS.find((panel) => panel.tab === mediaPanel);
 
@@ -193,6 +218,12 @@ export function EditPage(): JSX.Element {
           />
         ))}
         <span className="mx-auto truncate px-4 text-[12px] font-medium text-fg-2">{projectName}</span>
+        <ToolbarToggle
+          label="Mixer"
+          icon={AudioLines}
+          active={mixerOpen}
+          onClick={() => setMixerOpen(!mixerOpen)}
+        />
         <ToolbarToggle
           label="Inspector"
           icon={SlidersHorizontal}
@@ -225,12 +256,22 @@ export function EditPage(): JSX.Element {
           </DockRegion>
         )}
 
-        <DockRegion label="Timeline" name="Timeline" area="timeline" icon="rectangle.split.3x1" className="bg-tl-bg">
-          <Suspense fallback={<PanelLoading />}>
-            <Timeline />
-          </Suspense>
-          <RowHandle onPointerDown={timelineH.onHandlePointerDown} />
-        </DockRegion>
+        {mixerOpen && (
+          <DockRegion label="Mixer" name="Mixer" area="mixer" icon="slider.horizontal.3">
+            <div className="h-full overflow-auto">
+              <AudioMixer visible onClose={() => setMixerOpen(false)} />
+            </div>
+          </DockRegion>
+        )}
+
+        {showTimeline && (
+          <DockRegion label="Timeline" name="Timeline" area="timeline" icon="rectangle.split.3x1" className="bg-tl-bg">
+            <Suspense fallback={<PanelLoading />}>
+              <Timeline />
+            </Suspense>
+            <RowHandle onPointerDown={timelineH.onHandlePointerDown} />
+          </DockRegion>
+        )}
       </div>
     </div>
   );

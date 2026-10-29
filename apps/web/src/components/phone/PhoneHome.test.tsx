@@ -37,18 +37,16 @@ describe("PhoneHome", () => {
     expect(screen.getByRole("button", { name: "Me" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("links to donations and shows the licence on the Me tab", () => {
-    const open = vi.spyOn(window, "open").mockReturnValue(null);
+  it("hides donations while there is no donation page, and shows the licence on the Me tab", () => {
     render(<PhoneHome />);
     fireEvent.click(screen.getByRole("button", { name: "Me" }));
-    fireEvent.click(screen.getByRole("button", { name: /Support Laamacut/ }));
-    expect(open).toHaveBeenCalledWith(DONATE_URL, "_blank");
+    expect(DONATE_URL).toBe("");
+    expect(screen.queryByRole("button", { name: /Support Laamacut/ })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /About and licence/ }));
     expect(screen.getByText(/Augustus Otu and Contributors/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("Settings panel")).toBeTruthy();
-    open.mockRestore();
   });
 
   it("starts a new project straight into the media picker", () => {

@@ -8,9 +8,9 @@ describe("desktop-theme.css", () => {
   it("scopes overrides under .openreel-desktop", () => {
     expect(css).toContain(".openreel-desktop");
   });
-  it("retints the accent to purple and surfaces to charcoal", () => {
+  it("retints the accent to purple and surfaces to Resolve-style dark grey", () => {
     expect(css).toMatch(/--accent:\s*oklch\([^)]*30[0-9]/);
-    expect(css).toMatch(/--bg:\s*oklch\(0\.1[0-9]/);
+    expect(css).toMatch(/--bg:\s*oklch\(0\.(1[5-9]|2[0-4]?)\b/);
   });
   it("defines the full surface ramp + border tokens it overrides", () => {
     for (const token of ["--bg", "--bg-1", "--bg-2", "--bg-3", "--border", "--accent", "--accent-strong"]) {

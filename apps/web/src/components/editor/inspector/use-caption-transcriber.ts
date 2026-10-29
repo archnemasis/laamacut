@@ -4,6 +4,7 @@ import { loadAudioBuffer } from "../../../utils/load-audio-buffer";
 import { audioBufferToWhisperSamples, emphasizeSpeech } from "../../../utils/whisper-audio";
 import { stripNonSpeech } from "../../../services/caption-text";
 import { DEFAULT_WHISPER_MODEL, isWhisperModelKey, type WhisperModelKey } from "../../../workers/whisper-models";
+import { nativeWhisperAvailable, transcribeNatively } from "../../../services/native-whisper";
 
 interface WorkerChunk {
   text: string;
@@ -36,19 +37,17 @@ export function useCaptionTranscriber() {
   const [readyModels, setReadyModels] = useState<Set<WhisperModelKey>>(() => new Set());
   const [modelBackends, setModelBackends] = useState<Partial<Record<WhisperModelKey, "webgpu" | "wasm">>>({});
 
-  useEffect(() => {
-    const worker = new Worker(new URL("../../../workers/whisper-worker.ts", import.meta.url), { type: "module" });
-    workerRef.current = worker;
-    return () => {
-      worker.terminate();
-      workerRef.current = null;
-    };
+  // The worker (and its WebAssembly runtime) starts only when it's needed:
+  // on the Android app captions normally run natively instead.
+  useEffect(() => () => {
+    workerRef.current?.terminate();
+    workerRef.current = null;
   }, []);
 
   const runWorker = useCallback(
     (type: "load" | "transcribe", audio?: Float32Array, options: TranscribeOptions = {}): Promise<{ text?: string; chunks?: WorkerChunk[] }> => {
+      workerRef.current ??= new Worker(new URL("../../../workers/whisper-worker.ts", import.meta.url), { type: "module" });
       const worker = workerRef.current;
-      if (!worker) return Promise.reject(new Error("Caption worker is not ready."));
       const requestId = crypto.randomUUID();
       const markReady = (backend: unknown) => {
         setWorkerState("ready");
@@ -108,13 +107,21 @@ export function useCaptionTranscriber() {
     setWorkerState("loading");
     setProgress(0);
     setProgressMessage("Getting captions ready…");
+    if (await nativeWhisperAvailable()) {
+      // Built into the app: the model loads when the first clip is transcribed.
+      setWorkerState("ready");
+      setReadyModels((current) => new Set(current).add(selectedModel));
+      setProgress(1);
+      setProgressMessage("Captions are ready");
+      return;
+    }
     try {
       await runWorker("load");
     } catch (reason) {
       setWorkerState("idle");
       throw reason;
     }
-  }, [runWorker]);
+  }, [runWorker, selectedModel]);
 
   /** Read one clip's sound and return its captions, timed on the timeline. Throws when nothing is said. */
   const transcribeClip = useCallback(
@@ -143,7 +150,17 @@ export function useCaptionTranscriber() {
         const samples = emphasizeSpeech(audioBufferToWhisperSamples(audioBuffer, sourceStart, sourceEnd));
         setProgress(0.2);
         setProgressMessage(workerState === "ready" ? "Listening for words…" : "Getting captions ready…");
-        const result = await runWorker("transcribe", samples, options);
+        let result: { text?: string; chunks?: WorkerChunk[] } | null = null;
+        if (await nativeWhisperAvailable()) {
+          setProgressMessage("Listening for words…");
+          try {
+            result = await transcribeNatively(samples, options, (next) => setProgress(0.2 + next * 0.8));
+          } catch (error) {
+            // A phone the native build can't handle still gets captions, just slower.
+            console.warn("[Captions] Native captions failed, using the web worker:", error);
+          }
+        }
+        result ??= await runWorker("transcribe", samples, options);
         const sourceDuration = Math.max(0.1, sourceEnd - sourceStart);
         const playbackSpeed = Math.max(clip.speed ?? 1, 0.01);
         const clipEndTime = clip.startTime + clip.duration;

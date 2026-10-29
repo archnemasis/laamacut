@@ -16,17 +16,35 @@ import {
   resolveCanvasFitDimensions,
   type Clip,
 } from "@openreel/core";
-import * as THREE from "three";
+import type * as THREE from "three";
 
 type GraphicClipUnion = ShapeClip | SVGClip | StickerClip;
 import { getEffectsBridge } from "../../../bridges/effects-bridge";
 import { getTransitionBridge } from "../../../bridges/transition-bridge";
 import type { ClipTransform } from "./types";
 import { DEFAULT_TRANSFORM } from "./types";
-import { ThreeJSLayerRenderer } from "./threejs-layer-renderer";
+import type { ThreeJSLayerRenderer } from "./threejs-layer-renderer";
 
 let lastEffectsLogTime = 0;
 let threeJSRenderer: ThreeJSLayerRenderer | null = null;
+let threeJSLoading: Promise<void> | null = null;
+
+/**
+ * The Three.js renderer loads on first use so the 3D engine stays out of
+ * startup. Until it arrives, callers draw the clip flat for a frame or two.
+ */
+function getThreeJSRenderer(width: number, height: number): ThreeJSLayerRenderer | null {
+  if (threeJSRenderer) return threeJSRenderer;
+  threeJSLoading ??= import("./threejs-layer-renderer")
+    .then(({ ThreeJSLayerRenderer }) => {
+      threeJSRenderer = new ThreeJSLayerRenderer(width, height);
+    })
+    .catch((error: unknown) => {
+      threeJSLoading = null;
+      console.warn("[canvas-renderers] Three.js renderer failed to load", error);
+    });
+  return null;
+}
 const animationEngine = new AnimationEngine();
 
 interface EmphasisState {
@@ -593,11 +611,12 @@ export const renderTextClipToCanvas = (
   const hasBlendMode = textClip.blendMode && textClip.blendMode !== "normal";
   const has3DText = textClip.text3d?.enabled === true;
 
-  if (has3DTransforms || hasBlendMode || has3DText) {
-    // Lazy-initialize THREE.js renderer (reused for all 3D text rendering)
-    if (!threeJSRenderer) {
-      threeJSRenderer = new ThreeJSLayerRenderer(canvasWidth, canvasHeight);
-    }
+  const threeForText =
+    has3DTransforms || hasBlendMode || has3DText
+      ? getThreeJSRenderer(canvasWidth, canvasHeight)
+      : null;
+  if (threeForText) {
+    const threeJSRenderer = threeForText;
 
     if (
       threeJSRenderer.canvas.width !== canvasWidth ||
@@ -1403,10 +1422,12 @@ export const renderShapeClipToCanvas = (
     transformedClip.type === "shape" &&
     (transformedClip as ShapeClip).shapeType.startsWith("mesh-");
 
-  if (has3DTransforms || hasBlendMode || isShape3D) {
-    if (!threeJSRenderer) {
-      threeJSRenderer = new ThreeJSLayerRenderer(canvasWidth, canvasHeight);
-    }
+  const threeForShape =
+    has3DTransforms || hasBlendMode || isShape3D
+      ? getThreeJSRenderer(canvasWidth, canvasHeight)
+      : null;
+  if (threeForShape) {
+    const threeJSRenderer = threeForShape;
 
     if (
       threeJSRenderer.canvas.width !== canvasWidth ||

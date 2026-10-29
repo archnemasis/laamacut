@@ -8,3 +8,7 @@ release/
 
 # Auto-captions model, fetched by scripts/fetch-caption-model.mjs
 android/app/src/models/
+
+# whisper.cpp source, fetched by scripts/fetch-caption-model.mjs
+android/app/src/main/cpp/whisper.cpp/
+android/app/.cxx/

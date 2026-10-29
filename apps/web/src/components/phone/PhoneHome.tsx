@@ -181,18 +181,20 @@ function MeTab() {
             <span className="block text-[12px] text-fg-3">Everything stays on your phone</span>
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => openLink(DONATE_URL)}
-          className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-accent bg-bg-2 p-4 text-left active:scale-[0.99]"
-        >
-          <Heart size={24} className="shrink-0 text-accent" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">Support Laamacut</span>
-            <span className="block text-[12px] text-fg-3">Free forever, no watermark. Tips keep it that way.</span>
-          </span>
-          <ExternalLink size={16} className="shrink-0 text-fg-3" aria-hidden />
-        </button>
+        {DONATE_URL && (
+          <button
+            type="button"
+            onClick={() => openLink(DONATE_URL)}
+            className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-accent bg-bg-2 p-4 text-left active:scale-[0.99]"
+          >
+            <Heart size={24} className="shrink-0 text-accent" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold">Support Laamacut</span>
+              <span className="block text-[12px] text-fg-3">Free forever, no watermark. Tips keep it that way.</span>
+            </span>
+            <ExternalLink size={16} className="shrink-0 text-fg-3" aria-hidden />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setAbout(true)}
