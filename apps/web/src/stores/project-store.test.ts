@@ -322,6 +322,30 @@ describe("ProjectStore", () => {
       expect(useProjectStore.getState().getAllTextClips().find((c) => c.id === clip.id)?.text).toBe("First");
     });
 
+    it("undoes an added text box and the typing in it as one step when grouped", async () => {
+      const { insertTimelineOverlay } = await import("./project/insert-timeline-overlay");
+      const now = vi.spyOn(Date, "now");
+      let t = 1_000_000;
+      now.mockImplementation(() => (t += 500));
+      try {
+        const before = useProjectStore.getState().project.timeline.tracks.length;
+        useProjectStore.getState().beginHistoryGroup("Add text");
+        const clip = await insertTimelineOverlay(0, 3, (trackId) =>
+          useProjectStore.getState().createTextClip(trackId, 0, "Enter text", 3),
+        );
+        useProjectStore.getState().updateTextContent(clip!.id, "H");
+        useProjectStore.getState().updateTextContent(clip!.id, "Hi");
+        useProjectStore.getState().endHistoryGroup();
+
+        await useProjectStore.getState().undo();
+        expect(useProjectStore.getState().project.textClips?.some((c) => c.id === clip!.id) ?? false).toBe(false);
+        expect(useProjectStore.getState().getAllTextClips().some((c) => c.id === clip!.id)).toBe(false);
+        expect(useProjectStore.getState().project.timeline.tracks.length).toBe(before);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
     it("deleteTextClip is undoable", async () => {
       const trackId = await addTextTrack();
       const clip = useProjectStore.getState().createTextClip(trackId, 0, "Bye", 5)!;

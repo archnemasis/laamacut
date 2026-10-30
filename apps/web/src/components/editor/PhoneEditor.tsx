@@ -260,6 +260,16 @@ export const PhoneEditor: React.FC = () => {
   const [speechOpen, setSpeechOpen] = useState(false);
   const replaceInput = useRef<HTMLInputElement>(null);
   const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean; tab?: TextEditorTab } | null>(null);
+  // Adding text and the typing that follows undo as one step, like CapCut.
+  const addTextGroupOpen = useRef(false);
+  const closeTextEdit = useCallback(() => {
+    if (addTextGroupOpen.current) {
+      addTextGroupOpen.current = false;
+      useProjectStore.getState().endHistoryGroup();
+    }
+    setTextEdit(null);
+  }, []);
+  useEffect(() => closeTextEdit, [closeTextEdit]);
   // New projects open straight into the media picker, like CapCut.
   const [pickerOpen, setPickerOpen] = useState(false);
   const startedFromNewProject = useRef(false);
@@ -385,10 +395,17 @@ export const PhoneEditor: React.FC = () => {
   /** Add a text clip at the playhead and open the text editor, like CapCut's Add text. */
   const addText = async () => {
     const at = useTimelineStore.getState().playheadPosition;
+    if (!addTextGroupOpen.current) {
+      useProjectStore.getState().beginHistoryGroup("Add text");
+      addTextGroupOpen.current = true;
+    }
     const created = await insertTimelineOverlay(at, 3, (trackId) =>
       useProjectStore.getState().createTextClip(trackId, at, "Enter text", 3, { ...DEFAULT_TITLE_STYLE, fontSize: 72 }),
     );
-    if (!created) return;
+    if (!created) {
+      closeTextEdit();
+      return;
+    }
     setMenu(null);
     select({ type: "text-clip", id: created.id, trackId: created.trackId });
     setTextEdit({ clipId: created.id, isNew: true });
@@ -542,7 +559,7 @@ export const PhoneEditor: React.FC = () => {
 
   // Android's back gesture closes the top layer, one at a time, before it can leave.
   useBackHandler(fullscreen, () => void document.exitFullscreen?.(), 40);
-  useBackHandler(textEdit !== null, () => setTextEdit(null), 30);
+  useBackHandler(textEdit !== null, closeTextEdit, 30);
   useBackHandler(captionsOpen, () => setCaptionsOpen(false), 30);
   useBackHandler(speechOpen, () => { setSpeechOpen(false); setMenu(null); }, 30);
   useBackHandler(pickerOpen, () => closePicker(), 30);
@@ -651,7 +668,7 @@ export const PhoneEditor: React.FC = () => {
         {textEdit && (
           <div className="absolute inset-0 z-[110]">
             <PanelErrorBoundary name="Text">
-              <PhoneTextEditor clipId={textEdit.clipId} isNew={textEdit.isNew} initialTab={textEdit.tab} onDone={() => setTextEdit(null)} />
+              <PhoneTextEditor clipId={textEdit.clipId} isNew={textEdit.isNew} initialTab={textEdit.tab} onDone={closeTextEdit} />
             </PanelErrorBoundary>
           </div>
         )}

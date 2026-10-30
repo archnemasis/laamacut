@@ -253,8 +253,12 @@ export function PhoneTextEditor({ clipId, isNew, initialTab, onDone }: { clipId:
   const finish = () => {
     // A new box nobody typed in goes away. Judge by the clip, not the draft,
     // so a remounted editor can't throw away text that's there.
+    // Close after the delete so it lands in the same undo step as the add.
     if (isNew && !draft.trim() && (!clip.text.trim() || clip.text === "Enter text")) {
-      void import("../../utils/timeline-item-actions").then(({ deleteTimelineItem }) => deleteTimelineItem(store(), clipId));
+      void import("../../utils/timeline-item-actions")
+        .then(({ deleteTimelineItem }) => deleteTimelineItem(store(), clipId))
+        .finally(onDone);
+      return;
     }
     onDone();
   };

@@ -186,7 +186,7 @@ export function PhoneExportScreen({ status, progress, label, still, videoUrl, lo
               ? error ?? "Something went wrong."
               : status === "naming"
                 ? "Name your video to start."
-                : "Please don't close Laamacut or lock your screen."}
+                : "You can switch apps or lock your screen. We'll notify you when it's saved."}
           </p>
           <div className="relative mt-12 w-[80%] bg-black" style={{ aspectRatio: String(aspect) }}>
             {still && (
