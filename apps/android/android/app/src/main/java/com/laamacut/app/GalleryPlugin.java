@@ -124,7 +124,8 @@ public class GalleryPlugin extends Plugin {
         JSArray items = new JSArray();
         ContentResolver resolver = getContext().getContentResolver();
         String order = MediaStore.MediaColumns.DATE_ADDED + " DESC";
-        try (Cursor cursor = resolver.query(collection, projection, null, null, order)) {
+        try (Cursor cursor = resolver.query(
+                collection, projection, PrivateAlbum.selection(), PrivateAlbum.selectionArgs(), order)) {
             if (cursor != null && cursor.moveToPosition(offset)) {
                 int count = 0;
                 do {
@@ -153,6 +154,10 @@ public class GalleryPlugin extends Plugin {
         int size = call.getInt("size", 256);
         if (uri == null) {
             call.reject("Missing uri");
+            return;
+        }
+        if (!PrivateAlbum.allows(getContext(), uri)) {
+            call.reject("Not in the test album");
             return;
         }
         getBridge().execute(() -> {
@@ -189,6 +194,10 @@ public class GalleryPlugin extends Plugin {
         String uri = call.getString("uri");
         if (uri == null) {
             call.reject("Missing uri");
+            return;
+        }
+        if (!PrivateAlbum.allows(getContext(), uri)) {
+            call.reject("Not in the test album");
             return;
         }
         getBridge().execute(() -> {
@@ -306,6 +315,10 @@ public class GalleryPlugin extends Plugin {
             call.reject("Missing uri");
             return;
         }
+        if (!PrivateAlbum.allows(getContext(), uri)) {
+            call.reject("Not in the test album");
+            return;
+        }
         File dir = new File(getContext().getCacheDir(), "preview-copies");
         if (!dir.exists() && !dir.mkdirs()) {
             call.reject("Could not create the preview folder");
@@ -407,6 +420,10 @@ public class GalleryPlugin extends Plugin {
             call.reject("Missing uri");
             return;
         }
+        if (!PrivateAlbum.allows(getContext(), uri)) {
+            call.reject("Not in the test album");
+            return;
+        }
         File dir = new File(getContext().getCacheDir(), "audio-tracks");
         if (!dir.exists() && !dir.mkdirs()) {
             call.reject("Could not create the audio folder");
@@ -484,6 +501,10 @@ public class GalleryPlugin extends Plugin {
         int height = call.getInt("height", 160);
         if (uri == null) {
             call.reject("Missing uri");
+            return;
+        }
+        if (!PrivateAlbum.allows(getContext(), uri)) {
+            call.reject("Not in the test album");
             return;
         }
         getBridge().execute(() -> {

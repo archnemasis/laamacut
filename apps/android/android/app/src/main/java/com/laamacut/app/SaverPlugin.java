@@ -29,7 +29,7 @@ import java.util.UUID;
  */
 @CapacitorPlugin(name = "LaamacutSaver")
 public class SaverPlugin extends Plugin {
-    private static final String FOLDER = "Laamacut";
+    private static final String FOLDER = PrivateAlbum.saveFolder();
 
     private static class Pending {
         final OutputStream out;

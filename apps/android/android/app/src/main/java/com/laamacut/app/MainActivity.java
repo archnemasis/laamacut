@@ -1,12 +1,15 @@
 package com.laamacut.app;
 
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.ValueCallback;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
+import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.graphics.Insets;
@@ -15,6 +18,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
@@ -37,6 +41,19 @@ public class MainActivity extends BridgeActivity {
                 return media != null ? media : super.shouldInterceptRequest(view, request);
             }
         });
+
+        // Test builds: Android's own file pickers show the whole gallery, so they stay
+        // shut and only the in-app picker (the test album, see PrivateAlbum) is used.
+        if (PrivateAlbum.on()) {
+            getBridge().getWebView().setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+                @Override
+                public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                    callback.onReceiveValue(null);
+                    Toast.makeText(MainActivity.this, "Test build: only the \"" + BuildConfig.TEST_ALBUM + "\" album", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
+            });
+        }
 
         // Back (the edge swipe or button) closes the app's own sheets and screens
         // one at a time; only when nothing is open does it leave the app.

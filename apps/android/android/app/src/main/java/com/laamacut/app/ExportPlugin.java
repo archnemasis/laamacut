@@ -75,7 +75,7 @@ import java.util.UUID;
 @CapacitorPlugin(name = "LaamacutExport")
 public class ExportPlugin extends Plugin {
     private static final String TAG = "LaamacutExport";
-    private static final String FOLDER = "Laamacut";
+    private static final String FOLDER = PrivateAlbum.saveFolder();
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private Transformer running;

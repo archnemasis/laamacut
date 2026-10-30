@@ -8,10 +8,18 @@ if (keystorePropsFile.exists()) {
     keystorePropsFile.withInputStream { keystoreProps.load(it) }
 }
 
+// Test builds pass -PlaamacutTestAlbum="Laamacut Test" so the app only sees that
+// gallery album (see PrivateAlbum.java). Releases leave it out.
+def testAlbum = (project.findProperty("laamacutTestAlbum") ?: "").toString().replace("\"", "")
+
 android {
     namespace "com.laamacut.app"
     compileSdk rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
+        buildConfigField "String", "TEST_ALBUM", "\"${testAlbum}\""
         applicationId "com.laamacut.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion

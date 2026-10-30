@@ -36,6 +36,7 @@ final class MediaServer {
         String source = url.getQueryParameter("uri");
         // Only the phone's media library: never other apps' files or providers.
         if (source == null || !source.startsWith("content://media/")) return status(400, "Bad Request");
+        if (!PrivateAlbum.allows(context, source)) return status(403, "Forbidden");
 
         ParcelFileDescriptor descriptor = null;
         try {

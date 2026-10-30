@@ -50,7 +50,7 @@ public class ExportService extends Service {
                 .setDataAndType(Uri.parse(savedUri), "video/mp4")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             done.setContentTitle("Video saved")
-                .setContentText("Saved to Movies/Laamacut")
+                .setContentText("Saved to Movies/" + PrivateAlbum.saveFolder())
                 .setContentIntent(PendingIntent.getActivity(context, 1, view, PendingIntent.FLAG_IMMUTABLE));
         } else {
             done.setContentTitle("Export failed")
