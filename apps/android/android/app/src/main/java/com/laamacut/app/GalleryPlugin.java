@@ -301,12 +301,14 @@ public class GalleryPlugin extends Plugin {
         try {
             extractor.setDataSource(getContext(), Uri.parse(uri), null);
             boolean sawVideo = false;
+            int videoTrack = -1;
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
                 String mime = format.getString(MediaFormat.KEY_MIME);
                 if (mime == null) continue;
                 if (mime.startsWith("video/") && !sawVideo) {
                     sawVideo = true;
+                    videoTrack = i;
                     info.videoCodec = mime.substring(6);
                     if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
                         info.fps = Math.max(info.fps, format.getNumber(MediaFormat.KEY_FRAME_RATE).floatValue());
@@ -318,6 +320,19 @@ public class GalleryPlugin extends Plugin {
                     }
                     info.audioTracks++;
                 }
+            }
+            // WebM and some other files give neither a frame count nor a rate:
+            // count the frames in the first two seconds instead.
+            if (info.fps <= 0 && videoTrack >= 0) {
+                extractor.selectTrack(videoTrack);
+                long window = Math.min(2_000_000L, Math.max(1L, info.durationMs * 1000));
+                int frames = 0;
+                long first = extractor.getSampleTime();
+                while (frames < 1000 && extractor.getSampleTime() >= 0 && extractor.getSampleTime() - first < window) {
+                    frames++;
+                    if (!extractor.advance()) break;
+                }
+                if (frames > 1) info.fps = Math.round(frames * 1_000_000f / window);
             }
         } catch (Exception ignored) {
             // The frame count estimate above is good enough.
