@@ -5,7 +5,7 @@ import { GalleryFile } from "./gallery-file";
 
 /** The Android app's LaamacutGallery plugin (GalleryPlugin.java). */
 export type GalleryAccess = "granted" | "limited" | "denied";
-export type GalleryKind = "video" | "photo";
+export type GalleryKind = "video" | "photo" | "audio";
 
 export interface GalleryItem {
   uri: string;
@@ -32,6 +32,11 @@ export interface GalleryVideoProbe {
 export interface GalleryPlugin {
   access(): Promise<{ access: GalleryAccess }>;
   requestAccess(): Promise<{ access: GalleryAccess }>;
+  /** With limited access, Android's "select more" prompt. */
+  requestMore(): Promise<{ access: GalleryAccess }>;
+  /** Music and sounds (a separate permission from photos and videos). */
+  audioAccess(): Promise<{ access: "granted" | "denied" }>;
+  requestAudioAccess(): Promise<{ access: "granted" | "denied" }>;
   list(options: { kind: GalleryKind; offset: number; limit: number }): Promise<{ items: GalleryItem[] }>;
   thumbnail(options: { uri: string; size: number }): Promise<{ data: string }>;
   /** Size as shown (rotation applied) and frame rate, read without decoding the video. */

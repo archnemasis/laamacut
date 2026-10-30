@@ -216,6 +216,15 @@ declare global {
           audioBitrateKbps?: number;
         }): Promise<{ outPath: string }>;
         extractAudioWav(args: { srcPath: string; streamIndex?: number }): Promise<{ outPath: string }>;
+        /** Joins plain clips into the export without re-encoding; copied is false (with why) when they don't qualify. */
+        streamCopyExport?(args: {
+          inputs: { path: string; durationSec: number }[];
+          outPath: string;
+          codec: string;
+          width: number;
+          height: number;
+          frameRate: number;
+        }): Promise<{ copied: boolean; reason?: string }>;
         probeAudioStreams(args: { srcPath: string }): Promise<{
           streams: { index: number; codec: string; channels: number; sampleRate: number; language?: string }[];
         }>;

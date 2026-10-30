@@ -10,6 +10,7 @@ import {
   type TranscodeContainer,
 } from "../sidecar/media-job";
 import { probeAudioStreams as probe, type AudioStreamInfo } from "../sidecar/probe-streams";
+import { streamCopyExport as runStreamCopy } from "../sidecar/stream-copy";
 import { pathGrants } from "./fs";
 
 function tmpPath(ext: string): string {
@@ -55,4 +56,20 @@ export async function probeAudioStreams(args: {
   srcPath: string;
 }): Promise<{ streams: AudioStreamInfo[] }> {
   return { streams: await probe(pathGrants.require(args.srcPath)) };
+}
+
+/** Joins plain clips into the chosen export file without re-encoding, when they allow it. */
+export async function streamCopyExport(args: {
+  inputs: { path: string; durationSec: number }[];
+  outPath: string;
+  codec: string;
+  width: number;
+  height: number;
+  frameRate: number;
+}): Promise<{ copied: boolean; reason?: string }> {
+  return runStreamCopy({
+    ...args,
+    inputs: args.inputs.map((input) => ({ path: pathGrants.require(input.path), durationSec: input.durationSec })),
+    outPath: pathGrants.require(args.outPath),
+  });
 }

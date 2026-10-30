@@ -45,6 +45,7 @@ import {
   transcode,
   extractAudioWav,
   probeAudioStreams,
+  streamCopyExport,
 } from "./ipc/media";
 import { fetchUrl } from "./ipc/fetch-url";
 import { disposeAuroraClient } from "./aurora/client";
@@ -58,6 +59,7 @@ import {
   extractAudioArgsSchema,
   probeAudioArgsSchema,
   fetchUrlArgsSchema,
+  streamCopyExportArgsSchema,
   auroraPreviewSessionCancelArgsSchema,
   auroraPreviewSessionStartArgsSchema,
   auroraPreviewSessionStartResultSchema,
@@ -183,6 +185,7 @@ app.whenReady().then(() => {
   handle(CHANNELS.mediaExtractAudioWav, extractAudioArgsSchema, extractAudioWav);
   handle(CHANNELS.mediaProbeAudioStreams, probeAudioArgsSchema, probeAudioStreams);
   handle(CHANNELS.mediaFetchUrl, fetchUrlArgsSchema, fetchUrl);
+  handle(CHANNELS.mediaStreamCopyExport, streamCopyExportArgsSchema, streamCopyExport);
   handle(CHANNELS.auroraRenderPreview, auroraRenderPreviewArgsSchema, async (args) =>
     auroraRenderPreviewResultSchema.parse(
       await renderAuroraPreview(args as AuroraRenderPreviewArgs),

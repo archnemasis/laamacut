@@ -29,7 +29,9 @@ android {
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            // Also leaves out the web captions engine (ort-wasm, 21 MB): the app transcribes
+            // natively with whisper.cpp (WhisperPlugin), and the APK is arm64-only, so it always can.
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!ort-wasm*'
             // The caption model is copied out at its full size; compressing it gains nothing.
             noCompress "bin"
         }

@@ -37,6 +37,8 @@ public class MainActivity extends BridgeActivity {
         getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                WebResourceResponse blocked = PrivateAlbum.blockContent(MainActivity.this, request);
+                if (blocked != null) return blocked;
                 WebResourceResponse media = MediaServer.handle(MainActivity.this, request);
                 return media != null ? media : super.shouldInterceptRequest(view, request);
             }
@@ -45,6 +47,8 @@ public class MainActivity extends BridgeActivity {
         // Test builds: Android's own file pickers show the whole gallery, so they stay
         // shut and only the in-app picker (the test album, see PrivateAlbum) is used.
         if (PrivateAlbum.on()) {
+            // Test builds can be driven and timed from the PC (benchmarks).
+            WebView.setWebContentsDebuggingEnabled(true);
             getBridge().getWebView().setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
                 @Override
                 public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {

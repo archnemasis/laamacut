@@ -62,13 +62,19 @@ import java.util.UUID;
                 "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
             }
         ),
-        @Permission(alias = "legacyMedia", strings = { Manifest.permission.READ_EXTERNAL_STORAGE })
+        @Permission(alias = "legacyMedia", strings = { Manifest.permission.READ_EXTERNAL_STORAGE }),
+        @Permission(alias = "audio", strings = { "android.permission.READ_MEDIA_AUDIO" })
     }
 )
 public class GalleryPlugin extends Plugin {
 
     private String alias() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "media" : "legacyMedia";
+    }
+
+    /** Music and sounds have their own permission from Android 13; before that, storage covers them. */
+    private String audioAlias() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "audio" : "legacyMedia";
     }
 
     /** granted, limited (Android 14 "selected photos"), or denied. */
@@ -103,15 +109,45 @@ public class GalleryPlugin extends Plugin {
         access(call);
     }
 
+    /** With limited access, asks Android again so more photos and videos can be picked. */
+    @PluginMethod
+    public void requestMore(PluginCall call) {
+        requestPermissionForAlias(alias(), call, "accessResult");
+    }
+
+    @PluginMethod
+    public void audioAccess(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("access", getPermissionState(audioAlias()) == PermissionState.GRANTED ? "granted" : "denied");
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void requestAudioAccess(PluginCall call) {
+        if (getPermissionState(audioAlias()) == PermissionState.GRANTED) {
+            audioAccess(call);
+            return;
+        }
+        requestPermissionForAlias(audioAlias(), call, "audioAccessResult");
+    }
+
+    @PermissionCallback
+    private void audioAccessResult(PluginCall call) {
+        audioAccess(call);
+    }
+
     @PluginMethod
     public void list(PluginCall call) {
-        boolean video = "video".equals(call.getString("kind", "video"));
+        String kind = call.getString("kind", "video");
+        boolean video = "video".equals(kind);
+        boolean audio = "audio".equals(kind);
+        boolean timed = video || audio;
         int offset = call.getInt("offset", 0);
         int limit = call.getInt("limit", 60);
         Uri collection = video
             ? MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-        String[] projection = video
+            : audio ? MediaStore.Audio.Media.EXTERNAL_CONTENT_URI : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        String[] projection = timed
             ? new String[] {
                 MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME,
                 MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.SIZE,
@@ -135,7 +171,7 @@ public class GalleryPlugin extends Plugin {
                     item.put("name", cursor.getString(1));
                     item.put("mime", cursor.getString(2));
                     item.put("size", cursor.getLong(3));
-                    if (video) item.put("duration", cursor.getLong(4) / 1000.0);
+                    if (timed) item.put("duration", cursor.getLong(4) / 1000.0);
                     items.put(item);
                 } while (++count < limit && cursor.moveToNext());
             }

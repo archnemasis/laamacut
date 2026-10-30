@@ -4400,7 +4400,15 @@ export const Preview: React.FC = () => {
       const plan = planNativePreview(videoClips, startPosition, galleryOriginalUri, (clip) => {
         const size = getMediaItem(clip.mediaId)?.metadata;
         if (!size?.width || !size.height) return undefined;
-        const box = resolveCanvasFitDimensions(clip.transform?.fitMode ?? "contain", size.width, size.height, canvas.width, canvas.height);
+        // Fitted from the part a crop leaves visible, as drawFrameWithTransform does.
+        const crop = clip.transform?.crop;
+        const box = resolveCanvasFitDimensions(
+          clip.transform?.fitMode ?? "contain",
+          size.width * (crop?.width ?? 1),
+          size.height * (crop?.height ?? 1),
+          canvas.width,
+          canvas.height,
+        );
         return nativeFrameOf(clip.transform, box, canvas);
       });
       // Every video still to come has to be in the player's run of clips.

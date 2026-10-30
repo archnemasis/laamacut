@@ -31,6 +31,7 @@ export const CHANNELS = {
   mediaExtractAudioWav: "openreel:media:extractAudioWav",
   mediaProbeAudioStreams: "openreel:media:probeAudioStreams",
   mediaFetchUrl: "openreel:media:fetchUrl",
+  mediaStreamCopyExport: "openreel:media:streamCopyExport",
   cloudFetch: "openreel:cloud:fetch",
   windowControl: "openreel:window:control",
   windowIsMaximized: "openreel:window:isMaximized",

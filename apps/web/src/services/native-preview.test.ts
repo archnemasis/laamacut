@@ -84,6 +84,13 @@ describe("nativeFrameOf", () => {
       width: 1, height: 0.5, x: 0.1, y: -0.1, anchorX: 0.5, anchorY: 0.5, rotation: 10, scaleX: 1.5, scaleY: 1.5, opacity: 1,
     });
   });
+
+  it("passes a crop on, so even an otherwise plain clip is placed by the app", () => {
+    const crop = { x: 0.25, y: 0, width: 0.5, height: 1 };
+    const transform = { position: { x: 0, y: 0 }, scale: { x: 1, y: 1 }, rotation: 0, anchor: { x: 0.5, y: 0.5 }, opacity: 1, crop };
+    expect(nativeFrameOf(transform, { width: 1080, height: 1215 }, canvas)).toMatchObject({ crop, width: 1 });
+    expect(clipPlaysNatively(clip("a", 0, 1, 0, { transform }))).toBe(true);
+  });
 });
 
 describe("clipPlaysNatively", () => {

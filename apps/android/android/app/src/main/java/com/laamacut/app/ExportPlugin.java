@@ -145,8 +145,9 @@ public class ExportPlugin extends Plugin {
     }
 
     /**
-     * One untouched video that already has the project's size and frame rate
-     * is copied without re-encoding: faster, and no quality loss.
+     * Untouched videos that already have the project's size and frame rate are
+     * copied without re-encoding: faster, and no quality loss. Several such clips
+     * of the same kind join end to end; a single one may be trimmed anywhere.
      */
     private boolean canPassThrough(PluginCall call) {
         String blocker = passThroughBlocker(call);
@@ -158,36 +159,70 @@ public class ExportPlugin extends Plugin {
     private String passThroughBlocker(PluginCall call) {
         try {
             JSONArray clips = call.getArray("main", new JSArray());
-            if (clips.length() != 1) return clips.length() + " clips";
+            if (clips.length() == 0) return "no clips";
             if (call.getArray("overlays", new JSArray()).length() > 0) return "text or stickers";
             // Media3 re-encodes the video of any composition with more than one sequence.
             if (call.getArray("audio", new JSArray()).length() > 0) return "extra audio tracks";
-            JSONObject clip = clips.getJSONObject(0);
-            if (!"video".equals(clip.optString("kind"))) return "not a video";
-            if (Math.abs(clip.optDouble("speed", 1) - 1) > 0.001) return "speed changed";
-            if (Math.abs(clip.optDouble("volume", 1) - 1) > 0.001) return "volume changed";
             float frameRate = call.getFloat("frameRate", 30f);
-            if (clip.optDouble("sourceFrameRate", 0) > frameRate + 0.5) return "frame rate above " + frameRate;
-            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-            try {
-                retriever.setDataSource(getContext(), Uri.parse(clip.getString("uri")));
-                int w = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
-                int h = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
-                String rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
-                if ("90".equals(rotation) || "270".equals(rotation)) {
-                    int swap = w;
-                    w = h;
-                    h = swap;
-                }
-                int width = call.getInt("width", 1080);
-                int height = call.getInt("height", 1920);
-                if (w != width || h != height) return w + "x" + h + " clip in a " + width + "x" + height + " export";
-                return null;
-            } finally {
-                retriever.release();
+            String firstCodec = null;
+            for (int i = 0; i < clips.length(); i++) {
+                JSONObject clip = clips.getJSONObject(i);
+                if (!"video".equals(clip.optString("kind"))) return "not a video";
+                if (Math.abs(clip.optDouble("speed", 1) - 1) > 0.001) return "speed changed";
+                if (Math.abs(clip.optDouble("volume", 1) - 1) > 0.001) return "volume changed";
+                if (clip.optDouble("sourceFrameRate", 0) > frameRate + 0.5) return "frame rate above " + frameRate;
+                // Copied clips can only start on a keyframe; a single clip gets its first
+                // moments re-encoded instead (trim optimisation), joined clips can't.
+                if (clips.length() > 1 && clip.optLong("inUs", 0) > 0) return "joined clips trimmed at the start";
+                String size = clipSizeBlocker(clip, call.getInt("width", 1080), call.getInt("height", 1920));
+                if (size != null) return size;
+                String codec = videoCodec(Uri.parse(clip.getString("uri")));
+                if (firstCodec == null) firstCodec = codec;
+                else if (codec == null || !codec.equals(firstCodec)) return "clips of different kinds";
             }
+            return null;
         } catch (Exception e) {
             return "could not read the clip (" + e.getMessage() + ")";
+        }
+    }
+
+    /** Why the clip's shown size doesn't match the export, or null when it does. */
+    private String clipSizeBlocker(JSONObject clip, int width, int height) throws Exception {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(getContext(), Uri.parse(clip.getString("uri")));
+            int w = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            int h = Integer.parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+            String rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+            if ("90".equals(rotation) || "270".equals(rotation)) {
+                int swap = w;
+                w = h;
+                h = swap;
+            }
+            if (w != width || h != height) return w + "x" + h + " clip in a " + width + "x" + height + " export";
+            return null;
+        } finally {
+            retriever.release();
+        }
+    }
+
+    /** The video track's codec and coded size, so only matching clips are joined without re-encoding. */
+    private String videoCodec(Uri uri) {
+        android.media.MediaExtractor extractor = new android.media.MediaExtractor();
+        try {
+            extractor.setDataSource(getContext(), uri, null);
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                android.media.MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(android.media.MediaFormat.KEY_MIME);
+                if (mime != null && mime.startsWith("video/")) {
+                    return mime + " " + format.getInteger(android.media.MediaFormat.KEY_WIDTH) + "x" + format.getInteger(android.media.MediaFormat.KEY_HEIGHT);
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            extractor.release();
         }
     }
 
@@ -223,6 +258,8 @@ public class ExportPlugin extends Plugin {
         Transformer.Builder builder = new Transformer.Builder(getContext());
         // Asking for H.264 would force a re-encode of an HEVC phone video.
         if (!passthrough) builder.setVideoMimeType(MimeTypes.VIDEO_H264);
+        // A single copied clip trimmed mid-way: only the bit before its next keyframe is re-encoded.
+        else builder.experimentalSetTrimOptimizationEnabled(true);
         DefaultEncoderFactory.Builder encoders = new DefaultEncoderFactory.Builder(getContext());
         // Media3 re-encodes any video once encoder settings are requested, so copying must leave them unset.
         if (!passthrough) encoders.setRequestedVideoEncoderSettings(new VideoEncoderSettings.Builder().setBitrate(bitrate).build());

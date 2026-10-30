@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.util.Log;
+import android.graphics.Matrix;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -185,9 +186,22 @@ public class PreviewPlayerPlugin extends Plugin {
             surface.setScaleX((float) frame.optDouble("scaleX", 1));
             surface.setScaleY((float) frame.optDouble("scaleY", 1));
             surface.setAlpha((float) Math.max(0, Math.min(1, frame.optDouble("opacity", 1))));
+            // A crop shows only part of the video, stretched over the whole frame like the canvas.
+            JSONObject crop = frame.optJSONObject("crop");
+            if (crop != null) {
+                float cw = (float) Math.max(0.01, crop.optDouble("width", 1));
+                float ch = (float) Math.max(0.01, crop.optDouble("height", 1));
+                Matrix zoom = new Matrix();
+                zoom.setScale(1f / cw, 1f / ch);
+                zoom.postTranslate((float) (-crop.optDouble("x", 0) * width / cw), (float) (-crop.optDouble("y", 0) * height / ch));
+                surface.setTransform(zoom);
+            } else {
+                surface.setTransform(null);
+            }
             clipToBox();
             return;
         }
+        surface.setTransform(null);
         surface.setAlpha(1f);
         surface.setTranslationX(0);
         surface.setTranslationY(0);

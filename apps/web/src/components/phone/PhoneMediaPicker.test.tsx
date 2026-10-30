@@ -32,9 +32,14 @@ import { GalleryFile } from "../../services/gallery-file";
 const gallery = {
   access: vi.fn(async () => ({ access: "denied" as const })),
   requestAccess: vi.fn(async () => ({ access: "granted" as const })),
+  requestMore: vi.fn(async () => ({ access: "limited" as const })),
+  audioAccess: vi.fn(async () => ({ access: "denied" as const })),
+  requestAudioAccess: vi.fn(async () => ({ access: "granted" as const })),
   list: vi.fn(async ({ kind }: { kind: string }) => ({
     items:
-      kind === "video"
+      kind === "audio"
+        ? [{ uri: "content://a/1", name: "song.mp3", mime: "audio/mpeg", size: 7, duration: 180 }]
+        : kind === "video"
         ? [
             { uri: "content://v/1", name: "beach.mp4", mime: "video/mp4", size: 10, duration: 22 },
             { uri: "content://v/2", name: "party.mp4", mime: "video/mp4", size: 10, duration: 15 },
@@ -138,5 +143,41 @@ describe("PhoneMediaPicker gallery", () => {
     render(<PhoneMediaPicker onClose={() => {}} />);
     expect(await screen.findByText("Allow access to your videos and photos")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose videos" })).toBeInTheDocument();
+  });
+
+  it("offers Android's pick-more prompt with limited access, and reloads after it", async () => {
+    gallery.access.mockResolvedValueOnce({ access: "limited" as never });
+    render(<PhoneMediaPicker onClose={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Pick more" }));
+    await waitFor(() => expect(gallery.requestMore).toHaveBeenCalled());
+    await waitFor(() => expect(gallery.list).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("PhoneMediaPicker for editor tools", () => {
+  it("Sounds lists the phone's music and hands the picks to the editor", async () => {
+    const onPicked = vi.fn(async (_files: File[], ready: (i: number, id: string) => void) => ready(0, "media-0"));
+    render(<PhoneMediaPicker purpose="sound" onClose={() => {}} onPicked={onPicked} />);
+    expect(screen.getByRole("dialog", { name: "Sounds" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("checkbox", { name: /^song.mp3/ }));
+    expect(gallery.requestAudioAccess).toHaveBeenCalled();
+    expect(gallery.requestAccess).not.toHaveBeenCalled();
+    expect(screen.queryByRole("tab", { name: "Photos" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(onPicked).toHaveBeenCalled());
+    expect(onPicked.mock.calls[0][0].map((f) => f.name)).toEqual(["song.mp3"]);
+    expect(addMediaFilesToTimeline).not.toHaveBeenCalled();
+  });
+
+  it("Replace keeps one pick at a time", async () => {
+    const onPicked = vi.fn(async () => undefined);
+    render(<PhoneMediaPicker purpose="replace" onClose={() => {}} onPicked={onPicked} />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: /^beach.mp4/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^party.mp4/ }));
+    expect(screen.getByRole("checkbox", { name: /^beach.mp4/ })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+    await waitFor(() => expect(onPicked).toHaveBeenCalled());
+    expect((onPicked.mock.calls[0] as unknown as [File[]])[0].map((f) => f.name)).toEqual(["party.mp4"]);
   });
 });

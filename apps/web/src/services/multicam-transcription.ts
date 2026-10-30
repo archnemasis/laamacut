@@ -1,5 +1,6 @@
 import type { MulticamTranscriptSegment } from "@openreel/core";
 import { audioBufferToWhisperSamples } from "../utils/whisper-audio";
+import { nativeWhisperAvailable, transcribeNatively } from "./native-whisper";
 import type { WhisperModelKey } from "../workers/whisper-models";
 
 interface WorkerChunk {
@@ -27,6 +28,16 @@ export async function transcribeMulticamChannels(
     onStatus?: (angleId: string, message: string) => void;
   } = {},
 ): Promise<Record<string, MulticamTranscriptSegment[]>> {
+  // The Android app transcribes natively; its APK leaves out the web engine.
+  if (await nativeWhisperAvailable()) {
+    const transcripts: Record<string, MulticamTranscriptSegment[]> = {};
+    for (const [angleId, buffer] of buffers) {
+      options.onStatus?.(angleId, "Transcribing locally…");
+      const result = await transcribeNatively(audioBufferToWhisperSamples(buffer), { language: options.language });
+      transcripts[angleId] = whisperChunksToMulticamTranscript(result.chunks ?? []);
+    }
+    return transcripts;
+  }
   const worker = new Worker(
     new URL("../workers/whisper-worker.ts", import.meta.url),
     { type: "module" },

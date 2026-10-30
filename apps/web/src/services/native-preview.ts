@@ -45,6 +45,8 @@ export interface NativeFrame {
   scaleY: number;
   /** 0-1; the player fades its picture over the background colour, as the canvas would. */
   opacity: number;
+  /** Part of the video shown, as fractions of its size; it fills the frame like the canvas's crop. */
+  crop?: { x: number; y: number; width: number; height: number };
 }
 
 export function getPreviewPlayer(): PreviewPlayerPlugin | undefined {
@@ -70,20 +72,19 @@ export interface NativePlan {
 
 /**
  * Moves, scales, rotations and fit modes the phone's player can copy by
- * placing and fading its picture; rounded corners, crops and 3D need the canvas.
+ * placing, cropping and fading its picture; rounded corners and 3D need the canvas.
  */
 const isNativeTransform = (transform: Clip["transform"] | undefined): boolean => {
   if (!transform) return true;
   return (
     !transform.borderRadius &&
-    !transform.crop &&
     !(transform.rotate3d && (transform.rotate3d.x !== 0 || transform.rotate3d.y !== 0))
   );
 };
 
 const isPlainFrame = (frame: NativeFrame): boolean =>
   frame.x === 0 && frame.y === 0 && frame.rotation === 0 && frame.scaleX === 1 && frame.scaleY === 1 && frame.opacity === 1 &&
-  frame.anchorX === 0.5 && frame.anchorY === 0.5;
+  frame.anchorX === 0.5 && frame.anchorY === 0.5 && !frame.crop;
 
 /**
  * Where a clip's picture sits, as fractions of the canvas. `box` is the size
@@ -105,6 +106,7 @@ export function nativeFrameOf(
     scaleX: transform?.scale?.x ?? 1,
     scaleY: transform?.scale?.y ?? 1,
     opacity: transform?.opacity ?? 1,
+    ...(transform?.crop ? { crop: transform.crop } : {}),
   };
   // Plain "contain" clips are placed by the player itself from the video's size.
   return isPlainFrame(frame) && (transform?.fitMode ?? "contain") === "contain" ? undefined : frame;

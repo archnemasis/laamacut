@@ -105,3 +105,6 @@ xcuserdata/
 .codex-audit/
 .codex/
 **/local.properties
+
+# Synthetic benchmark media (scripts/make-bench-media.mjs)
+bench-media/

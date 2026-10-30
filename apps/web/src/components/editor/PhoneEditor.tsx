@@ -55,7 +55,7 @@ import { haptic } from "../../services/haptics";
 import { PhoneGestures } from "./PhoneGestures";
 import { applyTransform, currentTransform, findSelectedVisual, hasKeyframeAt, toggleKeyframe, type FlatTransform } from "./phone-keyframes";
 import { PhoneClipPanel, type ClipPanel } from "./PhoneClipPanels";
-import { PhoneMediaPicker } from "../phone/PhoneMediaPicker";
+import { PhoneMediaPicker, type PickedMediaReady, type PickerPurpose } from "../phone/PhoneMediaPicker";
 import { takePhoneMediaPickerRequest, usePhoneImportStore } from "../../services/phone-media";
 import { autoSaveManager } from "../../services/auto-save";
 import { captureProjectPreview } from "../../services/project-previews";
@@ -258,7 +258,8 @@ export const PhoneEditor: React.FC = () => {
   const [panel, setPanel] = useState<ClipPanel | null>(null);
   const [captionsOpen, setCaptionsOpen] = useState(false);
   const [speechOpen, setSpeechOpen] = useState(false);
-  const replaceInput = useRef<HTMLInputElement>(null);
+  // Overlay, Replace and Sounds open the in-app picker too, not Android's own.
+  const [toolPicker, setToolPicker] = useState<Exclude<PickerPurpose, "add"> | null>(null);
   const [textEdit, setTextEdit] = useState<{ clipId: string; isNew: boolean; tab?: TextEditorTab } | null>(null);
   // Adding text and the typing that follows undo as one step, like CapCut.
   const addTextGroupOpen = useRef(false);
@@ -273,8 +274,6 @@ export const PhoneEditor: React.FC = () => {
   // New projects open straight into the media picker, like CapCut.
   const [pickerOpen, setPickerOpen] = useState(false);
   const startedFromNewProject = useRef(false);
-  const soundInput = useRef<HTMLInputElement>(null);
-  const overlayInput = useRef<HTMLInputElement>(null);
   // The preview only draws a frame on play or seek; ask it to redraw when the
   // editor opens and whenever clips or media change, so a picture always shows.
   const mediaItems = useProjectStore((s) => s.project.mediaLibrary.items);
@@ -412,13 +411,14 @@ export const PhoneEditor: React.FC = () => {
   };
 
   /** Sounds and Overlay: import the picked files and lay them on new tracks at the playhead. */
-  const addAtPlayhead = async (files: FileList | null) => {
-    if (!files) return;
+  const addAtPlayhead = async (files: File[], ready: PickedMediaReady) => {
     const at = useTimelineStore.getState().playheadPosition;
     const store = useProjectStore.getState;
-    for (const file of Array.from(files)) {
+    for (const [index, file] of files.entries()) {
       const imported = await store().importMedia(file);
-      if (imported.success && imported.actionId) await store().addClipToNewTrack(imported.actionId, at);
+      if (!imported.success || !imported.actionId) continue;
+      ready(index, imported.actionId);
+      await store().addClipToNewTrack(imported.actionId, at);
     }
     setMenu(null);
   };
@@ -428,7 +428,7 @@ export const PhoneEditor: React.FC = () => {
     { label: "Audio", icon: Music, onClick: () => setMenu("audio") },
     { label: "Text", icon: Type, onClick: () => setMenu("text") },
     { label: "Effects", icon: Zap, onClick: () => openForMainClip("effects", "Effects") },
-    { label: "Overlay", icon: Layers, onClick: () => overlayInput.current?.click() },
+    { label: "Overlay", icon: Layers, onClick: () => setToolPicker("overlay") },
     { label: "Filters", icon: LooksIcon, onClick: () => openForMainClip("filters", "Filters") },
     { label: "Adjust", icon: SlidersHorizontal, onClick: () => openForMainClip("adjust", "Adjust") },
     { label: "Transitions", icon: Shuffle, onClick: () => open({ kind: "assets", tab: "transitions", title: "Transitions" }) },
@@ -439,7 +439,7 @@ export const PhoneEditor: React.FC = () => {
 
   const menuTools: Record<Menu, Tool[]> = {
     audio: [
-      { label: "Sounds", icon: Music, onClick: () => soundInput.current?.click() },
+      { label: "Sounds", icon: Music, onClick: () => setToolPicker("sound") },
       { label: "Record", icon: Mic, onClick: () => open({ kind: "voiceover", title: "Record" }) },
       { label: "Text to speech", icon: AudioLines, onClick: () => setSpeechOpen(true) },
     ],
@@ -517,7 +517,7 @@ export const PhoneEditor: React.FC = () => {
           deleteTool,
           ...(mediaKind === "video" ? [panelTool("Speed", Gauge, "speed")] : []),
           duplicateTool,
-          { label: "Replace", icon: Replace, onClick: () => replaceInput.current?.click() },
+          { label: "Replace", icon: Replace, onClick: () => setToolPicker("replace") },
           panelTool("Adjust", Palette, "adjust"),
           panelTool("Filters", LooksIcon, "filters"),
           panelTool("Opacity", Blend, "opacity"),
@@ -541,10 +541,12 @@ export const PhoneEditor: React.FC = () => {
       : [splitTool, { label: "Adjust", icon: SlidersHorizontal, onClick: () => open({ kind: "inspector", title: "Edit" }) }, deleteTool, duplicateTool];
 
   /** Replace: swap the clip's file, keeping its place and edits. */
-  const replaceClipMedia = async (files: FileList | null) => {
-    const file = files?.[0];
+  const replaceClipMedia = async (files: File[], ready: PickedMediaReady) => {
+    const file = files[0];
     const clip = project.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedIds[0]);
-    if (file && clip) await useProjectStore.getState().replaceMediaAsset(clip.mediaId, file);
+    if (!file || !clip) return;
+    const replaced = await useProjectStore.getState().replaceMediaAsset(clip.mediaId, file);
+    if (replaced.success) ready(0, clip.mediaId);
   };
 
   const hasSelection = selectedIds.length > 0;
@@ -563,6 +565,7 @@ export const PhoneEditor: React.FC = () => {
   useBackHandler(captionsOpen, () => setCaptionsOpen(false), 30);
   useBackHandler(speechOpen, () => { setSpeechOpen(false); setMenu(null); }, 30);
   useBackHandler(pickerOpen, () => closePicker(), 30);
+  useBackHandler(toolPicker !== null, () => setToolPicker(null), 30);
   useBackHandler(sheet !== null, () => setSheet(null), 20);
   useBackHandler(panel !== null && selectedIds.length === 1, () => setPanel(null), 20);
   useBackHandler(back !== null, () => back?.onClick(), 10);
@@ -650,10 +653,6 @@ export const PhoneEditor: React.FC = () => {
           <ToolStrip tools={tools} />
         </nav>
 
-        <input ref={soundInput} type="file" accept="audio/*" multiple hidden onChange={(e) => void addAtPlayhead(e.target.files).finally(() => (e.target.value = ""))} />
-        <input ref={replaceInput} type="file" accept="video/*,image/*" hidden onChange={(e) => void replaceClipMedia(e.target.files).finally(() => (e.target.value = ""))} />
-        <input ref={overlayInput} type="file" accept="video/*,image/*" multiple hidden onChange={(e) => void addAtPlayhead(e.target.files).finally(() => (e.target.value = ""))} />
-
         {panel && selectedIds.length === 1 && (
           <PanelErrorBoundary name="Clip tool">
             <PhoneClipPanel panel={panel} clipId={selectedIds[0]} onDone={() => setPanel(null)} />
@@ -661,6 +660,13 @@ export const PhoneEditor: React.FC = () => {
         )}
 
         {pickerOpen && <PhoneMediaPicker onClose={closePicker} />}
+        {toolPicker && (
+          <PhoneMediaPicker
+            purpose={toolPicker}
+            onClose={() => setToolPicker(null)}
+            onPicked={toolPicker === "replace" ? replaceClipMedia : addAtPlayhead}
+          />
+        )}
 
         {/* Nothing can be touched until picked media has loaded in. */}
         {importing && <div aria-hidden className="fixed inset-0 z-[500]" onPointerDownCapture={(e) => e.preventDefault()} />}

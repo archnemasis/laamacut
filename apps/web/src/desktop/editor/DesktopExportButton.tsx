@@ -8,6 +8,7 @@ import { ExportDialog } from "../../components/editor/ExportDialog";
 import { deriveSourceExportMatch } from "../../services/export-source-match";
 import { useExportRunner, extForFormat, exportFilename } from "../../services/export-runner";
 import { NativeFFmpegBackend } from "../../services/native-ffmpeg-backend";
+import { planStreamCopy, tryStreamCopyExport } from "../../services/desktop-stream-copy";
 import { Icon } from "@/icons/Icon";
 
 const NO_DRAG = { WebkitAppRegion: "no-drag" } as React.CSSProperties;
@@ -48,6 +49,8 @@ export function DesktopExportButton(): JSX.Element {
   const {
     state,
     runExport,
+    reportProgress,
+    markComplete,
     showSavePicker,
     beginExport,
     finishExportSoon,
@@ -71,7 +74,9 @@ export function DesktopExportButton(): JSX.Element {
 
       try {
         const ext = extForFormat(settings.format, settings.codec);
-        const useWebCodecs = shouldUseWebCodecs(settings);
+        // Untouched clips at the export's size are copied in without re-encoding, like the phone.
+        const copyPlan = planStreamCopy(useProjectStore.getState().project, settings);
+        const useWebCodecs = !copyPlan && shouldUseWebCodecs(settings);
         const writable = await showSavePicker(
           // Read the name now: the export dialog may have just renamed the project.
           exportFilename(useProjectStore.getState().project.name, ext),
@@ -80,6 +85,17 @@ export function DesktopExportButton(): JSX.Element {
         );
 
         beginExport();
+
+        if (copyPlan) {
+          const copied = await tryStreamCopyExport(copyPlan, settings, resolveExportOutputPath(), (percent) =>
+            reportProgress(percent / 100, "Copying clips"),
+          );
+          if (copied) {
+            markComplete();
+            finishExportSoon();
+            return;
+          }
+        }
 
         const needsUpscaling =
           settings.width > project.settings.width ||
@@ -131,7 +147,7 @@ export function DesktopExportButton(): JSX.Element {
         failExport(error);
       }
     },
-    [project, runExport, showSavePicker, beginExport, finishExportSoon, failExport],
+    [project, runExport, reportProgress, markComplete, showSavePicker, beginExport, finishExportSoon, failExport],
   );
 
   if (state.isExporting) {

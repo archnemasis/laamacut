@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld("openreel", {
     extractAudioWav: (args: unknown) => ipcRenderer.invoke(CHANNELS.mediaExtractAudioWav, args),
     probeAudioStreams: (args: unknown) => ipcRenderer.invoke(CHANNELS.mediaProbeAudioStreams, args),
     fetchUrl: (args: unknown) => ipcRenderer.invoke(CHANNELS.mediaFetchUrl, args),
+    streamCopyExport: (args: unknown) => ipcRenderer.invoke(CHANNELS.mediaStreamCopyExport, args),
   },
   updater: {
     // Auto-update status pushed from the main process (checking/available/

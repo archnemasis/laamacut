@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus, Loader2, X } from "@/icons/lucide-compat";
+import { ImagePlus, Loader2, Music, X } from "@/icons/lucide-compat";
 import { addMediaFilesToTimeline, usePhoneImportStore } from "../../services/phone-media";
 import { GalleryFile } from "../../services/gallery-file";
 import {
@@ -17,6 +17,26 @@ import {
 
 const PAGE = 60;
 
+/**
+ * What the picker is for. "add" builds the main track; the editor's Overlay,
+ * Replace and Sounds tools use the others and place the files themselves.
+ */
+export type PickerPurpose = "add" | "overlay" | "replace" | "sound";
+
+/** Called once each picked file is in the media library, so gallery extras can follow it. */
+export type PickedMediaReady = (index: number, mediaId: string) => void;
+
+const TABS: Record<PickerPurpose, GalleryKind[]> = {
+  add: ["video", "photo"],
+  overlay: ["video", "photo"],
+  replace: ["video", "photo"],
+  sound: ["audio"],
+};
+
+const TITLES: Record<PickerPurpose, string> = { add: "Gallery", overlay: "Overlay", replace: "Replace", sound: "Sounds" };
+const TAB_LABELS: Record<GalleryKind, string> = { video: "Videos", photo: "Photos", audio: "Music" };
+const ACCEPT: Record<GalleryKind, string> = { video: "video/*", photo: "image/*", audio: "audio/*" };
+
 /** One tile in the grid, from the phone gallery or from the browser file picker. */
 type Tile = {
   key: string;
@@ -28,6 +48,9 @@ type Tile = {
   galleryItem?: GalleryItem;
   file?: File;
 };
+
+const empty = (): Record<GalleryKind, Tile[]> => ({ video: [], photo: [], audio: [] });
+const none = (): Record<GalleryKind, boolean> => ({ video: false, photo: false, audio: false });
 
 const formatDuration = (seconds?: number): string => {
   if (seconds === undefined || !Number.isFinite(seconds)) return "";
@@ -67,24 +90,34 @@ function GalleryThumb({ uri, cache }: { uri: string; cache: Map<string, string> 
 
 /**
  * CapCut-style media picker. In the Android app it shows your gallery (after
- * asking for permission) with Videos and Photos tabs; elsewhere it uses the
- * system file picker. Tap to select in order; Add lays them end to end.
+ * asking for permission) with Videos and Photos tabs, or your music for
+ * Sounds; elsewhere it uses the system file picker. Tap to select in order;
+ * Add lays them end to end, or hands them to `onPicked` for the editor's tools.
  */
-export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => void }) {
+export function PhoneMediaPicker({
+  onClose,
+  purpose = "add",
+  onPicked,
+}: {
+  onClose: (adding?: boolean) => void;
+  purpose?: PickerPurpose;
+  onPicked?: (files: File[], ready: PickedMediaReady) => Promise<void>;
+}) {
   const gallery = getGallery();
-  const [tab, setTab] = useState<GalleryKind>("video");
+  const tabs = TABS[purpose];
+  const single = purpose === "replace";
+  const [tab, setTab] = useState<GalleryKind>(tabs[0]);
   const [access, setAccess] = useState<GalleryAccess | "checking">(gallery ? "checking" : "denied");
-  const [galleryTiles, setGalleryTiles] = useState<Record<GalleryKind, Tile[]>>({ video: [], photo: [] });
-  const [exhausted, setExhausted] = useState<Record<GalleryKind, boolean>>({ video: false, photo: false });
+  const [galleryTiles, setGalleryTiles] = useState(empty);
+  const [exhausted, setExhausted] = useState(none);
   const [fileTiles, setFileTiles] = useState<Tile[]>([]);
   const [order, setOrder] = useState<string[]>([]);
   const progress = usePhoneImportStore((s) => s.loading);
   const [hd, setHd] = useState(loadHdPreference);
   const thumbCache = useRef(new Map<string, string>()).current;
-  const loading = useRef<Record<GalleryKind, boolean>>({ video: false, photo: false });
+  const loading = useRef(none());
   const urls = useRef<string[]>([]);
-  const videoInput = useRef<HTMLInputElement>(null);
-  const photoInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => urls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
@@ -93,14 +126,20 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
     if (!gallery) return;
     let cancelled = false;
     void (async () => {
-      let { access: current } = await gallery.access();
-      if (current === "denied") ({ access: current } = await gallery.requestAccess());
+      let current: GalleryAccess;
+      if (purpose === "sound") {
+        ({ access: current } = await gallery.audioAccess());
+        if (current === "denied") ({ access: current } = await gallery.requestAudioAccess());
+      } else {
+        ({ access: current } = await gallery.access());
+        if (current === "denied") ({ access: current } = await gallery.requestAccess());
+      }
       if (!cancelled) setAccess(current);
     })().catch(() => !cancelled && setAccess("denied"));
     return () => {
       cancelled = true;
     };
-  }, [gallery]);
+  }, [gallery, purpose]);
 
   const loadMore = useCallback(
     async (kind: GalleryKind) => {
@@ -136,7 +175,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
   );
   const tileByKey = useMemo(() => {
     const map = new Map<string, Tile>();
-    for (const t of [...galleryTiles.video, ...galleryTiles.photo, ...fileTiles]) map.set(t.key, t);
+    for (const t of [...galleryTiles.video, ...galleryTiles.photo, ...galleryTiles.audio, ...fileTiles]) map.set(t.key, t);
     return map;
   }, [galleryTiles, fileTiles]);
 
@@ -148,11 +187,20 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
       return { key: url, name: file.name, kind, previewUrl: url, file };
     });
     setFileTiles((prev) => [...prev, ...next]);
-    setOrder((prev) => [...prev, ...next.map((t) => t.key)]);
+    setOrder((prev) => (single ? [next[0].key] : [...prev, ...next.map((t) => t.key)]));
   };
 
   const toggle = (key: string) =>
-    setOrder((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+    setOrder((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : single ? [key] : [...prev, key]));
+
+  /** Limited access: Android's own prompt to pick more, then the grid reloads with them. */
+  const pickMore = async () => {
+    if (!gallery) return;
+    const { access: next } = await gallery.requestMore();
+    setAccess(next);
+    setGalleryTiles(empty());
+    setExhausted(none());
+  };
 
   const handleAdd = async () => {
     const picked = order.map((key) => tileByKey.get(key)).filter((t): t is Tile => Boolean(t));
@@ -168,7 +216,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
       // timeline shows pictures from the start, and with HD off, heavy videos
       // (over 1080p or 60fps) get a small copy made in the background that
       // takes over the preview when it's ready. Export reads the original.
-      setProgress("Loading videos");
+      setProgress(purpose === "sound" ? "Loading sounds" : "Loading videos");
       const plans = await Promise.all(
         picked.map((tile) => (tile.galleryItem && tile.kind === "video" ? prepareGalleryVideo(tile.galleryItem, hd) : undefined)),
       );
@@ -180,8 +228,8 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
         else if (tile.galleryItem) files.push(await galleryItemToFile(tile.galleryItem));
       }
       const filmstrips = await Promise.all(plans.map((plan) => plan?.filmstrip ?? []));
-      setProgress("Adding to timeline");
-      await addMediaFilesToTimeline(files, (index, mediaId) => {
+      setProgress(purpose === "replace" ? "Replacing" : "Adding to timeline");
+      const ready: PickedMediaReady = (index, mediaId) => {
         const plan = plans[index];
         if (plan) applyGalleryVideoExtras(mediaId, { filmstrip: filmstrips[index] });
         // Export, and reopening the project, go back to the gallery file.
@@ -190,25 +238,27 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
         void plan?.previewCopy?.then((previewCopy) => {
           if (previewCopy) applyGalleryVideoExtras(mediaId, { filmstrip: [], previewCopy });
         });
-      });
+      };
+      if (onPicked) await onPicked(files, ready);
+      else await addMediaFilesToTimeline(files, ready);
     } finally {
       setProgress(null);
     }
   };
 
-  const openFiles = () => (tab === "video" ? videoInput : photoInput).current?.click();
+  const noun = TAB_LABELS[tab].toLowerCase();
 
   return (
-    <div role="dialog" aria-label="Add media" className="fixed inset-0 z-[200] flex flex-col bg-bg text-fg animate-in fade-in slide-in-from-bottom-4 duration-200 motion-reduce:animate-none">
+    <div role="dialog" aria-label={purpose === "add" ? "Add media" : TITLES[purpose]} className="fixed inset-0 z-[200] flex flex-col bg-bg text-fg animate-in fade-in slide-in-from-bottom-4 duration-200 motion-reduce:animate-none">
       <header className="flex h-14 shrink-0 items-center px-2">
         <button type="button" aria-label="Close" onClick={() => onClose()} className="grid h-11 w-11 place-items-center rounded-full">
           <X size={26} aria-hidden />
         </button>
-        <span className="mx-auto pr-11 text-[17px] font-semibold">{hasGallery ? "Gallery" : "Add media"}</span>
+        <span className="mx-auto pr-11 text-[17px] font-semibold">{hasGallery || purpose !== "add" ? TITLES[purpose] : "Add media"}</span>
       </header>
 
-      <div role="tablist" aria-label="Media type" className="grid shrink-0 grid-cols-2 border-b border-border">
-        {(["video", "photo"] as const).map((value) => (
+      <div role="tablist" aria-label="Media type" className={`grid shrink-0 border-b border-border ${tabs.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+        {tabs.map((value) => (
           <button
             key={value}
             type="button"
@@ -217,14 +267,13 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
             onClick={() => setTab(value)}
             className={`relative h-12 text-[16px] font-semibold ${tab === value ? "text-accent" : "text-fg-3"}`}
           >
-            {value === "video" ? "Videos" : "Photos"}
+            {TAB_LABELS[value]}
             {tab === value && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" />}
           </button>
         ))}
       </div>
 
-      <input ref={videoInput} type="file" accept="video/*" multiple hidden aria-label="Choose videos" onChange={(e) => { addFiles(e.target.files, "video"); e.target.value = ""; }} />
-      <input ref={photoInput} type="file" accept="image/*" multiple hidden aria-label="Choose photos" onChange={(e) => { addFiles(e.target.files, "photo"); e.target.value = ""; }} />
+      <input ref={fileInput} type="file" accept={ACCEPT[tab]} multiple={!single} hidden aria-label={`Choose ${noun}`} onChange={(e) => { addFiles(e.target.files, tab); e.target.value = ""; }} />
 
       <div
         className="min-h-0 flex-1 overflow-y-auto"
@@ -241,13 +290,15 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
 
         {gallery && access === "denied" && (
           <div className="px-6 py-10 text-center">
-            <p className="text-[15px] font-semibold">Allow access to your videos and photos</p>
+            <p className="text-[15px] font-semibold">{purpose === "sound" ? "Allow access to your music and sounds" : "Allow access to your videos and photos"}</p>
             <p className="mt-2 text-[13px] text-fg-3">
-              Laamacut shows your gallery here so you can pick clips. If you blocked it before, allow it in your phone&apos;s Settings → Apps → Laamacut → Permissions.
+              Laamacut shows your {purpose === "sound" ? "music" : "gallery"} here so you can pick {purpose === "sound" ? "sounds" : "clips"}. If you blocked it before, allow it in your phone&apos;s Settings → Apps → Laamacut → Permissions.
             </p>
             <button
               type="button"
-              onClick={() => void gallery.requestAccess().then(({ access: next }) => setAccess(next))}
+              onClick={() =>
+                void (purpose === "sound" ? gallery.requestAudioAccess() : gallery.requestAccess()).then(({ access: next }) => setAccess(next))
+              }
               className="mt-5 rounded-xl bg-accent px-6 py-2.5 text-[15px] font-semibold text-white"
             >
               Allow access
@@ -256,14 +307,24 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
         )}
 
         <div className="grid grid-cols-3 gap-0.5">
-          {(!gallery || access === "limited" || access === "denied") && access !== "checking" && (
+          {gallery && access === "limited" && (
             <button
               type="button"
-              onClick={openFiles}
+              onClick={() => void pickMore()}
               className="flex aspect-square flex-col items-center justify-center gap-2 bg-bg-2 text-[13px] text-fg-2"
             >
               <ImagePlus size={28} strokeWidth={1.5} aria-hidden />
-              {tab === "video" ? "Choose videos" : "Choose photos"}
+              Pick more
+            </button>
+          )}
+          {(!gallery || access === "denied") && access !== "checking" && (
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="flex aspect-square flex-col items-center justify-center gap-2 bg-bg-2 text-[13px] text-fg-2"
+            >
+              <ImagePlus size={28} strokeWidth={1.5} aria-hidden />
+              Choose {noun}
             </button>
           )}
           {tiles.map((tile) => {
@@ -276,16 +337,21 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
                 role="checkbox"
                 aria-checked={selected}
                 aria-label={[
-                  tile.name || (tile.kind === "video" ? "Video" : "Photo"),
-                  tile.kind === "video" && tile.duration ? formatDuration(tile.duration) : null,
-                  selected ? `number ${position + 1}` : null,
+                  tile.name || TAB_LABELS[tile.kind],
+                  tile.kind !== "photo" && tile.duration ? formatDuration(tile.duration) : null,
+                  selected && !single ? `number ${position + 1}` : null,
                 ]
                   .filter(Boolean)
                   .join(", ")}
                 onClick={() => toggle(tile.key)}
                 className="relative aspect-square overflow-hidden bg-black"
               >
-                {tile.galleryItem ? (
+                {tile.kind === "audio" ? (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-bg-2 px-2 text-fg-2">
+                    <Music size={26} strokeWidth={1.5} aria-hidden />
+                    <span className="line-clamp-2 break-all text-center text-[11px]">{tile.name}</span>
+                  </div>
+                ) : tile.galleryItem ? (
                   <GalleryThumb uri={tile.key} cache={thumbCache} />
                 ) : tile.kind === "video" ? (
                   <video
@@ -308,9 +374,9 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
                     selected ? "border-accent bg-accent text-white" : "border-white bg-black/10"
                   }`}
                 >
-                  {selected ? position + 1 : ""}
+                  {selected && !single ? position + 1 : ""}
                 </span>
-                {tile.kind === "video" && (
+                {tile.kind !== "photo" && (
                   <span className="absolute bottom-1.5 right-2 text-[13px] font-semibold text-white drop-shadow">
                     {formatDuration(tile.duration)}
                   </span>
@@ -323,15 +389,17 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
         {access !== "checking" && tiles.length === 0 && !(gallery && access === "denied") && (
           <p className="px-6 py-8 text-center text-[13px] text-fg-3">
             {hasGallery
-              ? tab === "video" ? "No videos found on this phone." : "No photos found on this phone."
-              : "Pick from your gallery. Clips go on the timeline in the order you select them."}
+              ? `No ${noun} found on this phone.`
+              : purpose === "sound"
+                ? "Pick sounds or music from your phone."
+                : "Pick from your gallery. Clips go on the timeline in the order you select them."}
           </p>
         )}
       </div>
 
       <footer className="flex h-16 shrink-0 items-center justify-between gap-3 border-t border-border px-4">
-        <span className="min-w-0 truncate text-[13px] text-fg-2">{progress ?? (order.length > 0 ? `${order.length} selected` : "")}</span>
-        {hasGallery && (
+        <span className="min-w-0 truncate text-[13px] text-fg-2">{progress ?? (order.length > 0 && !single ? `${order.length} selected` : "")}</span>
+        {hasGallery && purpose !== "sound" && (
           <button
             type="button"
             role="switch"
@@ -357,7 +425,7 @@ export function PhoneMediaPicker({ onClose }: { onClose: (adding?: boolean) => v
           className="flex min-w-[96px] items-center justify-center gap-2 rounded-xl bg-accent px-6 py-2.5 text-[15px] font-semibold text-white disabled:opacity-40"
         >
           {progress !== null && <Loader2 size={16} className="animate-spin" aria-hidden />}
-          Add
+          {single ? "Replace" : "Add"}
         </button>
       </footer>
     </div>

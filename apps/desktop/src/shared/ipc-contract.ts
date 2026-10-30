@@ -49,6 +49,16 @@ export const extractAudioArgsSchema = z.object({
   streamIndex: z.number().int().nonnegative().optional(),
 });
 export const probeAudioArgsSchema = z.object({ srcPath: z.string() });
+/** Plain clips joined into the export without re-encoding (see sidecar/stream-copy). */
+export const streamCopyExportArgsSchema = z.object({
+  inputs: z.array(z.object({ path: z.string(), durationSec: z.number().positive() })).min(1),
+  outPath: z.string(),
+  codec: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  frameRate: z.number().positive(),
+});
+
 export const fetchUrlArgsSchema = z.object({
   url: z.string().url(),
   maxBytes: z.number().int().positive().optional(),
