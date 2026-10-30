@@ -103,14 +103,24 @@ async function make(job) {
   if (only && !only.has(job.name)) return;
   if (!only && existsSync(job.out)) return console.log(`skip ${job.name} (exists)`);
   const started = Date.now();
-  if (job.after === "rotate") {
-    // Stored landscape with a 90° display matrix, like a phone held upright.
-    const raw = job.out.replace(/\.mp4$/, ".raw.mp4");
-    await run(job.cmd.slice(0, -1).concat(raw));
-    await run(["-display_rotation", "90", "-i", raw, "-c", "copy", job.out]);
-    await import("node:fs/promises").then((fs) => fs.rm(raw));
-  } else {
-    await run(job.cmd);
+  // Written under a temporary name, so a run that stops halfway never leaves
+  // a broken file that later runs would skip as already made.
+  const part = job.out.replace(/(\.\w+)$/, ".part$1");
+  const fs = await import("node:fs/promises");
+  try {
+    if (job.after === "rotate") {
+      // Stored landscape with a 90° display matrix, like a phone held upright.
+      const raw = job.out.replace(/\.mp4$/, ".raw.mp4");
+      await run(job.cmd.slice(0, -1).concat(raw));
+      await run(["-display_rotation", "90", "-i", raw, "-c", "copy", part]);
+      await fs.rm(raw);
+    } else {
+      await run(job.cmd.slice(0, -1).concat(part));
+    }
+    await fs.rename(part, job.out);
+  } catch (error) {
+    await fs.rm(part, { force: true });
+    throw error;
   }
   const mb = (statSync(job.out).size / 1e6).toFixed(1);
   console.log(`made ${job.name} ${mb} MB in ${((Date.now() - started) / 1000).toFixed(0)}s`);

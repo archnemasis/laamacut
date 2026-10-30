@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import React, { useCallback, useEffect, useState } from "react";
 import { ToolcraftButton as Button } from "@openreel/ui";
 import type { VideoExportSettings } from "@openreel/core";
-import { setEncoderBackendFactory, WebCodecsBackend } from "@openreel/core";
+import { setEncoderBackendFactory, trackHasAudioItems, WebCodecsBackend } from "@openreel/core";
 import { useProjectStore } from "../../stores/project-store";
 import { ExportDialog } from "../../components/editor/ExportDialog";
 import { deriveSourceExportMatch } from "../../services/export-source-match";
@@ -49,6 +49,7 @@ export function DesktopExportButton(): JSX.Element {
   const {
     state,
     runExport,
+    runAudioExport,
     reportProgress,
     markComplete,
     showSavePicker,
@@ -150,6 +151,22 @@ export function DesktopExportButton(): JSX.Element {
     [project, runExport, reportProgress, markComplete, showSavePicker, beginExport, finishExportSoon, failExport],
   );
 
+  const handleExportAudio = useCallback(
+    async (loudnessTarget?: number) => {
+      setIsDialogOpen(false);
+      try {
+        const writable = await showSavePicker(exportFilename(useProjectStore.getState().project.name, "wav"), "wav");
+        beginExport();
+        await runAudioExport({ format: "wav", sampleRate: 48000, channels: 2, bitDepth: 24, loudnessTarget }, writable);
+        markComplete();
+        finishExportSoon();
+      } catch (error) {
+        failExport(error);
+      }
+    },
+    [runAudioExport, markComplete, showSavePicker, beginExport, finishExportSoon, failExport],
+  );
+
   if (state.isExporting) {
     return (
       <Button
@@ -214,6 +231,8 @@ export function DesktopExportButton(): JSX.Element {
         projectHeight={project?.settings?.height ?? 1080}
         frameRate={project?.settings?.frameRate ?? 30}
         sourceMatch={deriveSourceExportMatch(project)}
+        hasAudio={project.timeline.tracks.some((track) => trackHasAudioItems(project, track.id))}
+        onExportAudio={(loudnessTarget) => void handleExportAudio(loudnessTarget)}
         projectName={project?.name}
         onRename={(name) => useProjectStore.getState().renameProject(name)}
       />

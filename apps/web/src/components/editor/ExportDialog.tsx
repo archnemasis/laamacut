@@ -103,6 +103,20 @@ interface ExportDialogProps {
   /** Current project name; with onRename, shows a Name field like CapCut. */
   projectName?: string;
   onRename?: (name: string) => void | Promise<unknown>;
+  /** Shows a Sound only button that exports just the mix as a WAV. */
+  onExportAudio?: (loudnessTarget?: number) => void;
+}
+
+/** Streaming services' common target; peaks are kept under -1 dBFS. */
+export const EVEN_LOUDNESS_LUFS = -14;
+const EVEN_LOUDNESS_KEY = "laamacut-even-loudness";
+
+function loadEvenLoudness(): boolean {
+  try {
+    return localStorage.getItem(EVEN_LOUDNESS_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 type AspectRatioType = "vertical" | "square" | "horizontal";
@@ -194,8 +208,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   markedRange = null,
   projectName,
   onRename,
+  onExportAudio,
 }) => {
   const [exportSection, setExportSection] = useState<"all" | "range">("all");
+  const [evenLoudness, setEvenLoudness] = useState(loadEvenLoudness);
+  const toggleEvenLoudness = (on: boolean) => {
+    setEvenLoudness(on);
+    try {
+      localStorage.setItem(EVEN_LOUDNESS_KEY, on ? "1" : "0");
+    } catch {
+      // Still applies to this export.
+    }
+  };
+  const loudnessTarget = evenLoudness && hasAudio ? EVEN_LOUDNESS_LUFS : undefined;
   const validMarkedRange = markedRange && Number.isFinite(markedRange.startTime)
     && Number.isFinite(markedRange.endTime) && markedRange.startTime >= 0
     && markedRange.endTime > markedRange.startTime && markedRange.endTime <= timelineDuration + 1e-7
@@ -207,7 +232,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const [exportName, setExportName] = useState(projectName ?? "");
   useEffect(() => { if (isOpen) setExportName(projectName ?? ""); }, [isOpen, projectName]);
   // Rename first so the exported file is named after the new project name.
-  const finishExport = useCallback((settings: VideoExportSettings, deliveryMode: ExportDeliveryMode) => {
+  const finishExport = useCallback((chosen: VideoExportSettings, deliveryMode: ExportDeliveryMode) => {
+    const settings = loudnessTarget === undefined
+      ? chosen
+      : { ...chosen, audioSettings: { ...chosen.audioSettings, loudnessTarget } };
     const name = exportName.trim();
     if (onRename && name && name !== projectName) {
       void Promise.resolve(onRename(name)).then(() => onExport(settings, deliveryMode));
@@ -215,7 +243,17 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       onExport(settings, deliveryMode);
     }
     onClose();
-  }, [exportName, onRename, projectName, onExport, onClose]);
+  }, [exportName, onRename, projectName, onExport, onClose, loudnessTarget]);
+  const exportAudioOnly = useCallback(() => {
+    if (!onExportAudio) return;
+    const name = exportName.trim();
+    if (onRename && name && name !== projectName) {
+      void Promise.resolve(onRename(name)).then(() => onExportAudio(loudnessTarget));
+    } else {
+      onExportAudio(loudnessTarget);
+    }
+    onClose();
+  }, [exportName, onRename, projectName, onExportAudio, onClose, loudnessTarget]);
   const applyExportSection = useCallback((settings: VideoExportSettings): VideoExportSettings => ({
     ...settings,
     range: exportSection === "range" && validMarkedRange ? { ...validMarkedRange } : undefined,
@@ -1907,7 +1945,20 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {hasAudio && (
+                  <label className="flex items-center gap-1.5 text-[11px] text-fg-muted" title="Evens the mix out to -14 LUFS, like YouTube and Spotify, without clipping">
+                    <input
+                      type="checkbox"
+                      checked={evenLoudness}
+                      onChange={(e) => toggleEvenLoudness(e.target.checked)}
+                    />
+                    Even out loudness
+                  </label>
+                )}
                 <Button label="Cancel" variant="ghost" onClick={onClose} />
+                {onExportAudio && hasAudio && (
+                  <Button label="Sound only" variant="secondary" onClick={exportAudioOnly} />
+                )}
                 <Button
                   label={
                     activeTab === "reduce"

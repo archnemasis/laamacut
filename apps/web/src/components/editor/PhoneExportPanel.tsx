@@ -1,5 +1,8 @@
 import { DEFAULT_VIDEO_SETTINGS, type VideoExportSettings } from "@openreel/core";
 
+/** Streaming services' common loudness target. */
+export const EVEN_LOUDNESS_LUFS = -14;
+
 export const RESOLUTIONS = [
   { value: 480, label: "480p" },
   { value: 720, label: "720p" },
@@ -15,10 +18,12 @@ export interface PhoneExportChoice {
   frameRate: number;
   /** Mbps, or null for the recommended rate. */
   bitrate: number | null;
+  /** Evens the mix out to -14 LUFS. */
+  evenLoudness: boolean;
 }
 
 const STORAGE_KEY = "laamacut-phone-export";
-const DEFAULT_CHOICE: PhoneExportChoice = { resolution: 1080, frameRate: 30, bitrate: null };
+const DEFAULT_CHOICE: PhoneExportChoice = { resolution: 1080, frameRate: 30, bitrate: null, evenLoudness: false };
 
 export function loadPhoneExportChoice(): PhoneExportChoice {
   try {
@@ -57,6 +62,9 @@ export function phoneExportSettings(choice: PhoneExportChoice, project: { width:
     bitrateMode: "vbr",
     quality: 90,
     keyframeInterval: choice.frameRate * 2,
+    audioSettings: choice.evenLoudness
+      ? { ...DEFAULT_VIDEO_SETTINGS.audioSettings, loudnessTarget: EVEN_LOUDNESS_LUFS }
+      : DEFAULT_VIDEO_SETTINGS.audioSettings,
   };
 }
 
@@ -107,10 +115,13 @@ export function PhoneExportPanel({
   choice,
   duration,
   onChange,
+  onExportSound,
 }: {
   choice: PhoneExportChoice;
   duration: number;
   onChange: (choice: PhoneExportChoice) => void;
+  /** Saves just the sound as a WAV. */
+  onExportSound?: () => void;
 }) {
   const recommended = recommendedBitrate(choice.resolution, choice.frameRate);
   const mbps = choice.bitrate ?? recommended;
@@ -143,7 +154,27 @@ export function PhoneExportPanel({
         format={String}
         onChange={(bitrate) => update({ bitrate })}
       />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={choice.evenLoudness}
+        onClick={() => update({ evenLoudness: !choice.evenLoudness })}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+      >
+        <span>
+          <span className="block text-[15px] font-semibold">Even out loudness</span>
+          <span className="block text-[12px] text-fg-3">-14 LUFS like YouTube and Spotify. Exports take longer</span>
+        </span>
+        <span className={`flex h-6 w-10 shrink-0 items-center rounded-full p-0.5 transition-colors ${choice.evenLoudness ? "justify-end bg-accent" : "justify-start bg-bg-3"}`}>
+          <span className="h-5 w-5 rounded-full bg-white" />
+        </span>
+      </button>
       <p className="pt-1 text-center text-[12px] text-fg-3">Estimated file size: {sizeMb} MB</p>
+      {onExportSound && (
+        <button type="button" onClick={onExportSound} className="mx-auto mt-2 block rounded-lg bg-bg-2 px-4 py-2 text-[13px] font-semibold">
+          Save sound only
+        </button>
+      )}
     </div>
   );
 }

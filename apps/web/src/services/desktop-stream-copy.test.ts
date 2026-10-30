@@ -59,5 +59,6 @@ describe("planStreamCopy", () => {
     expect(planStreamCopy(project([clip("a", 0)], { textClips: [{}] } as Partial<Project>), settings)).toBeNull();
     expect(planStreamCopy(project([clip("a", 0)]), { ...settings, width: 1280, height: 720 })).toBeNull();
     expect(planStreamCopy(project([clip("a", 0)]), { ...settings, codec: "prores" } as VideoExportSettings)).toBeNull();
+    expect(planStreamCopy(project([clip("a", 0)]), { ...settings, audioSettings: { loudnessTarget: -14 } } as VideoExportSettings)).toBeNull();
   });
 });

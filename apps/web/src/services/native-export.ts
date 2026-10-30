@@ -352,11 +352,15 @@ function createPngEncoder(): { encode: (canvas: OffscreenCanvas) => Promise<Uint
 /** Everything the phone needs for this export, or null when it can't do it natively. */
 export async function prepareNativeExport(
   project: Project,
-  settings: Pick<VideoExportSettings, "width" | "height" | "frameRate" | "bitrate">,
+  settings: Pick<VideoExportSettings, "width" | "height" | "frameRate" | "bitrate"> & Partial<Pick<VideoExportSettings, "audioSettings">>,
   filename: string,
 ): Promise<NativeExportRequest | null> {
   const plugin = getNativeExporter();
   if (!plugin || typeof OffscreenCanvas === "undefined") return null;
+  if (settings.audioSettings?.loudnessTarget !== undefined) {
+    console.info("[native-export] Using the web export: evening out loudness");
+    return null;
+  }
   const plan = planNativeExport(project);
   if ("reason" in plan) {
     console.info(`[native-export] Using the web export: ${plan.reason}`);

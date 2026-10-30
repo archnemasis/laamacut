@@ -88,6 +88,13 @@ export function useKeyboardShortcuts() {
       if (direction === -1) seek(Math.max(0, ...candidates));
       else if (candidates.length) seek(Math.min(...candidates));
     };
+    const seekMarker = (direction: -1 | 1) => {
+      const position = useTimelineStore.getState().playheadPosition;
+      const times = useProjectStore.getState().project.timeline.markers
+        .map((marker) => marker.time)
+        .filter((time) => direction === -1 ? time < position - 0.001 : time > position + 0.001);
+      if (times.length) seek(direction === -1 ? Math.max(...times) : Math.min(...times));
+    };
     const deleteSelection = async (cut: boolean) => {
       const ids = editableIds();
       const ui = useUIStore.getState();
@@ -149,6 +156,33 @@ export function useKeyboardShortcuts() {
       ["playback.goToEnd", () => seek(timelineEnd())],
       ["playback.prevClip", () => seekClipEdge(-1)],
       ["playback.nextClip", () => seekClipEdge(1)],
+      ["playback.shuttleBack", () => {
+        const timeline = useTimelineStore.getState();
+        // The preview can't play backwards, so J slows L's speed-up back down,
+        // then steps back a second at a time once paused.
+        if (timeline.playbackState === "playing" && timeline.playbackRate > 1) {
+          timeline.setPlaybackRate(timeline.playbackRate / 2);
+        } else {
+          timeline.setPlaybackRate(1);
+          seekRelative(-1);
+        }
+      }],
+      ["playback.shuttleStop", () => {
+        const timeline = useTimelineStore.getState();
+        timeline.pause();
+        timeline.setPlaybackRate(1);
+      }],
+      ["playback.shuttleForward", () => {
+        const timeline = useTimelineStore.getState();
+        if (timeline.playbackState !== "playing") {
+          timeline.setPlaybackRate(1);
+          timeline.play();
+        } else {
+          timeline.setPlaybackRate(Math.min(4, timeline.playbackRate * 2));
+        }
+      }],
+      ["playback.prevMarker", () => seekMarker(-1)],
+      ["playback.nextMarker", () => seekMarker(1)],
       ["playback.markLoopStart", () => markLoopRange(true)],
       ["playback.markLoopEnd", () => markLoopRange(false)],
       ["playback.toggleLoop", () => {

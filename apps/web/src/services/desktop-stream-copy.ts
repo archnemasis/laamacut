@@ -45,6 +45,8 @@ export function planStreamCopy(project: Project, settings: VideoExportSettings):
   if (settings.codec !== "h264" && settings.codec !== "h265") return null;
   if (settings.format !== "mp4" && settings.format !== "mov") return null;
   if (settings.upscaling?.enabled) return null;
+  // Evening out loudness changes the sound, so it has to be rendered.
+  if (settings.audioSettings?.loudnessTarget !== undefined) return null;
   const { timeline } = project;
   if (timeline.subtitles.length > 0 || timeline.backgroundFillMode === "blur") return null;
   if ((project.textClips ?? []).length > 0 || (project.shapeClips ?? []).length > 0) return null;

@@ -2,6 +2,7 @@ import "../../test/install-local-storage-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useUIStore } from "../../stores/ui-store";
+import { useTimelineStore } from "../../stores/timeline-store";
 
 const state = vi.hoisted(() => ({
   project: {
@@ -49,6 +50,15 @@ describe("PhoneTimeline", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mute clip audio" }));
     expect(state.muteTrack).toHaveBeenCalledWith("t1", true);
     state.project.textClips = texts;
+  });
+
+  it("jumps to a marker tapped on the ruler", () => {
+    (state.project.timeline as { markers?: unknown[] }).markers = [{ id: "mk", time: 3, label: "Drop", color: "#f00" }];
+    render(<PhoneTimeline onAddMedia={() => {}} onAddAudio={() => {}} onAddText={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Drop, 00:03" }));
+    expect(useTimelineStore.getState().playheadPosition).toBe(3);
+    delete (state.project.timeline as { markers?: unknown[] }).markers;
+    useTimelineStore.setState({ playheadPosition: 0, playbackState: "stopped" });
   });
 
   it("selects a clip on tap and shows trim handles", () => {

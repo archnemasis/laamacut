@@ -18,6 +18,7 @@ import {
 } from "./types";
 import { VideoEngine, getVideoEngine } from "../video/video-engine";
 import { AudioEngine, getAudioEngine } from "../audio/audio-engine";
+import { LoudnessMeter, applyGain, loudnessGain, measureBuffer } from "../audio/loudness";
 import { titleEngine } from "../text/title-engine";
 import { graphicsEngine } from "../graphics/graphics-engine";
 import { UpscalingEngine, getUpscalingEngine } from "../video/upscaling";
@@ -495,6 +496,12 @@ export class ExportEngine {
           "No audio to export",
           "rendering",
         );
+      }
+
+      if (fullSettings.loudnessTarget !== undefined) {
+        const meter = new LoudnessMeter(audioBuffer.sampleRate);
+        measureBuffer(meter, audioBuffer);
+        applyGain(audioBuffer, loudnessGain(meter.integrated(), meter.peakDb(), fullSettings.loudnessTarget));
       }
 
       yield this.createProgress("encoding", 0.5, 1, 0, 0);
@@ -1009,6 +1016,29 @@ export class ExportEngine {
 
     const chunkDuration = ExportEngine.AUDIO_EXPORT_CHUNK_DURATION_SECONDS;
 
+    // Evening out loudness needs the whole mix measured first, so render it
+    // once to listen, then again to encode with the one gain that fits.
+    let gain = 1;
+    if (audioSettings.loudnessTarget !== undefined) {
+      let meter: LoudnessMeter | null = null;
+      for (let startTime = 0; startTime < timelineDuration; startTime += chunkDuration) {
+        if (this.abortController?.signal.aborted) {
+          throw this.createError("CANCELLED", "Export cancelled by user", "encoding");
+        }
+        const chunk = await this.renderTimelineAudio(
+          project,
+          rangeStart + startTime,
+          Math.min(chunkDuration, timelineDuration - startTime),
+          audioSettings,
+        );
+        if (!chunk) continue;
+        meter ??= new LoudnessMeter(chunk.sampleRate);
+        measureBuffer(meter, chunk);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      if (meter) gain = loudnessGain(meter.integrated(), meter.peakDb(), audioSettings.loudnessTarget);
+    }
+
     for (
       let startTime = 0;
       startTime < timelineDuration;
@@ -1037,6 +1067,7 @@ export class ExportEngine {
         continue;
       }
 
+      applyGain(audioBuffer, gain);
       await backend.addAudioBuffer(audioBuffer);
 
       // Yield between chunks so the browser can reclaim the previous buffer

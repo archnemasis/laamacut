@@ -112,6 +112,37 @@ describe("keyboard editing commands", () => {
     view.unmount();
   });
 
+  it("shuttles with J, K and L", () => {
+    const view = renderHook(useKeyboardShortcuts);
+    press("l");
+    expect(useTimelineStore.getState()).toMatchObject({ playbackState: "playing", playbackRate: 1 });
+    press("l");
+    press("l");
+    expect(useTimelineStore.getState().playbackRate).toBe(4);
+    press("j");
+    expect(useTimelineStore.getState().playbackRate).toBe(2);
+    press("k");
+    expect(useTimelineStore.getState()).toMatchObject({ playbackState: "paused", playbackRate: 1 });
+    act(() => useTimelineStore.setState({ playheadPosition: 3 }));
+    press("j");
+    expect(useTimelineStore.getState().playheadPosition).toBe(2);
+    view.unmount();
+  });
+
+  it("jumps between markers", () => {
+    store.project.timeline.markers.push({ id: "m1", time: 1, label: "A", color: "#fff" }, { id: "m2", time: 4, label: "B", color: "#fff" });
+    const view = renderHook(useKeyboardShortcuts);
+    act(() => useTimelineStore.setState({ playheadPosition: 2 }));
+    press("ArrowDown", { shiftKey: true });
+    expect(useTimelineStore.getState().playheadPosition).toBe(4);
+    press("ArrowDown", { shiftKey: true });
+    expect(useTimelineStore.getState().playheadPosition).toBe(4);
+    press("ArrowUp", { shiftKey: true });
+    press("ArrowUp", { shiftKey: true });
+    expect(useTimelineStore.getState().playheadPosition).toBe(1);
+    view.unmount();
+  });
+
   it("deletes a selection sequentially in one undo group while preserving locked captions", async () => {
     let release!: (value: { success: boolean }) => void;
     vi.mocked(store.removeClip).mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));

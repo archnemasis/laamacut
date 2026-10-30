@@ -19,6 +19,7 @@ import {
 } from "@openreel/core";
 import { ExportDialog } from "./ExportDialog";
 import {
+  EVEN_LOUDNESS_LUFS,
   PhoneExportPanel,
   RESOLUTIONS,
   loadPhoneExportChoice,
@@ -226,7 +227,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
   }, [deviceProfile, project.timeline?.duration, project.settings.width, project.settings.height]);
 
   const handleExport = useCallback(
-    async (type: ExportType) => {
+    async (type: ExportType, loudnessTarget?: number) => {
       setIsExportOpen(false);
       if (!hasTimelineContent) return;
 
@@ -241,6 +242,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
             sampleRate: 48000,
             channels: 2,
             bitDepth: 24,
+            loudnessTarget,
           };
 
           await runAudioExport(audioSettings, writable);
@@ -428,6 +430,29 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
     },
     [handleCustomExport, phoneChoice, project.settings, renameProject, releaseExportedVideo, beginExport, runNativeExport, markComplete, finishExportSoon, failExport],
   );
+  /** Saves just the mix as a WAV (to Downloads on the phone). */
+  const exportPhoneSound = useCallback(async () => {
+    setPhoneSettingsOpen(false);
+    const filename = exportFilename(useProjectStore.getState().project.name, "wav");
+    try {
+      const saver = getAndroidSaver();
+      const writable = await showSavePicker(filename, "wav", saver
+        ? { onFile: async (file) => { await saveBlobOnAndroid(saver, file, filename); } }
+        : { delivery: "download" });
+      beginExport(writable);
+      await runAudioExport({
+        format: "wav",
+        sampleRate: 48000,
+        channels: 2,
+        bitDepth: 16,
+        loudnessTarget: phoneChoice.evenLoudness ? EVEN_LOUDNESS_LUFS : undefined,
+      }, writable);
+      markComplete();
+      finishExportSoon();
+    } catch (error) {
+      failExport(error);
+    }
+  }, [phoneChoice, showSavePicker, beginExport, runAudioExport, markComplete, finishExportSoon, failExport]);
   // The runner clears "complete" after a moment; the phone screen keeps it until you leave.
   useEffect(() => {
     if (phoneRun?.status !== "exporting") return;
@@ -619,6 +644,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
               setPhoneChoice(choice);
               savePhoneExportChoice(choice);
             }}
+            onExportSound={project.timeline.tracks.some((t) => trackHasAudioItems(project, t.id)) ? () => void exportPhoneSound() : undefined}
           />
         )}
         {/* Export */}
@@ -779,6 +805,7 @@ export const Toolbar: React.FC<{ phone?: boolean }> = ({ phone = false }) => {
         markedRange={loopEnd > loopStart ? { startTime: loopStart, endTime: loopEnd } : null}
         projectName={project.name}
         onRename={renameProject}
+        onExportAudio={(loudnessTarget) => void handleExport("wav", loudnessTarget)}
       />
 
       <ScreenRecorder

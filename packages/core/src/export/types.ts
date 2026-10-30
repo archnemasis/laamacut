@@ -38,6 +38,8 @@ export interface AudioExportSettings {
   bitDepth: 16 | 24 | 32;
   bitrate: number;
   channels: 1 | 2;
+  /** Evens the whole mix out to this loudness in LUFS (e.g. -14), peaks kept under -1 dBFS. */
+  loudnessTarget?: number;
 }
 
 export interface ImageExportSettings {

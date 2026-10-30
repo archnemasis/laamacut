@@ -29,6 +29,7 @@ import { attachUnsavedGuard, markQuitting } from "./lifecycle";
 import { initAutoUpdater } from "./updater";
 import { initCrashReporter, reportError } from "./crash-reporter";
 import { migrateGpuCacheOnUpgrade } from "./gpu-cache-migration";
+import { loadWindowState, trackWindowState } from "./window-state";
 import {
   fileWriters,
   showSaveDialog,
@@ -104,9 +105,9 @@ function rendererRoot(): string {
 
 function createWindow(): void {
   const isMac = process.platform === "darwin";
+  const saved = loadWindowState();
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    ...(saved?.bounds ?? { width: 1440, height: 900 }),
     minWidth: 1024,
     minHeight: 700,
     show: false,
@@ -125,11 +126,14 @@ function createWindow(): void {
       webSecurity: true,
     },
   });
-  // The editor opens maximized. When launched from a shortcut, Windows applies
-  // the launcher's "normal window" style just after the first show and undoes
-  // the maximize, so re-assert it if that happens during startup.
+  trackWindowState(win);
+  // The editor opens maximized unless it was last closed smaller. When launched
+  // from a shortcut, Windows applies the launcher's "normal window" style just
+  // after the first show and undoes the maximize, so re-assert it if that
+  // happens during startup.
   win.once("ready-to-show", () => {
     win.show();
+    if (saved && !saved.maximized) return;
     const startBounds = win.getBounds();
     win.maximize();
     // The state lags the resize event, so check again a moment later. Only undo

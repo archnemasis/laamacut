@@ -4,139 +4,46 @@ import type {
   ScriptableTemplate,
 } from "@openreel/core";
 
-import { OPENREEL_CLOUD_URL } from "../config/api-endpoints";
-
-const CLOUD_API_URL = OPENREEL_CLOUD_URL;
-
 export interface CloudTemplate extends TemplateSummary {
   author?: string;
 }
 
+/**
+ * Laamacut keeps templates on this device. The upstream editor listed and
+ * uploaded them through its own server; this keeps the same shape for callers
+ * but never connects anywhere, so nothing from a project leaves the device.
+ */
 export class TemplateCloudService {
-  private apiUrl: string;
-
-  constructor(apiUrl: string = CLOUD_API_URL) {
-    this.apiUrl = apiUrl;
-  }
-
   async listTemplates(): Promise<CloudTemplate[]> {
-    try {
-      const response = await fetch(`${this.apiUrl}/templates`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      return data.templates || [];
-    } catch (error) {
-      console.error("Failed to list templates from cloud:", error);
-      return [];
-    }
+    return [];
   }
 
-  async getTemplate(id: string): Promise<Template | null> {
-    try {
-      const response = await fetch(`${this.apiUrl}/templates/${id}`);
-      if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error(`Failed to get template ${id} from cloud:`, error);
-      return null;
-    }
+  async getTemplate(_id: string): Promise<Template | null> {
+    return null;
   }
 
   async uploadTemplate(
-    template: Template,
+    _template: Template,
   ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const response = await fetch(`${this.apiUrl}/templates`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(template),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return { success: false, error: data.error || "Upload failed" };
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error("Failed to upload template to cloud:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Upload failed",
-      };
-    }
+    return { success: false, error: "Templates are saved on this device only" };
   }
 
   async deleteTemplate(
-    id: string,
+    _id: string,
   ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const response = await fetch(`${this.apiUrl}/templates/${id}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return { success: false, error: data.error || "Delete failed" };
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error(`Failed to delete template ${id} from cloud:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Delete failed",
-      };
-    }
+    return { success: false, error: "Templates are saved on this device only" };
   }
 
   async checkHealth(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.apiUrl}/health`);
-      return response.ok;
-    } catch {
-      return false;
-    }
+    return false;
   }
 
   async listScriptableTemplates(): Promise<ScriptableTemplate[]> {
-    try {
-      const response = await fetch(`${this.apiUrl}/templates/scriptable`);
-      if (!response.ok) {
-        return [];
-      }
-      const data = await response.json();
-      return data.templates || [];
-    } catch (error) {
-      console.error("Failed to list scriptable templates from cloud:", error);
-      return [];
-    }
+    return [];
   }
 
-  async getScriptableTemplate(id: string): Promise<ScriptableTemplate | null> {
-    try {
-      const response = await fetch(`${this.apiUrl}/templates/scriptable/${id}`);
-      if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error(
-        `Failed to get scriptable template ${id} from cloud:`,
-        error,
-      );
-      return null;
-    }
+  async getScriptableTemplate(_id: string): Promise<ScriptableTemplate | null> {
+    return null;
   }
 }
 

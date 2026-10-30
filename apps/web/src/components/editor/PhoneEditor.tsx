@@ -23,6 +23,7 @@ import {
   Pencil,
   Play,
   Proportions,
+  Bookmark,
   Redo2,
   Scissors,
   Shuffle,
@@ -423,6 +424,15 @@ export const PhoneEditor: React.FC = () => {
     setMenu(null);
   };
 
+  /** Adds a marker at the playhead, or takes away the one already there. */
+  const toggleMarker = () => {
+    const store = useProjectStore.getState();
+    const time = useTimelineStore.getState().playheadPosition;
+    const existing = store.project.timeline.markers.find((marker) => Math.abs(marker.time - time) < 0.05);
+    if (existing) void store.removeMarker(existing.id);
+    else store.addMarker(time, `Marker ${store.project.timeline.markers.length + 1}`, "#3b82f6");
+  };
+
   const mainTools: Tool[] = [
     { label: "Edit", icon: EditIcon, onClick: () => openForMainClip(undefined, "Edit") },
     { label: "Audio", icon: Music, onClick: () => setMenu("audio") },
@@ -435,6 +445,7 @@ export const PhoneEditor: React.FC = () => {
     { label: "Aspect ratio", icon: Proportions, onClick: () => open({ kind: "ratio", title: "Aspect ratio" }) },
     { label: "Background", icon: PaintBucket, onClick: () => open({ kind: "background", title: "Background" }) },
     { label: "Templates", icon: LayoutTemplate, onClick: () => open({ kind: "assets", tab: "templates", title: "Templates" }) },
+    { label: "Marker", icon: Bookmark, onClick: toggleMarker },
   ];
 
   const menuTools: Record<Menu, Tool[]> = {

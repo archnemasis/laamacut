@@ -11,9 +11,12 @@ import { useResizable } from "../editor/useResizable";
 import { useProjectStore } from "../../stores/project-store";
 import { AudioMixer } from "../../components/audio-mixer";
 import { useDesktopPage, type DesktopPage } from "../shell/desktop-page";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
+import { KeyboardShortcutsOverlay } from "../../components/editor/KeyboardShortcutsOverlay";
 import {
   AudioLines,
   Clapperboard,
+  Keyboard,
   LayoutTemplate,
   Shapes,
   Shuffle,
@@ -159,6 +162,7 @@ export function EditPage(): JSX.Element {
   const [mediaPanel, setMediaPanel] = useState<AssetsTab | null>("media");
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [mixerOpen, setMixerOpen] = useState(false);
+  const { showShortcutsOverlay, setShowShortcutsOverlay } = useKeyboardShortcuts();
   useEffect(() => {
     const layout = PAGE_LAYOUTS[page];
     setMediaPanel(layout.media);
@@ -230,6 +234,12 @@ export function EditPage(): JSX.Element {
           active={inspectorOpen}
           onClick={() => setInspectorOpen(!inspectorOpen)}
         />
+        <ToolbarToggle
+          label="Shortcuts"
+          icon={Keyboard}
+          active={showShortcutsOverlay}
+          onClick={() => setShowShortcutsOverlay(!showShortcutsOverlay)}
+        />
       </div>
       <div
         className="grid min-h-0 w-full flex-1 gap-px overflow-hidden bg-border"
@@ -273,6 +283,7 @@ export function EditPage(): JSX.Element {
           </DockRegion>
         )}
       </div>
+      <KeyboardShortcutsOverlay isOpen={showShortcutsOverlay} onClose={() => setShowShortcutsOverlay(false)} />
     </div>
   );
 }

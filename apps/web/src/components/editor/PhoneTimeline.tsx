@@ -637,6 +637,23 @@ export function PhoneTimeline({
                 />
               );
             })}
+            {(project.timeline.markers ?? []).map((marker) => (
+              <button
+                key={marker.id}
+                type="button"
+                aria-label={`${marker.label}, ${formatPhoneTime(marker.time)}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const timeline = useTimelineStore.getState();
+                  timeline.pause();
+                  timeline.seekTo(marker.time);
+                }}
+                className="absolute top-0 grid h-7 w-6 -translate-x-1/2 place-items-start justify-center"
+                style={{ left: half + marker.time * pps }}
+              >
+                <span className="h-3 w-2.5 [clip-path:polygon(0_0,100%_0,100%_70%,50%_100%,0_70%)]" style={{ background: marker.color ?? "#3b82f6" }} />
+              </button>
+            ))}
           </div>
 
           <div className="relative space-y-2 pt-3 pb-6" style={{ paddingLeft: half }}>

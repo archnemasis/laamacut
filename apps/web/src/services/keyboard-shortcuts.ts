@@ -283,6 +283,56 @@ const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
     enabled: true,
   },
   {
+    id: "playback.shuttleBack",
+    name: "Shuttle Back",
+    description: "Slow down playback, or step back a second when paused",
+    category: "playback",
+    defaultKey: "j",
+    currentKey: "j",
+    action: "playback.shuttleBack",
+    enabled: true,
+  },
+  {
+    id: "playback.shuttleStop",
+    name: "Shuttle Stop",
+    description: "Pause at normal speed",
+    category: "playback",
+    defaultKey: "k",
+    currentKey: "k",
+    action: "playback.shuttleStop",
+    enabled: true,
+  },
+  {
+    id: "playback.shuttleForward",
+    name: "Shuttle Forward",
+    description: "Play, then faster with each press",
+    category: "playback",
+    defaultKey: "l",
+    currentKey: "l",
+    action: "playback.shuttleForward",
+    enabled: true,
+  },
+  {
+    id: "playback.prevMarker",
+    name: "Previous Marker",
+    description: "Jump to the previous marker",
+    category: "playback",
+    defaultKey: "shift+arrowup",
+    currentKey: "shift+arrowup",
+    action: "playback.prevMarker",
+    enabled: true,
+  },
+  {
+    id: "playback.nextMarker",
+    name: "Next Marker",
+    description: "Jump to the next marker",
+    category: "playback",
+    defaultKey: "shift+arrowdown",
+    currentKey: "shift+arrowdown",
+    action: "playback.nextMarker",
+    enabled: true,
+  },
+  {
     id: "editing.undo",
     name: "Undo",
     description: "Undo last action",
@@ -637,7 +687,7 @@ class KeyboardShortcutsManager {
       e.stopPropagation();
       // Holding a key may scrub/zoom continuously, but must not repeat edits,
       // toggle playback, add markers, or open dialogs repeatedly.
-      if (e.repeat && !/^(playback\.(frame|second|jump5|prevClip|nextClip)|timeline\.zoom)/.test(matchedShortcut.action)) return;
+      if (e.repeat && !/^(playback\.(frame|second|jump5|prevClip|nextClip|shuttleBack|prevMarker|nextMarker)|timeline\.zoom)/.test(matchedShortcut.action)) return;
       this.executeAction(matchedShortcut.action, e);
     }
   };
